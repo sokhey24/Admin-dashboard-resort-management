@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Card, Statistic, Table, Spin } from "antd";
-import { MdRestaurant, MdAccessTime, MdAttachMoney } from "react-icons/md";
+import { Spin } from "antd";
+import { MdRestaurantMenu, MdAttachMoney, MdTableRestaurant, MdStar } from "react-icons/md";
 import { request } from "../../util/request";
+import { useDarkMode } from "../../util/DarkModeContext";
+import Chart_data_resort from "../Chart_Data/Chart_data_resort";
+import ChartCircle from "../Chart_Data/Chart_cirlce";
 
-const topItemColumns = [
-  { title: "#",         dataIndex: "order_items_count", width: 50 },
-  { title: "Menu Item", dataIndex: "name" },
-  { title: "Price",     dataIndex: "price", render: (v) => `$${v}` },
-];
+function StatCard({ title, value, icon, color, dark }) {
+  return (
+    <div className={`rounded-xl border p-4 ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200 shadow-sm"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-xs font-medium uppercase tracking-wide ${dark ? "text-gray-400" : "text-gray-500"}`}>{title}</span>
+        <span className="text-xl" style={{ color }}>{icon}</span>
+      </div>
+      <div className="text-2xl font-bold" style={{ color }}>{value}</div>
+    </div>
+  );
+}
 
 export default function RestaurantDashboard() {
+  const dark = useDarkMode();
   const [data,    setData]    = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -21,29 +31,34 @@ export default function RestaurantDashboard() {
   }, []);
 
   const stats = [
-    { title: "Orders Today",       value: data.orders_today       ?? 0, icon: <MdRestaurant />,  color: "#1677ff" },
-    { title: "Pending Orders",     value: data.pending_orders     ?? 0, icon: <MdAccessTime />,  color: "#faad14" },
-    { title: "Tables Available",   value: data.tables_available   ?? 0, icon: <MdRestaurant />,  color: "#52c41a" },
-    { title: "Tables Occupied",    value: data.tables_occupied    ?? 0, icon: <MdRestaurant />,  color: "#ff4d4f" },
-    { title: "Reservations Today", value: data.reservations_today ?? 0, icon: <MdAccessTime />,  color: "#722ed1" },
-    { title: "Revenue Today",      value: data.revenue_today      ?? 0, icon: <MdAttachMoney />, color: "#52c41a", precision: 2 },
+    { title: "Total Menu Items",   value: data.total_menu      ?? 0, icon: <MdRestaurantMenu />, color: "#1677ff" },
+    { title: "Orders Today",       value: data.orders_today    ?? 0, icon: <MdRestaurantMenu />, color: "#52c41a" },
+    { title: "Tables Reserved",    value: data.tables_reserved ?? 0, icon: <MdTableRestaurant />, color: "#faad14" },
+    { title: "Revenue Today",      value: `$${data.revenue_today ?? 0}`, icon: <MdAttachMoney />, color: "#722ed1" },
+    { title: "Pending Orders",     value: data.pending_orders  ?? 0, icon: <MdRestaurantMenu />, color: "#ff4d4f" },
+    { title: "Completed Orders",   value: data.completed_orders ?? 0, icon: <MdRestaurantMenu />, color: "#13c2c2" },
+    { title: "Average Rating",     value: data.average_rating  ?? 0, icon: <MdStar />,           color: "#faad14" },
+    { title: "Total Revenue",      value: `$${data.total_revenue ?? 0}`, icon: <MdAttachMoney />, color: "#52c41a" },
   ];
 
   return (
     <Spin spinning={loading}>
-      <h2 className="text-xl font-bold mb-5">Restaurant Dashboard</h2>
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        {stats.map((s) => (
-          <Card key={s.title}>
-            <Statistic title={s.title} value={s.value} prefix={s.icon} valueStyle={{ color: s.color }} precision={s.precision} />
-          </Card>
-        ))}
+      <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-gray-100"}`}>
+        <h2 className={`text-xl font-bold mb-5 ${dark ? "text-gray-100" : "text-gray-800"}`}>Restaurant Dashboard</h2>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          {stats.map((s) => (
+            <StatCard key={s.title} title={s.title} value={s.value} icon={s.icon} color={s.color} dark={dark} />
+          ))}
+        </div>
+
+        <div className={`rounded-xl border p-5 ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200 shadow-sm"}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Chart_data_resort />
+            <ChartCircle />
+          </div>
+        </div>
       </div>
-      {data.top_menu_items?.length > 0 && (
-        <Card title="Top Menu Items">
-          <Table columns={topItemColumns} dataSource={data.top_menu_items} rowKey="id" pagination={false} size="small" />
-        </Card>
-      )}
     </Spin>
   );
 }

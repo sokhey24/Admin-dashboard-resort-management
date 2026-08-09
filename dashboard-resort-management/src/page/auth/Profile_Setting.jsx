@@ -57,7 +57,7 @@ export default function Profile_Setting() {
       const res = await request('auth/change-password', 'post', {
         current_password:      values.current_password,
         password:              values.password,
-        password_confirmation: values.password_confirmatiABon,
+        password_confirmation: values.password_confirmation,
       });
       if (res?.message && !res?.errors) {
         message.success(res.message);

@@ -274,7 +274,7 @@ export default function CustomerManagement() {
           <table className={`min-w-full divide-y ${divider}`}>
             <thead className={thead}>
               <tr>
-                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-12 ${thText}`}>#</th>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-12 ${thText}`}>No.</th>
                 <HeadCell col="name"       label="Name"          className="w-1/4" />
                 <HeadCell col="status"     label="Status" />
                 <HeadCell col="role"       label="Role" />

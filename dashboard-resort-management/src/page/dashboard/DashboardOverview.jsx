@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Tabs, Spin, Modal, Form, Select, message } from "antd";
+import { Row, Col } from "antd";
 import {
   CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined,
   UserOutlined, TeamOutlined, DollarOutlined, DownloadOutlined, BarChartOutlined,
@@ -11,6 +12,7 @@ import {
 import { useDarkMode } from "../../util/DarkModeContext";
 import { request } from "../../util/request";
 import ActionButtons from "../../components/ActionButtons";
+import ChartDataDashboard from "../Chart_Data/ChartDataDashboard";
 
 const { Option } = Select;
 
@@ -350,10 +352,15 @@ function RevenueTab({ dark }) {
         <StatCard title="Total Customer"  value={280}                          icon={<TeamOutlined />}    color="#fa8c16" dark={dark} />
         <StatCard title="Total Check-in"  value={142}                          icon={<CalendarOutlined />} color="#1677ff" dark={dark} />
         <StatCard title="Total Check-out" value={138}                          icon={<CalendarOutlined />} color="#722ed1" dark={dark} />
+        <StatCard title="Total Customer"  value={280}                          icon={<TeamOutlined />}    color="#fa8c16" dark={dark} />
+        <StatCard title="Total Check-in"  value={142}                          icon={<CalendarOutlined />} color="#1677ff" dark={dark} />
+        <StatCard title="Total Check-out" value={138}                          icon={<CalendarOutlined />} color="#722ed1" dark={dark} />
+        <StatCard title="Total Check-out" value={138}                          icon={<CalendarOutlined />} color="#722ed1" dark={dark} />
         <StatCard title="Total Revenue"   value={`$${totalRev.toLocaleString()}`} icon={<DollarOutlined />}  color="#52c41a" dark={dark} />
       </div>
 
       {/* Bar chart */}
+      <div>
       <Card title="Revenue by Category" dark={dark} className="mb-4">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data}>
@@ -381,6 +388,9 @@ function RevenueTab({ dark }) {
           </LineChart>
         </ResponsiveContainer>
       </Card>
+            <ChartDataDashboard/>
+      
+      </div>
 
       {/* Revenue table */}
       <Card title={`${period === "day" ? "Day" : period === "monthly" ? "Month" : "Year"} Revenue Breakdown`} dark={dark}>

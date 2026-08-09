@@ -2,17 +2,16 @@ import { useEffect, useState } from "react";
 import { Layout, Menu, Dropdown, Badge, Button, Tooltip, Modal, ConfigProvider, theme as antTheme } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
-  MdDashboard, MdCalendarMonth, MdPeople, MdBarChart,
+  MdDashboard, MdCalendarMonth, MdPeople,
   MdRestaurantMenu, MdAccountBalance, MdSettings, MdLogout,
   MdKeyboardArrowDown, MdWarningAmber, MdNotifications,
-  MdLightMode, MdDarkMode, MdPerson, MdOutlineBedroomParent,
+  MdLightMode, MdDarkMode, MdPerson, MdOutlineBedroomParent, MdBarChart
 } from "react-icons/md";
 import { ProfileStore } from "../../store/ProfileStore";
 import logoResort from "../../assets/image/LogoResort.jpg";
 import useRole, { ROLES } from "../../util/useRole";
 import config from "../../util/config";
 import { DarkModeContext } from "../../util/DarkModeContext";
-import "../../App.css";
 
 const { Sider, Content } = Layout;
 
@@ -34,34 +33,36 @@ const adminMenu = [
   ]),
   item("Resort Management", "resort", <MdAccountBalance size={18} />, [
     item("Resort Dashboard", "/resort/dashboard"),
-    item("Branch",      "/resort/branch"),
-    item("Check-in Today",  "/booking/checkin"),
-    item("Check-out Today", "/booking/checkout"),
-    item("Pending Booking", "/booking/pending"),
-    item("Facilities",  "/resort/facilities"),
-    item("Gallery",     "/resort/gallery"),
+    item("Resort Info",  "/resort/info"),
+    item("Branch",       "/resort/branch"),
+    item("Facilities",   "/resort/facilities"),
+    item("Gallery",      "/resort/gallery"),
   ]),
   item("Restaurant Management", "restaurant", <MdRestaurantMenu size={18} />, [
+    item("Restaurant Dashboard", "/restaurant/dashboard"),
     item("Menu",              "/restaurant/menu"),
     item("Food Category",     "/restaurant/category"),
     item("Table Reservation", "/restaurant/table"),
     item("Food Order",        "/restaurant/order"),
     item("Billing",           "/restaurant/billing"),
   ]),
-  item("Customer Management", "/customer", <MdPeople size={18} />),
-  item("Setting Management", "settings", <MdSettings size={18} />, [
-    item("General Settings",      "/settings/general"),
-    item("Payment Settings",      "/settings/payment"),
+  item("User Management", "user_management", <MdPeople size={18} />, [
+    item("Employees Management", "/user_management/employees"),
+    item("User Management",      "/user_management/users_management"),
+    item("Role Management",      "/user_management/role"),
+    item("Permission Management","/user_management/permission"),
+  ]),
+   item("Setting Management", "settings", <MdSettings size={18} />, [
+    item("General Settings",      "/settings/general_settings"),
     item("Notification Settings", "/settings/notification"),
-    item("Role Permissions",      "/settings/roles"),
-    item("User Management",       "/settings/users"),
+    
   ]),
 ];
 
 const resortMenu = [
   item("Resort Dashboard", "/resort/dashboard", <MdDashboard size={18} />),
   item("Room Management", "room", <MdOutlineBedroomParent size={18} />, [
-    item("Villa Room",     "/room/villa"),
+    item("Room Types",     "/room/room"),
     item("Room Status",    "/room/status"),
     item("Occupancy Rate", "/room/occupancy"),
   ]),
@@ -70,7 +71,6 @@ const resortMenu = [
     item("Check-out Today", "/booking/checkout"),
     item("Pending Booking", "/booking/pending"),
   ]),
-  item("Revenue Analytics", "/revenue", <MdBarChart size={18} />),
   item("Resort Info", "resort", <MdAccountBalance size={18} />, [
     item("Resort Info", "/resort/info"),
     item("Branch",      "/resort/branch"),
