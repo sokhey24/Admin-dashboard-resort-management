@@ -15,13 +15,14 @@ const columns = [
   )},
 ];
 
+
 const data = [
-  { key: 1, name: "Starter",     icon: "🥗", items: 8,  status: "Active" },
-  { key: 2, name: "Main Course", icon: "🍽️", items: 15, status: "Active" },
-  { key: 3, name: "Dessert",     icon: "🍰", items: 6,  status: "Active" },
-  { key: 4, name: "Beverage",    icon: "🥤", items: 12, status: "Active" },
-  { key: 5, name: "Seafood",     icon: "🦞", items: 9,  status: "Active" },
-  { key: 6, name: "Vegetarian",  icon: "🥦", items: 7,  status: "Inactive" },
+  { key: 1, name: "Starter",     image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 8,  status: "Active" },
+  { key: 2, name: "Main Course", image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 15, status: "Active" },
+  { key: 3, name: "Dessert",     image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 6,  status: "Active" },
+  { key: 4, name: "Beverage",    image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 12, status: "Active" },
+  { key: 5, name: "Seafood",     image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 9,  status: "Active" },
+  { key: 6, name: "Vegetarian",  image: "https://i.pinimg.com/1200x/fe/65/fd/fe65fd37f7e8627b8d1f7951e7f3c8d1.jpg", items: 7,  status: "Inactive" },
 ];
 
 export default function FoodCategory() {

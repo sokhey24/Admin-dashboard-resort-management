@@ -102,7 +102,7 @@ export default function RegisterPage() {
           </div>
 
           {/* Google Button */}
-          <button
+          {/* <button
             type="button"
             onClick={() => googleRegister()}
             className="w-full flex items-center justify-center gap-3 h-11 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200 text-gray-700 font-medium text-sm cursor-pointer"
@@ -114,9 +114,9 @@ export default function RegisterPage() {
               <path fill="#34A853" d="M24 47c5.5 0 10.12-1.82 13.5-4.94l-7.18-5.58c-1.82 1.22-4.15 1.94-6.32 1.94-6.26 0-11.57-4.11-13.28-9.72l-8.16 6.48C7.07 41.52 14.82 47 24 47z"/>
             </svg>
             Continue with Google
-          </button>
+          </button> */}
 
-          <Divider className="!my-4 !text-gray-400 !text-xs">or register with email</Divider>
+          {/* <Divider className="!my-4 !text-gray-400 !text-xs">or register with email</Divider> */}
 
           <Form form={form} onFinish={onFinish} layout="vertical" requiredMark={false}>
 
