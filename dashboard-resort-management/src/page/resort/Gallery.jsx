@@ -36,31 +36,31 @@ export default function Gallery() {
 
   const handleDelete = (id) => setList(prev => prev.filter(img => img.id !== id));
 
-  const bg         = dark ? "bg-gray-900"                 : "bg-gray-100";
-  const titleCls   = dark ? "text-gray-100"               : "text-gray-900";
-  const subText    = dark ? "text-gray-400"               : "text-gray-500";
-  const cardCls    = dark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
+  const bg         = dark ? "bg-gray-900"                 : "bg-[#F5F8FC]";
+  const titleCls   = dark ? "text-gray-100"               : "text-[#102A43]";
+  const subText    = dark ? "text-gray-400"               : "text-[#829AB1]";
+  const cardCls    = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
   const nameCls    = dark ? "text-gray-100"               : "text-stone-950";
   const descCls    = dark ? "text-gray-400"               : "text-stone-600";
   const priceCls   = dark ? "text-gray-100"               : "text-stone-950";
-  const perCls     = dark ? "text-gray-500"               : "text-stone-500";
+  const perCls     = dark ? "text-[#829AB1]"               : "text-stone-500";
   const dividerCls = dark ? "border-gray-700"             : "border-stone-100";
   const searchCls  = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2744]/30 w-48";
+    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
+    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48";
   const pageBtn    = dark
-    ? "px-3 py-1.5 rounded-lg border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700";
+    ? "px-3 py-1.5 rounded-[10px] border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
+    : "px-3 py-1.5 rounded-[10px] border border-[#D9E2EC] text-xs font-medium hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed text-[#486581]";
   const pageNumCls = (isActive) => isActive
-    ? "w-8 h-8 rounded-lg text-xs font-medium bg-[#0f2744] text-white"
-    : `w-8 h-8 rounded-lg text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`;
+    ? "w-8 h-8 rounded-[10px] text-xs font-medium bg-[#FF6B00] text-white"
+    : `w-8 h-8 rounded-[10px] text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${bg}`}>
+    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${bg}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h2 className={`text-xl font-bold ${titleCls}`}>Gallery</h2>
+        <h2 className={`text-[26px] font-bold ${titleCls}`}>Gallery</h2>
         <div className="flex items-center gap-2">
           <div className="relative">
             <MdSearch className={`absolute left-3 top-1/2 -translate-y-1/2 text-lg ${dark ? "text-gray-400" : "text-gray-400"}`} />
@@ -72,8 +72,8 @@ export default function Gallery() {
             />
           </div>
           <Button
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] transition-colors">
-            <MdAdd size={16} /> Upload Photo
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[10px] bg-[#FF6B00] text-white hover:bg-[#e05e00] transition-colors">
+            <MdAdd size={14} /> Upload Photo
           </Button>
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function Gallery() {
         <div className={`mt-6 flex items-center justify-between text-sm ${subText}`}>
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</button>
+            <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
               .reduce((acc, p, i, arr) => {
@@ -138,9 +138,9 @@ export default function Gallery() {
               .map((p, i) => p === "…" ? (
                 <span key={`e-${i}`} className="px-2">…</span>
               ) : (
-                <button key={p} onClick={() => setPage(p)} className={pageNumCls(page === p)}>{p}</button>
+                <Button key={p} onClick={() => setPage(p)} className={pageNumCls(page === p)}>{p}</Button>
               ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</button>
+            <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</Button>
           </div>
         </div>
       )}

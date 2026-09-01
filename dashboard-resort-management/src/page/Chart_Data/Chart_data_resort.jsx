@@ -1,47 +1,189 @@
-import { Bar, BarChart, Tooltip, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
-import { useDarkMode } from '../../util/DarkModeContext';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { useDarkMode } from "../../util/DarkModeContext";
 
 const data = [
-  { name: 'Jan', uv: 400,  pv: 2400 },
-  { name: 'Feb', uv: 300,  pv: 4567 },
-  { name: 'Mar', uv: 300,  pv: 1398 },
-  { name: 'Apr', uv: 200,  pv: 9800 },
-  { name: 'May', uv: 278,  pv: 3908 },
-  { name: 'Jun', uv: 189,  pv: 4800 },
+  { month: "Jan", revenue: 18500 },
+  { month: "Feb", revenue: 22400 },
+  { month: "Mar", revenue: 25800 },
+  { month: "Apr", revenue: 23100 },
+  { month: "May", revenue: 29500 },
+  { month: "Jun", revenue: 32800 },
+  { month: "Jul", revenue: 35600 },
+  { month: "Aug", revenue: 38200 },
+  { month: "Sep", revenue: 33400 },
+  { month: "Oct", revenue: 36800 },
+  { month: "Nov", revenue: 40500 },
+  { month: "Dec", revenue: 46800 },
 ];
 
-function CustomTooltip({ payload, label, active, dark }) {
-  if (!active || !payload || !payload.length) return null;
+const formatCurrency = (value) => {
+  return `$${Number(value).toLocaleString()}`;
+};
+
+function CustomTooltip({ active, payload, label, dark }) {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
+  const revenue = payload[0]?.value ?? 0;
+
   return (
-    <div className={`rounded-lg px-4 py-3 shadow-md border ${dark ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-white border-red-300 text-gray-800'}`}>
-      <p className="font-bold mb-1">{`${label} : ${payload[0].value}`}</p>
-      <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>UV value for {label}</p>
-      <p className={`text-xs border-t border-dashed mt-1 pt-1 ${dark ? 'border-gray-600 text-gray-500' : 'border-gray-200 text-gray-400'}`}>
-        Anything you want can be displayed here.
+    <div
+      className={`min-w-[200px] rounded-xl border px-4 py-3 shadow-xl ${
+        dark
+          ? "border-gray-700 bg-gray-900 text-gray-100"
+          : "border-[#D9E2EC] bg-white text-[#102A43]"
+      }`}
+    >
+      <p
+        className={`mb-3 text-sm font-semibold ${
+          dark ? "text-gray-100" : "text-[#102A43]"
+        }`}
+      >
+        {label} Revenue
       </p>
+
+      <div className="flex items-center justify-between gap-6">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+
+          <span
+            className={`text-sm ${
+              dark ? "text-gray-300" : "text-[#486581]"
+            }`}
+          >
+            Resort Revenue
+          </span>
+        </div>
+
+        <span
+          className={`text-sm font-semibold ${
+            dark ? "text-gray-100" : "text-[#102A43]"
+          }`}
+        >
+          {formatCurrency(revenue)}
+        </span>
+      </div>
     </div>
   );
 }
 
 export default function Chart_data_resort() {
   const dark = useDarkMode();
-  const axisColor = dark ? '#6b7280' : '#9ca3af';
-  const gridColor = dark ? '#374151' : '#e5e7eb';
+
+  const axisColor = dark ? "#9ca3af" : "#6b7280";
+  const gridColor = dark ? "#374151" : "#e5e7eb";
 
   return (
-    <div className={`w-full rounded-xl shadow p-5 transition-colors duration-200 ${dark ? 'bg-gray-800' : 'bg-white'}`}>
-      <h2 className={`text-base font-semibold mb-4 ${dark ? 'text-gray-200' : 'text-gray-700'}`}>Resort Chart Data</h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <XAxis dataKey="name" tick={{ fill: axisColor, fontSize: 12 }} />
-          <YAxis tick={{ fill: axisColor, fontSize: 12 }} />
-          <Tooltip content={<CustomTooltip dark={dark} />} />
-          <Legend wrapperStyle={{ color: dark ? '#d1d5db' : '#374151', fontSize: 12 }} />
-          <Bar dataKey="uv" name="UV" fill="#8884d8" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="pv" name="PV" fill="#82ca9d" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <div
+      className={`w-full rounded-xl border p-5 shadow-sm transition-colors duration-200 ${
+        dark
+          ? "border-gray-700 bg-gray-800"
+          : "border-[#D9E2EC] bg-white"
+      }`}
+    >
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2
+            className={`text-lg font-semibold ${
+              dark ? "text-gray-100" : "text-[#102A43]"
+            }`}
+          >
+            Revenue Analysis
+          </h2>
+
+          <p
+            className={`mt-1 text-sm ${
+              dark ? "text-gray-400" : "text-[#829AB1]"
+            }`}
+          >
+            Monthly revenue generated from resort bookings
+          </p>
+        </div>
+
+        {/* Summary */}
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+
+          <span
+            className={`text-sm ${
+              dark ? "text-gray-300" : "text-[#486581]"
+            }`}
+          >
+            Resort Revenue
+          </span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="h-[350px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{
+              top: 10,
+              right: 10,
+              left: 10,
+              bottom: 5,
+            }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke={gridColor}
+            />
+
+            <XAxis
+              dataKey="month"
+              axisLine={false}
+              tickLine={false}
+              tick={{
+                fill: axisColor,
+                fontSize: 12,
+              }}
+              dy={8}
+            />
+
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{
+                fill: axisColor,
+                fontSize: 12,
+              }}
+              width={65}
+              tickFormatter={(value) => `$${value / 1000}k`}
+            />
+
+            <Tooltip
+              content={<CustomTooltip dark={dark} />}
+              cursor={{
+                fill: dark
+                  ? "rgba(255,255,255,0.04)"
+                  : "rgba(0,0,0,0.03)",
+              }}
+            />
+
+            <Bar
+              dataKey="revenue"
+              name="Resort Revenue"
+              fill="#3b82f6"
+              radius={[5, 5, 0, 0]}
+              maxBarsize={14}
+              animationDuration={1000}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

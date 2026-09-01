@@ -21,13 +21,13 @@ export default function AuthNavbar() {
       <div className="flex items-center gap-2">
         <Link to="/login">
           <div className={`px-5 py-[7px] rounded-lg font-semibold text-sm border border-white/40 transition-all duration-200
-            ${isLogin ? "bg-white text-[#0f2744]" : "bg-transparent text-white"}`}>
+            ${isLogin ? "bg-white text-[#102A43]" : "bg-transparent text-white"}`}>
             Sign In
           </div>
         </Link>
         <Link to="/register">
           <div className={`px-5 py-[7px] rounded-lg font-semibold text-sm border border-white/40 transition-all duration-200
-            ${!isLogin ? "bg-white text-[#0f2744]" : "bg-transparent text-white"}`}>
+            ${!isLogin ? "bg-white text-[#102A43]" : "bg-transparent text-white"}`}>
             Register
           </div>
         </Link>

@@ -36,10 +36,10 @@ function BadgeWithDot({ active, dark }) {
 }
 
 function SortIcon({ column, sortCol, sortDir, dark }) {
-  if (sortCol !== column) return <MdUnfoldMore className={`text-base ${dark ? "text-gray-500" : "text-gray-400"}`} />;
+  if (sortCol !== column) return <MdUnfoldMore className={`text-base ${dark ? "text-[#829AB1]" : "text-gray-400"}`} />;
   return sortDir === "asc"
-    ? <MdKeyboardArrowUp className={`text-base ${dark ? "text-gray-200" : "text-gray-700"}`} />
-    : <MdKeyboardArrowDown className={`text-base ${dark ? "text-gray-200" : "text-gray-700"}`} />;
+    ? <MdKeyboardArrowUp className={`text-base ${dark ? "text-gray-200" : "text-[#486581]"}`} />
+    : <MdKeyboardArrowDown className={`text-base ${dark ? "text-gray-200" : "text-[#486581]"}`} />;
 }
 
 export default function Facilities() {
@@ -69,26 +69,26 @@ export default function Facilities() {
   const pageItems  = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2744]/30 w-48";
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-gray-200";
-  const cardHdr   = dark ? "border-gray-700"               : "border-gray-200";
-  const titleCls  = dark ? "text-gray-100"                 : "text-gray-900";
-  const subText   = dark ? "text-gray-400"                 : "text-gray-500";
-  const thead     = dark ? "bg-gray-700/60"                : "bg-gray-50";
-  const thText    = dark ? "text-gray-400"                 : "text-gray-500";
-  const thHover   = dark ? "hover:bg-gray-700"             : "hover:bg-gray-100";
+    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
+    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48";
+  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
+  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
+  const titleCls  = dark ? "text-gray-100"                 : "text-[#102A43]";
+  const subText   = dark ? "text-gray-400"                 : "text-[#829AB1]";
+  const thead     = dark ? "bg-gray-700/60"                : "bg-[#F5F8FC]";
+  const thText    = dark ? "text-gray-400"                 : "text-[#829AB1]";
+  const thHover   = dark ? "hover:bg-gray-700"             : "hover:bg-[#F5F8FC]";
   const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-gray-100";
-  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-gray-50";
-  const cellText  = dark ? "text-gray-300"                 : "text-gray-600";
-  const cellMuted = dark ? "text-gray-500"                 : "text-gray-500";
+  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-[#F5F8FC]";
+  const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
+  const cellMuted = dark ? "text-[#829AB1]"                 : "text-[#829AB1]";
   const divider   = dark ? "divide-gray-700"               : "divide-gray-200";
   const pageBtn   = dark
-    ? "px-3 py-1.5 rounded-lg border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed";
+    ? "px-3 py-1.5 rounded-[10px] border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
+    : "px-3 py-1.5 rounded-[10px] border border-[#D9E2EC] text-xs font-medium hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
   const pageNum   = (isActive) => isActive
-    ? "w-8 h-8 rounded-lg text-xs font-medium bg-[#0f2744] text-white"
-    : `w-8 h-8 rounded-lg text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`;
+    ? "w-8 h-8 rounded-[10px] text-xs font-medium bg-[#FF6B00] text-white"
+    : `w-8 h-8 rounded-[10px] text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
 
   const HeadCell = ({ col, label }) => (
     <th onClick={() => handleSort(col)}
@@ -101,17 +101,17 @@ export default function Facilities() {
   );
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-gray-100"}`}>
-      <h2 className={`text-xl font-bold mb-5 ${titleCls}`}>Facilities</h2>
+    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
+      <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>Facilities</h2>
 
-      <div className={`rounded-2xl shadow-sm border overflow-hidden ${card}`}>
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
 
         {/* Header */}
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
-            <span className={`text-base font-semibold ${titleCls}`}>Facility List</span>
+            <span className={`text-[18px] font-semibold ${titleCls}`}>Facility List</span>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
-              dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#0f2744]/10 text-[#0f2744] ring-[#0f2744]/20"
+              dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FF6B00]/10 text-[#102A43] ring-[#FF6B00]/20"
             }`}>
               {sorted.length} facilities
             </span>
@@ -125,8 +125,8 @@ export default function Facilities() {
             </div>
             {/* Add Button */}
             <Button onClick={() => {}}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] transition-colors">
-              <MdAdd size={16} /> Add Facility
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[10px] bg-[#FF6B00] text-white hover:bg-[#e05e00] transition-colors">
+              <MdAdd size={14} /> Add Facility
             </Button>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function Facilities() {
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <img src={f.imageSrc} alt={f.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      <img src={f.imageSrc} alt={f.name} className="w-10 h-10 rounded-[10px] object-cover shrink-0" />
                       <span className={`text-sm font-medium ${titleCls}`}>{f.name}</span>
                     </div>
                   </td>
@@ -161,13 +161,13 @@ export default function Facilities() {
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot active={f.active} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
+                        dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-[#F5F8FC] text-[#486581] hover:bg-[#F5F8FC]"
                       }`}><IoEyeOutline size={14} /> View</Button>
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
+                        dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
                       }`}><MdEdit size={14} /> Edit</Button>
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
                         dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
                       }`}><MdDelete size={14} /> Delete</Button>
                     </div>

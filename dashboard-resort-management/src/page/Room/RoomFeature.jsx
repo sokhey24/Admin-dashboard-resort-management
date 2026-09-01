@@ -21,22 +21,22 @@ function BadgeWithDot({ status, dark }) {
 export default function RoomFeature({ room, onClose }) {
   const dark = useDarkMode();
 
-  const card     = dark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const titleCls = dark ? "text-gray-100"               : "text-gray-900";
-  const subText  = dark ? "text-gray-400"               : "text-gray-500";
+  const card     = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
+  const titleCls = dark ? "text-gray-100"               : "text-[#102A43]";
+  const subText  = dark ? "text-gray-400"               : "text-[#829AB1]";
   const divider  = dark ? "border-gray-700"             : "border-gray-100";
-  const metaBg   = dark ? "bg-gray-700/60"              : "bg-gray-50";
-  const metaText = dark ? "text-gray-300"               : "text-gray-700";
+  const metaBg   = dark ? "bg-gray-700/60"              : "bg-[#F5F8FC]";
+  const metaText = dark ? "text-gray-300"               : "text-[#486581]";
 
   const stats = [
-    { icon: <MdSquareFoot size={18} />, label: "Room Size", value: room.size              },
-    { icon: <MdPeople     size={18} />, label: "Capacity",  value: `${room.capacity} guests` },
-    { icon: <MdHotel      size={18} />, label: "Bed Type",  value: room.beds              },
-    { icon: <MdLayers     size={18} />, label: "Floor",     value: `Floor ${room.floor}`  },
+    { icon: <MdSquareFoot size={14} />, label: "Room Size", value: room.size              },
+    { icon: <MdPeople     size={14} />, label: "Capacity",  value: `${room.capacity} guests` },
+    { icon: <MdHotel      size={14} />, label: "Bed Type",  value: room.beds              },
+    { icon: <MdLayers     size={14} />, label: "Floor",     value: `Floor ${room.floor}`  },
   ];
 
   return (
-    <div className={`rounded-2xl shadow-sm border overflow-hidden ${card}`}>
+    <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
       {/* Image */}
       <div className="relative h-48 overflow-hidden">
         <img src={room.imageRoom} alt={room.title} className="w-full h-full object-cover" />
@@ -44,7 +44,7 @@ export default function RoomFeature({ room, onClose }) {
           type="text"
           shape="circle"
           size="small"
-          icon={<MdClose size={16} />}
+          icon={<MdClose size={14} />}
           onClick={onClose}
           className="!absolute top-3 right-3 !bg-black/50 hover:!bg-black/70 !text-white !border-0"
         />
@@ -63,7 +63,7 @@ export default function RoomFeature({ room, onClose }) {
 
         {/* Price */}
         <div className={`flex items-baseline gap-1 mb-4 pb-4 border-b ${divider}`}>
-          <span className={`text-2xl font-extrabold ${dark ? "text-blue-400" : "text-[#0f2744]"}`}>{room.price}</span>
+          <span className={`text-2xl font-extrabold ${dark ? "text-blue-400" : "text-[#102A43]"}`}>{room.price}</span>
           <span className={`text-xs ${subText}`}>/ night</span>
         </div>
 
@@ -81,7 +81,7 @@ export default function RoomFeature({ room, onClose }) {
         {/* Description */}
         <div className={`mb-4 pb-4 border-b ${divider}`}>
           <p className={`text-xs font-medium uppercase tracking-wide mb-2 ${subText}`}>Description</p>
-          <p className={`text-sm leading-relaxed ${dark ? "text-gray-300" : "text-gray-600"}`}>{room.desc}</p>
+          <p className={`text-sm leading-relaxed ${dark ? "text-gray-300" : "text-[#486581]"}`}>{room.desc}</p>
         </div>
 
         {/* Amenities */}
@@ -90,9 +90,9 @@ export default function RoomFeature({ room, onClose }) {
           <div className="flex flex-wrap gap-1.5">
             {room.amenities?.map((a) => (
               <span key={a} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                dark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
+                dark ? "bg-gray-700 text-gray-300" : "bg-[#F5F8FC] text-[#486581]"
               }`}>
-                <MdCheckCircle size={11} className={dark ? "text-green-400" : "text-green-500"} />
+                <MdCheckCircle size={14} className={dark ? "text-green-400" : "text-green-500"} />
                 {a}
               </span>
             ))}

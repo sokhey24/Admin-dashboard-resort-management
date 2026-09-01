@@ -7,7 +7,6 @@ import {
 import { ProfileStore } from '../../store/ProfileStore';
 import { request } from '../../util/request';
 import { useDarkMode } from '../../util/DarkModeContext';
-import config from '../../util/config';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -23,7 +22,7 @@ export default function Profile_Setting() {
   const [imgKey,   setImgKey]   = useState(Date.now());
 
   const avatarUrl = fileList[0]?.thumbUrl
-    || (profile?.profile_image_url ? `${config.image_path}${profile.profile_image_url}?v=${imgKey}` : null);
+    || (profile?.profile_image_url ? `${profile.profile_image_url}?v=${imgKey}` : null);
   const roleLabel = profile?.roles?.[0]?.name?.replaceAll('_', ' ') || 'User';
 
   const onSaveInfo = async (values) => {
@@ -72,8 +71,8 @@ export default function Profile_Setting() {
 
   // dark mode styles
   const cardCls  = dark ? 'bg-gray-800 border-gray-700' : '';
-  const textPri  = dark ? 'text-gray-100' : 'text-gray-800';
-  const textSub  = dark ? 'text-gray-400' : 'text-gray-400';
+  const textPri  = dark ? 'text-gray-100' : 'text-[#102A43]';
+  const textSub  = dark ? 'text-[#829AB1]' : 'text-[#829AB1]';
 
   return (
     <div className={`max-w-3xl mx-auto py-6 flex flex-col gap-5 ${dark ? 'text-gray-100' : ''}`}>
@@ -83,7 +82,7 @@ export default function Profile_Setting() {
         <div className="flex items-center gap-6">
           <div className="relative">
             <Avatar
-              size={90}
+              size={14}
               src={avatarUrl}
               icon={!avatarUrl && <UserOutlined />}
               className="border-4 border-blue-100"
@@ -96,9 +95,12 @@ export default function Profile_Setting() {
               onChange={({ fileList: fl }) => setFileList(fl)}
               showUploadList={false}
             >
-              <button className="absolute bottom-0 right-0 w-7 h-7 bg-[#0f2744] rounded-full flex items-center justify-center text-white shadow cursor-pointer border-2 border-white">
-                <EditOutlined style={{ fontSize: 12 }} />
-              </button>
+              <Button
+                shape="circle"
+                size="small"
+                icon={<EditOutlined style={{ fontSize: 12 }} />}
+                className="!absolute !bottom-0 !right-0 !w-7 !h-7 !bg-[#FF6B00] !border-[#FF6B00] !text-white !shadow"
+              />
             </Upload>
           </div>
           <div>
@@ -125,7 +127,7 @@ export default function Profile_Setting() {
           }}
         >
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="name" label="Full Name" rules={[{ required: true }]}>
+            <Form.Item name="name" label="Full Name" rules={[{ required: true, message: "Full name is required" }]}>
               <Input prefix={<UserOutlined />} placeholder="Full name" size="large" />
             </Form.Item>
             <Form.Item name="phone" label="Phone Number">
@@ -158,7 +160,7 @@ export default function Profile_Setting() {
 
           <Form.Item className="!mb-0">
             <Button type="primary" htmlType="submit" loading={saving} size="large"
-              className="!bg-[#0f2744] !border-[#0f2744]">
+              className="!bg-[#FF6B00] !border-[#FF6B00]">
               Save Changes
             </Button>
           </Form.Item>
@@ -169,18 +171,18 @@ export default function Profile_Setting() {
       {!profile?.is_google_account && (
         <Card title="Change Password" className={cardCls}>
           <Form form={passForm} layout="vertical" onFinish={onChangePassword}>
-            <Form.Item name="current_password" label="Current Password" rules={[{ required: true }]}>
+            <Form.Item name="current_password" label="Current Password" rules={[{ required: true, message: "Current password is required" }]}>
               <Input.Password prefix={<LockOutlined />} placeholder="Current password" size="large" />
             </Form.Item>
             <div className="grid grid-cols-2 gap-4">
               <Form.Item name="password" label="New Password"
-                rules={[{ required: true }, { min: 8, message: 'Minimum 8 characters' }]}>
+                rules={[{ required: true, message: "New password is required" }, { min: 8, message: 'Minimum 8 characters' }]}>
                 <Input.Password prefix={<LockOutlined />} placeholder="New password" size="large" />
               </Form.Item>
               <Form.Item name="password_confirmation" label="Confirm Password"
                 dependencies={['password']}
                 rules={[
-                  { required: true },
+                  { required: true, message: "Please confirm your password" },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue('password') === value) return Promise.resolve();

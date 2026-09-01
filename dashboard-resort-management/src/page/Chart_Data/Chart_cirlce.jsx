@@ -1,61 +1,164 @@
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useDarkMode } from '../../util/DarkModeContext';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useDarkMode } from "../../util/DarkModeContext";
 
 const data = [
-  { name: 'Group A', value: 400 },
-  { name: 'Group B', value: 300 },
-  { name: 'Group C', value: 500 },
-  { name: 'Group D', value: 200 },
-  { name: 'Group E', value: 278 },
-  { name: 'Group F', value: 189 },
+  { name: "Khmer Food", value: 28 },
+  { name: "Asian Food", value: 22 },
+  { name: "Western Food", value: 18 },
+  { name: "Seafood", value: 14 },
+  { name: "Drinks", value: 12 },
+  { name: "Desserts", value: 6 },
 ];
 
-const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#ff8042'];
+const COLORS = [
+  "#3b82f6",
+  "#22c55e",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ef4444",
+  "#06b6d4",
+];
 
 const RADIAN = Math.PI / 180;
-const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+const renderCustomLabel = ({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+}) => {
+  const radius =
+    innerRadius + (outerRadius - innerRadius) * 0.5;
+
+  const x =
+    cx + radius * Math.cos(-midAngle * RADIAN);
+
+  const y =
+    cy + radius * Math.sin(-midAngle * RADIAN);
+
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}>
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontsize={14}
+      fontWeight={600}
+    >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
   );
 };
 
-export default function ChartCircle() {
-  const dark = useDarkMode();
+const CustomTooltip = ({ active, payload, dark }) => {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
+  const item = payload[0];
+
   return (
-    <div className={`w-full rounded-xl shadow p-5 transition-colors duration-200 ${dark ? 'bg-gray-800' : 'bg-white'}`}>
-      <h2 className={`text-base font-semibold mb-4 ${dark ? 'text-gray-200' : 'text-gray-700'}`}>Resort Distribution</h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            outerRadius={110}
-            dataKey="value"
-            labelLine={false}
-            label={renderCustomLabel}
-          >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value, name) => [`${value}`, name]}
-            contentStyle={{
-              background: dark ? '#1f2937' : '#ffffff',
-              border: `1px solid ${dark ? '#374151' : '#e5e7eb'}`,
-              borderRadius: '8px',
-              color: dark ? '#e5e7eb' : '#374151',
-            }}
-          />
-          <Legend wrapperStyle={{ color: dark ? '#d1d5db' : '#374151', fontSize: 12 }} />
-        </PieChart>
-      </ResponsiveContainer>
+    <div
+      className={`min-w-[170px] rounded-xl border px-4 py-3 shadow-xl ${
+        dark
+          ? "border-gray-700 bg-gray-900 text-gray-100"
+          : "border-[#D9E2EC] bg-white text-[#102A43]"
+      }`}
+    >
+      <p className="text-sm font-semibold">
+        {item.name}
+      </p>
+
+      <p
+        className={`mt-1 text-sm ${
+          dark ? "text-gray-300" : "text-[#486581]"
+        }`}
+      >
+        Sales:{" "}
+        <span className="font-semibold">
+          {item.value}%
+        </span>
+      </p>
+    </div>
+  );
+};
+
+export default function ChartCircleRestaurant() {
+  const dark = useDarkMode();
+
+  return (
+    <div
+      className={`w-full rounded-xl border p-5 shadow-sm transition-colors duration-200 ${
+        dark
+          ? "border-gray-700 bg-gray-800"
+          : "border-[#D9E2EC] bg-white"
+      }`}
+    >
+      {/* Header */}
+      <div className="mb-2">
+        <h2
+          className={`text-lg font-semibold ${
+            dark ? "text-gray-100" : "text-[#102A43]"
+          }`}
+        >
+          Restaurant Sales
+        </h2>
+
+        <p
+          className={`mt-1 text-sm ${
+            dark ? "text-gray-400" : "text-[#829AB1]"
+          }`}
+        >
+          Sales distribution by food category
+        </p>
+      </div>
+
+      {/* Chart */}
+      <div className="h-[300px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              outerRadius={105}
+              dataKey="value"
+              labelLine={false}
+              label={renderCustomLabel}
+            >
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
+            </Pie>
+
+            <Tooltip
+              content={<CustomTooltip dark={dark} />}
+            />
+
+            <Legend
+              verticalAlign="bottom"
+              height={36}
+              wrapperStyle={{
+                color: dark ? "#d1d5db" : "#374151",
+                fontSize: 12,
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

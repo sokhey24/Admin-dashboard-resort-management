@@ -3,19 +3,10 @@ import { MdEdit, MdDelete, MdSearch, MdAdd, MdClose, MdPerson } from "react-icon
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
+import usePermission from "../../util/usePermission";
+import { ProfileStore } from "../../store/ProfileStore";
 
-const SAMPLE = [
-  { id: 1,  name: "Sophea Meas",   email: "sophea@resort.com",   phone: "0961234501", department: "Front Desk",    position: "Receptionist",    status: "active",   joined: "2022-03-10" },
-  { id: 2,  name: "Dara Chann",    email: "dara@resort.com",     phone: "0961234502", department: "Housekeeping",  position: "Supervisor",      status: "active",   joined: "2021-07-15" },
-  { id: 3,  name: "Bopha Keo",     email: "bopha@resort.com",    phone: "0961234503", department: "Restaurant",    position: "Chef",            status: "active",   joined: "2020-01-20" },
-  { id: 4,  name: "Virak Sok",     email: "virak@resort.com",    phone: "0961234504", department: "Security",      position: "Guard",           status: "inactive", joined: "2023-05-01" },
-  { id: 5,  name: "Sreymom Pich",  email: "sreymom@resort.com",  phone: "0961234505", department: "Front Desk",    position: "Concierge",       status: "active",   joined: "2022-09-12" },
-  { id: 6,  name: "Kosal Heng",    email: "kosal@resort.com",    phone: "0961234506", department: "Maintenance",   position: "Technician",      status: "active",   joined: "2021-11-03" },
-  { id: 7,  name: "Chanthy Lim",   email: "chanthy@resort.com",  phone: "0961234507", department: "Restaurant",    position: "Waiter",          status: "active",   joined: "2023-02-18" },
-  { id: 8,  name: "Piseth Noun",   email: "piseth@resort.com",   phone: "0961234508", department: "Housekeeping",  position: "Housekeeper",     status: "inactive", joined: "2022-06-25" },
-];
-
-const DEPTS   = ["all", "Front Desk", "Housekeeping", "Restaurant", "Security", "Maintenance"];
+const DEPTS    = ["all", "Front Desk", "Housekeeping", "Restaurant", "Security", "Maintenance"];
 const PAGE_SIZE = 8;
 
 const STATUS_STYLE = {
@@ -37,64 +28,83 @@ function EmployeeModal({ employee, onClose, onSaved, dark }) {
   const isEdit = !!employee;
   const [form, setForm] = useState(
     isEdit
-      ? { name: employee.name, email: employee.email, phone: employee.phone, department: employee.department, position: employee.position, status: employee.status }
-      : { name: "", email: "", phone: "", department: "Front Desk", position: "", status: "active" }
+      ? { name: employee.name, email: employee.email, phone: employee.phone ?? "", status: employee.status }
+      : { name: "", email: "", phone: "", status: "active" }
   );
   const [saving, setSaving] = useState(false);
+  const [errs,   setErrs]   = useState({});
 
-  const handleSave = async () => {
-    setSaving(true);
-    const res = isEdit
-      ? await request(`admin/employees/${employee.id}`, "put", form)
-      : await request("admin/employees", "post", form);
-    setSaving(false);
-    if (res?.message || res?.data) { onSaved(); onClose(); }
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())  e.name  = "Full name is required.";
+    if (!form.email.trim()) e.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email.";
+    setErrs(e);
+    return !Object.keys(e).length;
   };
 
-  const inputCls = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f2744]/40 ${
-    dark ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
-  }`;
-  const labelCls = `block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`;
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    const res = isEdit
+      ? await request(`admin/users/${employee.id}`, "put", form)
+      : await request("admin/users", "post", { ...form, password: "password" });
+    setSaving(false);
+    if (res?.data) { onSaved(); onClose(); }
+    else setErrs({ _: res?.errors?.message ?? "Failed to save." });
+  };
 
-  const field = (label, key, type = "text", options = null) => (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {options ? (
-        <select value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inputCls}>
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inputCls} />
-      )}
-    </div>
-  );
+  const set = (key) => (e) => {
+    setForm(f => ({ ...f, [key]: e.target.value }));
+    setErrs(p => ({ ...p, [key]: undefined }));
+  };
+
+  const inputCls = (key) => `w-full border rounded-[10px] px-5 py-2.5 text-[15px] focus:outline-none focus:ring-2 ${
+    errs[key] ? "border-red-400 focus:ring-red-400/40" : "focus:ring-[#FF6B00]/30 " + (dark ? "border-gray-600" : "border-[#D9E2EC]")
+  } ${dark ? "bg-gray-700 text-gray-100 placeholder-[#829AB1]" : "bg-white text-[#102A43] placeholder:text-[#829AB1]"}`;
+  const labelCls = `block text-[14px] font-semibold mb-1 ${dark ? "text-gray-300" : "text-[#486581]"}`;
+  const errMsg   = (key) => errs[key] && <p className="mt-1 text-xs text-red-500">{errs[key]}</p>;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className={`rounded-2xl shadow-2xl w-full max-w-md p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
+      <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className={`text-base font-semibold ${dark ? "text-gray-100" : "text-gray-900"}`}>
+          <h3 className={`text-[18px] font-bold ${dark ? "text-gray-100" : "text-[#102A43]"}`}>
             {isEdit ? "Edit Employee" : "Add Employee"}
           </h3>
-          <Button onClick={onClose} className={`${dark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-            <MdClose size={20} />
-          </Button>
+          <Button onClick={onClose}><MdClose size={14} /></Button>
         </div>
         <div className="space-y-4">
-          {field("Full Name",   "name")}
-          {field("Email",       "email", "email")}
-          {field("Phone",       "phone")}
-          {field("Department",  "department", "text", ["Front Desk", "Housekeeping", "Restaurant", "Security", "Maintenance"])}
-          {field("Position",    "position")}
-          {field("Status",      "status", "text", ["active", "inactive"])}
+          <div>
+            <label className={labelCls}>Full Name <span className="text-red-500">*</span></label>
+            <input value={form.name} onChange={set("name")} className={inputCls("name")} />
+            {errMsg("name")}
+          </div>
+          <div>
+            <label className={labelCls}>Email <span className="text-red-500">*</span></label>
+            <input type="email" value={form.email} onChange={set("email")} className={inputCls("email")} />
+            {errMsg("email")}
+          </div>
+          <div>
+            <label className={labelCls}>Phone</label>
+            <input value={form.phone} onChange={set("phone")} className={inputCls("phone")} />
+          </div>
+          <div>
+            <label className={labelCls}>Status</label>
+            <select value={form.status} onChange={set("status")} className={inputCls("status")}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          {errs._ && <p className="text-xs text-red-500">{errs._}</p>}
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <Button onClick={onClose}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
+            className={`px-4 py-2 text-sm rounded-[8px] border font-semibold ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}
-            className="px-4 py-2 text-sm rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] disabled:opacity-60 transition-colors">
+            className="px-4 py-2 text-sm rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] disabled:opacity-60 font-semibold">
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
@@ -105,6 +115,8 @@ function EmployeeModal({ employee, onClose, onSaved, dark }) {
 
 export default function Employees() {
   const dark = useDarkMode();
+  const { can } = usePermission();
+  const { profile } = ProfileStore();
   const [employees, setEmployees] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState("");
@@ -115,56 +127,57 @@ export default function Employees() {
 
   const load = () => {
     setLoading(true);
-    request("admin/employees", "get").then(res => {
-      setEmployees(res?.data?.length ? res.data : SAMPLE);
+    request("admin/users", "get").then(res => {
+      const data = Array.isArray(res?.data) ? res.data : [];
+      setEmployees(data.filter(u => u.id !== profile?.id && u.roles?.some(r => r.name !== "customer") && u.roles?.every(r => r.name !== "admin")));
       setLoading(false);
-    }).catch(() => { setEmployees(SAMPLE); setLoading(false); });
+    }).catch(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return employees.filter(e =>
-      (dept === "all" || e.department === dept) &&
-      (!q || e.name?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q) || e.position?.toLowerCase().includes(q))
+      (dept === "all" || e.roles?.some(r => r.name === dept)) &&
+      (!q || e.name?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q))
     );
   }, [employees, search, dept]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-gray-200";
-  const cardHdr   = dark ? "border-gray-700"               : "border-gray-200";
-  const titleCls  = dark ? "text-gray-100"                 : "text-gray-900";
-  const subText   = dark ? "text-gray-400"                 : "text-gray-500";
-  const thead     = dark ? "bg-gray-700/60"                : "bg-gray-50";
-  const thText    = dark ? "text-gray-400"                 : "text-gray-500";
-  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-gray-100";
-  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-gray-50";
-  const cellText  = dark ? "text-gray-300"                 : "text-gray-600";
-  const cellMuted = dark ? "text-gray-500"                 : "text-gray-500";
-  const divider   = dark ? "divide-gray-700"               : "divide-gray-200";
-  const filterBg  = dark ? "bg-gray-700"                   : "bg-gray-100";
-  const filterBtn = dark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700";
-  const filterAct = dark ? "bg-gray-600 text-gray-100 shadow" : "bg-white text-gray-900 shadow";
+  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
+  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
+  const titleCls  = dark ? "text-gray-100"                 : "text-[#102A43]";
+  const subText   = dark ? "text-gray-400"                 : "text-[#486581]";
+  const thead     = dark ? "bg-gray-700/60"                : "bg-[#F5F8FC]";
+  const thText    = dark ? "text-gray-400"                 : "text-[#486581]";
+  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-[#D9E2EC]";
+  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-[#F5F8FC]";
+  const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
+  const cellMuted = dark ? "text-[#829AB1]"                 : "text-[#829AB1]";
+  const divider   = dark ? "divide-gray-700"               : "divide-[#D9E2EC]";
+  const filterBg  = dark ? "bg-gray-700"                   : "bg-[#F5F8FC]";
+  const filterBtn = dark ? "text-gray-400 hover:text-gray-200" : "text-[#486581] hover:text-[#102A43]";
+  const filterAct = dark ? "bg-gray-600 text-gray-100 shadow" : "bg-white text-[#102A43] shadow";
   const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2744]/30 w-48";
+    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
+    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48 placeholder:text-[#829AB1]";
   const pageBtn   = dark
-    ? "px-3 py-1.5 rounded-lg border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed";
+    ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
+    : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold text-[#486581] hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-gray-100"}`}>
-      <h2 className={`text-xl font-bold mb-5 ${titleCls}`}>Employee Management</h2>
+    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
+      <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>Employee Management</h2>
 
-      <div className={`rounded-2xl shadow-sm border overflow-hidden ${card}`}>
-        {/* Header */}
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
-            <span className={`text-base font-semibold ${titleCls}`}>Employee List</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#0f2744]/10 text-[#0f2744] ring-[#0f2744]/20"}`}>
+            <span className={`text-[18px] font-bold ${titleCls}`}>Employee List</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FFF3E8] text-[#FF6B00] ring-[#FFD4A8]"}`}>
               {filtered.length} employees
             </span>
           </div>
@@ -182,22 +195,22 @@ export default function Employees() {
               <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search…" className={searchCls} />
             </div>
-            <Button onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] transition-colors">
-              <MdAdd size={16} /> Add Employee
-            </Button>
+            {can("admin.users.create") && (
+              <Button onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] transition-colors">
+                <MdAdd size={14} /> Add Employee
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className={`min-w-full divide-y ${divider}`}>
             <thead className={thead}>
               <tr>
                 <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-12 ${thText}`}>No.</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Employee</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Department</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Position</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Role</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Phone</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Status</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Joined</th>
@@ -206,15 +219,15 @@ export default function Employees() {
             </thead>
             <tbody className={`${tbody} divide-y`}>
               {loading ? (
-                <tr><td colSpan={8} className={`py-16 text-center text-sm ${subText}`}>Loading…</td></tr>
+                <tr><td colSpan={7} className={`py-16 text-center text-sm ${subText}`}>Loading…</td></tr>
               ) : pageItems.length === 0 ? (
-                <tr><td colSpan={8} className={`py-16 text-center text-sm ${subText}`}>No employees found</td></tr>
+                <tr><td colSpan={7} className={`py-16 text-center text-sm ${subText}`}>No employees found</td></tr>
               ) : pageItems.map((emp, idx) => (
                 <tr key={emp.id} className={`transition-colors ${rowHover}`}>
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0 ${dark ? "bg-[#1a3a5c]" : "bg-[#0f2744]"}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0 ${dark ? "bg-[#1a3a5c]" : "bg-[#FF6B00]"}`}>
                         {emp.name?.charAt(0).toUpperCase() ?? <MdPerson />}
                       </div>
                       <div className="min-w-0">
@@ -223,24 +236,33 @@ export default function Employees() {
                       </div>
                     </div>
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellText}`}>{emp.department}</td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellText}`}>{emp.position}</td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellText}`}>{emp.phone}</td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellText}`}>
+                    {emp.roles?.[0]?.display_name ?? emp.roles?.[0]?.name ?? "—"}
+                  </td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellText}`}>{emp.phone ?? "—"}</td>
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={emp.status} dark={dark} /></td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellMuted}`}>{emp.joined?.slice(0, 10)}</td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${cellMuted}`}>{emp.created_at?.slice(0, 10)}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button onClick={() => setEditing(emp)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      {can("admin.users.update") && (
+                        <Button onClick={() => setEditing(emp)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-xs font-semibold transition-colors ${
+                            dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
+                          }`}>
+                          <MdEdit size={14} /> Edit
+                        </Button>
+                      )}
+                      {can("admin.users.delete") && (
+                        <Button onClick={async () => {
+                          if (!window.confirm("Delete this employee?")) return;
+                          await request(`admin/users/${emp.id}`, "delete");
+                          load();
+                        }} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-xs font-semibold transition-colors ${
+                          dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
                         }`}>
-                        <MdEdit size={14} /> Edit
-                      </Button>
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
-                      }`}>
-                        <MdDelete size={14} /> Delete
-                      </Button>
+                          <MdDelete size={14} /> Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -249,15 +271,14 @@ export default function Employees() {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className={`px-6 py-3 border-t flex items-center justify-between text-sm ${cardHdr} ${subText}`}>
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-1">
             <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
               <Button key={p} onClick={() => setPage(p)}
-                className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                  page === p ? "bg-[#0f2744] text-white" : dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-600"
+                className={`w-8 h-8 rounded-[8px] text-xs font-semibold transition-colors ${
+                  page === p ? "bg-[#FF6B00] text-white" : dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"
                 }`}>{p}</Button>
             ))}
             <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</Button>

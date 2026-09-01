@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { MdSave, MdNotifications, MdEmail, MdSms } from "react-icons/md";
 import { useDarkMode } from "../../util/DarkModeContext";
-import { message } from "antd";
-import { Button } from "antd/es/radio";
+import { message, Button } from "antd";
+
 const NOTIFICATION_GROUPS = [
   {
     group: "Booking Notifications",
-    icon: <MdNotifications size={18} />,
+    icon: <MdNotifications size={14} />,
     color: "text-blue-500",
     items: [
       { key: "new_booking",       label: "New Booking",        desc: "When a new booking is created" },
@@ -18,38 +18,39 @@ const NOTIFICATION_GROUPS = [
   },
   {
     group: "Restaurant Notifications",
-    icon: <MdEmail size={18} />,
+    icon: <MdEmail size={14} />,
     color: "text-orange-500",
     items: [
-      { key: "new_order",         label: "New Food Order",     desc: "When a new food order is placed" },
-      { key: "table_reservation", label: "Table Reservation",  desc: "When a table is reserved" },
-      { key: "order_completed",   label: "Order Completed",    desc: "When an order is marked complete" },
+      { key: "new_order",         label: "New Food Order",    desc: "When a new food order is placed" },
+      { key: "table_reservation", label: "Table Reservation", desc: "When a table is reserved" },
+      { key: "order_completed",   label: "Order Completed",   desc: "When an order is marked complete" },
     ],
   },
   {
     group: "System Notifications",
-    icon: <MdSms size={18} />,
+    icon: <MdSms size={14} />,
     color: "text-purple-500",
     items: [
-      { key: "maintenance_alert", label: "Maintenance Alert",  desc: "When a room needs maintenance" },
-      { key: "payment_received",  label: "Payment Received",   desc: "When a payment is processed" },
-      { key: "low_inventory",     label: "Low Inventory",      desc: "When restaurant inventory is low" },
-      { key: "system_update",     label: "System Update",      desc: "When a system update is available" },
+      { key: "maintenance_alert", label: "Maintenance Alert", desc: "When a room needs maintenance" },
+      { key: "payment_received",  label: "Payment Received",  desc: "When a payment is processed" },
+      { key: "low_inventory",     label: "Low Inventory",     desc: "When restaurant inventory is low" },
+      { key: "system_update",     label: "System Update",     desc: "When a system update is available" },
     ],
   },
 ];
 
 function Toggle({ checked, onChange, dark }) {
   return (
-    <Button
+    <button
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-        checked ? "bg-[#0f2744]" : dark ? "bg-gray-600" : "bg-gray-300"
-      }`}>
+        checked ? "bg-[#FF6B00]" : dark ? "bg-gray-600" : "bg-gray-300"
+      }`}
+    >
       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
         checked ? "translate-x-4" : "translate-x-1"
       }`} />
-    </Button>
+    </button>
   );
 }
 
@@ -64,12 +65,8 @@ export default function Notification() {
     return init;
   });
 
-  const toggle = (key, channel) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: { ...prev[key], [channel]: !prev[key][channel] },
-    }));
-  };
+  const toggle = (key, channel) =>
+    setSettings(prev => ({ ...prev, [key]: { ...prev[key], [channel]: !prev[key][channel] } }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -78,39 +75,39 @@ export default function Notification() {
     message.success("Notification settings saved!");
   };
 
-  const card     = dark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const titleCls = dark ? "text-gray-100" : "text-gray-900";
-  const subText  = dark ? "text-gray-400" : "text-gray-500";
-  const rowHover = dark ? "hover:bg-gray-700/30" : "hover:bg-gray-50";
+  const card     = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
+  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
+  const subText  = dark ? "text-gray-400" : "text-[#829AB1]";
+  const rowHover = dark ? "hover:bg-gray-700/30" : "hover:bg-[#F5F8FC]";
   const divider  = dark ? "divide-gray-700" : "divide-gray-100";
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-gray-100"}`}>
+    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       <div className="flex items-center justify-between mb-5">
-        <h2 className={`text-xl font-bold ${titleCls}`}>Notification Settings</h2>
-        <Button onClick={handleSave} disabled={saving}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] disabled:opacity-60 transition-colors">
-          <MdSave size={16} /> {saving ? "Saving…" : "Save Settings"}
+        <h2 className={`text-[26px] font-bold ${titleCls}`}>Notification Settings</h2>
+        <Button
+          type="primary"
+          loading={saving}
+          onClick={handleSave}
+          icon={<MdSave size={14} />}
+          className="!bg-[#FF6B00] !border-[#FF6B00] hover:!bg-[#e05e00]"
+        >
+          {saving ? "Saving…" : "Save Settings"}
         </Button>
       </div>
 
       <div className="space-y-5">
         {NOTIFICATION_GROUPS.map(group => (
-          <div key={group.group} className={`rounded-2xl border shadow-sm overflow-hidden ${card}`}>
-            {/* Group Header */}
-            <div className={`px-6 py-4 border-b flex items-center gap-2 ${dark ? "border-gray-700" : "border-gray-200"}`}>
+          <div key={group.group} className={`rounded-xl border shadow-sm overflow-hidden ${card}`}>
+            <div className={`px-6 py-4 border-b flex items-center gap-2 ${dark ? "border-gray-700" : "border-[#D9E2EC]"}`}>
               <span className={group.color}>{group.icon}</span>
               <span className={`text-sm font-semibold ${titleCls}`}>{group.group}</span>
             </div>
-
-            {/* Column Headers */}
-            <div className={`px-6 py-2 grid grid-cols-[1fr_80px_80px] gap-4 border-b ${dark ? "border-gray-700 bg-gray-700/40" : "border-gray-100 bg-gray-50"}`}>
+            <div className={`px-6 py-2 grid grid-cols-[1fr_80px_80px] gap-4 border-b ${dark ? "border-gray-700 bg-gray-700/40" : "border-gray-100 bg-[#F5F8FC]"}`}>
               <span className={`text-xs font-medium uppercase tracking-wider ${subText}`}>Notification</span>
               <span className={`text-xs font-medium uppercase tracking-wider text-center ${subText}`}>Email</span>
               <span className={`text-xs font-medium uppercase tracking-wider text-center ${subText}`}>Push</span>
             </div>
-
-            {/* Items */}
             <div className={`divide-y ${divider}`}>
               {group.items.map(item => (
                 <div key={item.key} className={`px-6 py-3 grid grid-cols-[1fr_80px_80px] gap-4 items-center transition-colors ${rowHover}`}>

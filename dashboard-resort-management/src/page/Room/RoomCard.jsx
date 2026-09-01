@@ -69,23 +69,23 @@ export default function RoomCard({ selectedId, onSelect }) {
     (!search || r.title.toLowerCase().includes(search.toLowerCase()) || r.desc.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-gray-200";
-  const cardHdr   = dark ? "border-gray-700"               : "border-gray-200";
-  const titleCls  = dark ? "text-gray-100"                 : "text-gray-900";
-  const subText   = dark ? "text-gray-400"                 : "text-gray-500";
-  const filterBg  = dark ? "bg-gray-700"                   : "bg-gray-100";
+  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
+  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
+  const titleCls  = dark ? "text-gray-100"                 : "text-[#102A43]";
+  const subText   = dark ? "text-gray-400"                 : "text-[#486581]";
+  const filterBg  = dark ? "bg-gray-700"                   : "bg-[#F5F8FC]";
   const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2744]/30 w-48";
+    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
+    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48 placeholder:text-[#829AB1]";
 
   return (
-    <div className={`rounded-2xl shadow-sm border overflow-hidden mb-6 ${card}`}>
+    <div className={`rounded-xl shadow-sm border overflow-hidden mb-6 ${card}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       {/* Header */}
       <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
         <div className="flex items-center gap-2">
-          <span className={`text-base font-semibold ${titleCls}`}>Room Types</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
-            dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#0f2744]/10 text-[#0f2744] ring-[#0f2744]/20"
+          <span className={`text-[18px] font-bold ${titleCls}`}>Room Types</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${
+            dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FFF3E8] text-[#FF6B00] ring-[#FFD4A8]"
           }`}>
             {filtered.length} rooms
           </span>
@@ -94,13 +94,16 @@ export default function RoomCard({ selectedId, onSelect }) {
           {/* Status filter */}
           <div className={`flex gap-1 rounded-lg p-1 ${filterBg}`}>
             {STATUSES.map((s) => (
-              <Button
+              <button
                 key={s}
-                size="small"
-                type={status === s ? "primary" : "text"}
-                onClick={() => setStatus(s)}>
+                onClick={() => setStatus(s)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                  status === s
+                    ? dark ? "bg-gray-600 text-gray-100 shadow" : "bg-white text-[#102A43] shadow"
+                    : dark ? "text-[#829AB1] hover:text-gray-200" : "text-[#829AB1] hover:text-[#486581]"
+                }`}>
                 {s.charAt(0).toUpperCase() + s.slice(1)}
-              </Button>
+              </button>
             ))}
           </div>
           {/* Search */}
@@ -110,9 +113,9 @@ export default function RoomCard({ selectedId, onSelect }) {
               placeholder="Search…" className={searchCls} />
           </div>
           {/* Add Room */}
-          <Button type="primary" icon={<MdAdd size={16} />}>
-            Add Room
-          </Button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] transition-colors">
+            <MdAdd size={14} /> Add Room
+          </button>
         </div>
       </div>
 
@@ -128,9 +131,9 @@ export default function RoomCard({ selectedId, onSelect }) {
                 onClick={() => onSelect?.(item)}
                 className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 ${
                   selectedId === item.id
-                    ? dark ? "border-blue-500 ring-2 ring-blue-500/40" : "border-[#0f2744] ring-2 ring-[#0f2744]/20"
+                    ? dark ? "border-[#FF6B00] ring-2 ring-[#FF6B00]/30" : "border-[#FF6B00] ring-2 ring-[#FF6B00]/20"
                     : card
-                } ${dark ? "bg-gray-800 hover:bg-gray-700/60" : "bg-white hover:bg-gray-50"}`}>
+                } ${dark ? "bg-gray-800 hover:bg-gray-700/60" : "bg-white hover:bg-[#F5F8FC]"}`}>
                 <img src={item.imageRoom} alt={item.title} className="w-full h-40 object-cover" />
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-1">
@@ -139,7 +142,7 @@ export default function RoomCard({ selectedId, onSelect }) {
                   </div>
                   <p className={`text-xs mb-1 ${subText}`}>Room No: {item.roomNumber}</p>
                   <p className={`text-xs mb-3 ${subText}`}>{item.desc}</p>
-                  <p className={`text-sm font-bold ${dark ? "text-blue-400" : "text-[#0f2744]"}`}>{item.price}/night</p>
+                  <p className={`text-sm font-bold ${dark ? "text-[#FF6B00]" : "text-[#FF6B00]"}`}>{item.price}/night</p>
                 </div>
               </div>
             ))}

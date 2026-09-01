@@ -8,8 +8,8 @@ function Room() {
   const [selectedRoom, setSelectedRoom] = useState(ROOM_TYPES[0]);
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      <h2 className={`text-xl font-bold mb-5 ${dark ? 'text-gray-100' : 'text-gray-900'}`}>Room Management</h2>
+    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? 'bg-gray-900' : 'bg-[#F5F8FC]'}`} style={{ fontFamily: 'Inter, Poppins, sans-serif' }}>
+      <h2 className={`text-[26px] font-bold mb-5 ${dark ? 'text-gray-100' : 'text-[#102A43]'}`}>Room Management</h2>
       <div className="flex flex-col xl:flex-row gap-4 items-start">
         <div className="flex-1 min-w-0">
           <RoomCard selectedId={selectedRoom?.id} onSelect={setSelectedRoom} />

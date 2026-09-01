@@ -4,16 +4,18 @@ import { persist, createJSONStorage } from "zustand/middleware";
 export const ProfileStore = create()(
   persist(
     (set) => ({
-      profile: null,
+      profile:      null,
       access_token: null,
-      permission: null,
-      setProfile: (params) => set({ profile: params }),
-      setAccessToken: (params) => set({ access_token: params }),
-      setPermission: (params) => set({ permission: params }),
-      logout: () => set({ profile: null, access_token: null, permission: null }),
+      permission:   [],   // flat array of permission strings e.g. ["admin.dashboard.view", ...]
+      roles:        [],   // flat array of role name strings e.g. ["admin"]
+      setProfile:      (params) => set({ profile: params }),
+      setAccessToken:  (params) => set({ access_token: params }),
+      setPermission:   (params) => set({ permission: Array.isArray(params) ? params : [] }),
+      setRoles:        (params) => set({ roles: Array.isArray(params) ? params : [] }),
+      logout: () => set({ profile: null, access_token: null, permission: [], roles: [] }),
     }),
     {
-      name: "ResortProfileStore",
+      name:    "ResortProfileStore",
       storage: createJSONStorage(() => localStorage),
     }
   )

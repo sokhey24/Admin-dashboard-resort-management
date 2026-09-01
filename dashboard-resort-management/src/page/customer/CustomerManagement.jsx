@@ -3,6 +3,7 @@ import { MdEdit, MdDelete, MdSearch, MdUnfoldMore, MdKeyboardArrowUp, MdKeyboard
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
+import { ProfileStore } from "../../store/ProfileStore";
 
 
 const SAMPLE_USERS = [
@@ -36,7 +37,7 @@ const PAGE_SIZE = 10;
 function Avatar({ name, src }) {
   if (src) return <img src={src} alt={name} className="w-9 h-9 rounded-full object-cover shrink-0" />;
   return (
-    <div className="w-9 h-9 rounded-full bg-[#0f2744] flex items-center justify-center text-white font-semibold text-sm shrink-0">
+    <div className="w-9 h-9 rounded-full bg-[#FF6B00] flex items-center justify-center text-white font-semibold text-sm shrink-0">
       {name?.charAt(0).toUpperCase() ?? <MdPerson />}
     </div>
   );
@@ -53,8 +54,8 @@ function BadgeWithDot({ status, dark }) {
 }
 
 function SortIcon({ column, sortCol, sortDir, dark }) {
-  const cls = dark ? "text-gray-500" : "text-gray-400";
-  const activeClass = dark ? "text-gray-200" : "text-gray-700";
+  const cls = dark ? "text-[#829AB1]" : "text-gray-400";
+  const activeClass = dark ? "text-gray-200" : "text-[#486581]";
   if (sortCol !== column) return <MdUnfoldMore className={`text-base ${cls}`} />;
   return sortDir === "asc"
     ? <MdKeyboardArrowUp className={`text-base ${activeClass}`} />
@@ -64,55 +65,83 @@ function SortIcon({ column, sortCol, sortDir, dark }) {
 function EditModal({ user, onClose, onSaved, dark }) {
   const [form, setForm] = useState({ name: user.name, email: user.email, phone: user.phone ?? "", gender: user.gender ?? "", status: user.status });
   const [saving, setSaving] = useState(false);
+  const [errs,   setErrs]   = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())  e.name  = "Name is required.";
+    if (!form.email.trim()) e.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email.";
+    setErrs(e);
+    return !Object.keys(e).length;
+  };
 
   const handleSave = async () => {
+    if (!validate()) return;
     setSaving(true);
     const res = await request(`admin/users/${user.id}`, "put", form);
     setSaving(false);
-    if (res?.message) { onSaved(); onClose(); }
+    if (res?.data || !res?.errors) { onSaved(); onClose(); }
+    else setErrs({ _: res?.errors?.message ?? "Failed to save." });
   };
 
-  const inputCls = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-    dark ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400" : "bg-white border-gray-300 text-gray-900"
-  }`;
-  const labelCls = `block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`;
+  const set = (key) => (e) => {
+    setForm(f => ({ ...f, [key]: e.target.value }));
+    setErrs(p => ({ ...p, [key]: undefined }));
+  };
 
-  const field = (label, key, type = "text", options = null) => (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {options ? (
-        <select value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inputCls}>
-          {options.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
-        </select>
-      ) : (
-        <input type={type} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className={inputCls} />
-      )}
-    </div>
-  );
+  const inputCls = (key) => `w-full border rounded-[10px] px-5 py-2.5 text-[15px] focus:outline-none focus:ring-2 ${
+    errs[key] ? "border-red-400 focus:ring-red-400/40" : "focus:ring-[#FF6B00]/30 " + (dark ? "border-gray-600" : "border-[#D9E2EC]")
+  } ${dark ? "bg-gray-700 text-gray-100 placeholder-[#829AB1]" : "bg-white text-[#102A43] placeholder:text-[#829AB1]"}`;
+  const labelCls = `block text-[14px] font-semibold mb-1 ${dark ? "text-gray-300" : "text-[#486581]"}`;
+  const errMsg   = (key) => errs[key] && <p className="mt-1 text-xs text-red-500">{errs[key]}</p>;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className={`rounded-2xl shadow-2xl w-full max-w-md p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
+      <div className={`rounded-xl shadow-2xl w-full max-w-md p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className={`text-base font-semibold ${dark ? "text-gray-100" : "text-gray-900"}`}>Edit User</h3>
-          <Button onClick={onClose} className={`${dark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-            <MdClose size={20} />
+          <h3 className={`text-[18px] font-bold ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Edit Customer</h3>
+          <Button onClick={onClose} className={`${dark ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-[#486581]"}`}>
+            <MdClose size={14} />
           </Button>
         </div>
         <div className="space-y-4">
-          {field("Name",   "name")}
-          {field("Email",  "email", "email")}
-          {field("Phone",  "phone")}
-          {field("Gender", "gender", "text", ["male", "female", "other"])}
-          {field("Status", "status", "text", ["active", "inactive", "banned"])}
+          <div>
+            <label className={labelCls}>Name <span className="text-red-500">*</span></label>
+            <input value={form.name} onChange={set("name")} className={inputCls("name")} />
+            {errMsg("name")}
+          </div>
+          <div>
+            <label className={labelCls}>Email <span className="text-red-500">*</span></label>
+            <input type="email" value={form.email} onChange={set("email")} className={inputCls("email")} />
+            {errMsg("email")}
+          </div>
+          <div>
+            <label className={labelCls}>Phone</label>
+            <input value={form.phone} onChange={set("phone")} className={inputCls("phone")} />
+          </div>
+          <div>
+            <label className={labelCls}>Gender</label>
+            <select value={form.gender} onChange={set("gender")} className={inputCls("gender")}>
+              <option value="">Select gender</option>
+              {["male", "female", "other"].map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Status</label>
+            <select value={form.status} onChange={set("status")} className={inputCls("status")}>
+              {["active", "inactive", "banned"].map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+            </select>
+          </div>
+          {errs._ && <p className="text-xs text-red-500">{errs._}</p>}
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <Button onClick={onClose}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
+            className={`px-4 py-2 text-sm rounded-[8px] border font-semibold transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}
-            className="px-4 py-2 text-sm rounded-lg bg-[#0f2744] text-white hover:bg-[#1a3a5c] disabled:opacity-60 transition-colors">
+            className="px-4 py-2 text-sm rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] disabled:opacity-60 transition-colors font-semibold">
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
@@ -127,24 +156,24 @@ function DeleteConfirm({ user, onClose, onDeleted, dark }) {
     setLoading(true);
     const res = await request(`admin/users/${user.id}`, "delete");
     setLoading(false);
-    if (res?.message) { onDeleted(); onClose(); }
+    if (!res?.errors) { onDeleted(); onClose(); }
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className={`rounded-2xl shadow-2xl w-full max-w-sm p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
-        <h3 className={`text-base font-semibold mb-2 ${dark ? "text-gray-100" : "text-gray-900"}`}>Delete User</h3>
-        <p className={`text-sm mb-6 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+      <div className={`rounded-xl shadow-2xl w-full max-w-sm p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
+        <h3 className={`text-[18px] font-bold mb-2 ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Delete User</h3>
+        <p className={`text-sm mb-6 ${dark ? "text-gray-400" : "text-[#486581]"}`}>
           Are you sure you want to delete {" "}
-          <span className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{user.name}</span>?
+          <span className={`font-medium ${dark ? "text-gray-200" : "text-[#102A43]"}`}>{user.name}</span>?
           This action cannot be undone.
         </p>
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
+            className={`px-4 py-2 text-sm rounded-[8px] border font-semibold transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>
             Cancel
           </Button>
           <Button onClick={handleDelete} disabled={loading}
-            className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors">
+            className="px-4 py-2 text-sm rounded-[8px] bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors font-semibold">
             {loading ? "Deleting…" : "Delete"}
           </Button>
         </div>
@@ -166,10 +195,14 @@ export default function CustomerManagement() {
   const [editing,  setEditing]  = useState(null);
   const [deleting, setDeleting] = useState(null);
 
+  const { profile } = ProfileStore();
+
   const load = () => {
     setLoading(true);
     request("admin/users", "get").then((res) => {
-      setUsers(res?.data?.length ? res.data : SAMPLE_USERS);
+      const data = Array.isArray(res) ? res : res?.data;
+      const list = data?.length ? data : SAMPLE_USERS;
+      setUsers(list.filter(u => u.id !== profile?.id && u.roles?.every(r => r.name !== "admin")));
       setLoading(false);
     }).catch(() => {
       setUsers(SAMPLE_USERS);
@@ -177,6 +210,7 @@ export default function CustomerManagement() {
     });
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const handleSort = (col) => {
@@ -201,34 +235,34 @@ export default function CustomerManagement() {
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── dynamic classes ──────────────────────────────────────────
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-gray-200";
-  const cardHdr   = dark ? "border-gray-700"               : "border-gray-200";
-  const title     = dark ? "text-gray-100"                 : "text-gray-900";
-  const subText   = dark ? "text-gray-400"                 : "text-gray-500";
-  const thead     = dark ? "bg-gray-700/60"                : "bg-gray-50";
-  const thText    = dark ? "text-gray-400"                 : "text-gray-500";
-  const thHover   = dark ? "hover:bg-gray-700"             : "hover:bg-gray-100";
-  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-gray-100";
-  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-gray-50";
-  const cellText  = dark ? "text-gray-300"                 : "text-gray-600";
-  const cellMuted = dark ? "text-gray-500"                 : "text-gray-500";
-  const divider   = dark ? "divide-gray-700"               : "divide-gray-200";
-  const filterBg  = dark ? "bg-gray-700"                   : "bg-gray-100";
-  const filterBtn = dark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700";
-  const filterAct = dark ? "bg-gray-600 text-gray-100 shadow" : "bg-white text-gray-900 shadow";
+  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
+  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
+  const title     = dark ? "text-gray-100"                 : "text-[#102A43]";
+  const subText   = dark ? "text-gray-400"                 : "text-[#486581]";
+  const thead     = dark ? "bg-gray-700/60"                : "bg-[#F5F8FC]";
+  const thText    = dark ? "text-gray-400"                 : "text-[#486581]";
+  const thHover   = dark ? "hover:bg-gray-700"             : "hover:bg-[#F5F8FC]";
+  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-[#D9E2EC]";
+  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-[#F5F8FC]";
+  const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
+  const cellMuted = dark ? "text-[#829AB1]"                 : "text-[#829AB1]";
+  const divider   = dark ? "divide-gray-700"               : "divide-[#D9E2EC]";
+  const filterBg  = dark ? "bg-gray-700"                   : "bg-[#F5F8FC]";
+  const filterBtn = dark ? "text-gray-400 hover:text-gray-200" : "text-[#486581] hover:text-[#102A43]";
+  const filterAct = dark ? "bg-gray-600 text-gray-100 shadow" : "bg-white text-[#102A43] shadow";
   const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2744]/30 w-48";
+    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
+    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48 placeholder:text-[#829AB1]";
   const pageBtn   = dark
-    ? "px-3 py-1.5 rounded-lg border border-gray-600 text-xs font-medium hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed";
+    ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
+    : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold text-[#486581] hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
   const pageNum   = (active) => active
-    ? "w-8 h-8 rounded-lg text-xs font-medium bg-[#0f2744] text-white"
-    : `w-8 h-8 rounded-lg text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`;
+    ? "w-8 h-8 rounded-[8px] text-xs font-semibold bg-[#FF6B00] text-white"
+    : `w-8 h-8 rounded-[8px] text-xs font-semibold transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
 
   const HeadCell = ({ col, label, className = "" }) => (
     <th onClick={() => handleSort(col)}
-      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap ${thText} ${thHover} ${className}`}>
+      className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none whitespace-nowrap ${thText} ${thHover} ${className}`}>
       <span className="inline-flex items-center gap-1">
         {label}
         <SortIcon column={col} sortCol={sortCol} sortDir={sortDir} dark={dark} />
@@ -237,16 +271,16 @@ export default function CustomerManagement() {
   );
 
   return (
-    <div>
-      <h2 className={`text-xl font-bold mb-5 ${title}`}>Customer Management</h2>
+    <div style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
+      <h2 className={`text-[26px] font-bold mb-5 ${title}`}>Customer Management</h2>
 
-      <div className={`rounded-2xl shadow-sm border overflow-hidden ${card}`}>
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
 
         {/* ── Header ── */}
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
-            <span className={`text-base font-semibold ${title}`}>Customer List</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-blue-50 text-blue-700 ring-blue-200"}`}>
+            <span className={`text-[18px] font-bold ${title}`}>Customer List</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FFF3E8] text-[#FF6B00] ring-[#FFD4A8]"}`}>
               {filtered.length} users
             </span>
           </div>
@@ -329,13 +363,13 @@ export default function CustomerManagement() {
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <Button onClick={() => setEditing(user)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-xs font-semibold transition-colors ${
+                          dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
                         }`}>
                         <MdEdit size={14} /> Edit
                       </Button>
                       <Button onClick={() => setDeleting(user)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-xs font-semibold transition-colors ${
                           dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
                         }`}>
                         <MdDelete size={14} /> Delete

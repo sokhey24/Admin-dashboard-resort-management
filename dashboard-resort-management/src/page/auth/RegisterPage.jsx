@@ -65,23 +65,23 @@ export default function RegisterPage() {
     handleAuthSuccess(res);
   };
 
-  const googleRegister = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      const res = await request("auth/google/token", "post", { token: tokenResponse.access_token });
-      setLoading(false);
-      if (res?.errors) { message.error(res.errors.message ?? "Google sign-up failed."); return; }
-      if (res?.access_token) {
-        setAuth(res.access_token, res.user);
-        setProfile({ ...res.user });
-        setAccessToken(res.access_token);
-        setPermission(res.permission ?? null);
-        message.success("Google sign-up successful!");
-        navigate(getRedirectByRole(res.user));
-      }
-    },
-    onError: () => message.error("Google sign-up failed. Please try again."),
-  });
+  // const googleRegister = useGoogleLogin({
+  //   onSuccess: async (tokenResponse) => {
+  //     setLoading(true);
+  //     const res = await request("auth/google/token", "post", { token: tokenResponse.access_token });
+  //     setLoading(false);
+  //     if (res?.errors) { message.error(res.errors.message ?? "Google sign-up failed."); return; }
+  //     if (res?.access_token) {
+  //       setAuth(res.access_token, res.user);
+  //       setProfile({ ...res.user });
+  //       setAccessToken(res.access_token);
+  //       setPermission(res.permission ?? null);
+  //       message.success("Google sign-up successful!");
+  //       navigate(getRedirectByRole(res.user));
+  //     }
+  //   },
+  //   // onError: () => message.error("Google sign-up failed. Please try again."),
+  // });
 
   return (
     <Spin spinning={loading}>
@@ -92,20 +92,20 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-black/50" />
         <AuthNavbar />
 
-        <div className="w-full max-w-[480px] bg-white rounded-2xl shadow-2xl p-10 relative z-10">
+        <div className="w-full max-w-[480px] bg-white rounded-xl shadow-2xl p-10 relative z-10">
 
           {/* Header */}
           <div className="text-center mb-6">
             <img src={logoResort} alt="Resort Logo" className="w-16 h-16 rounded-full object-cover mx-auto mb-2" />
-            <h2 className="text-2xl font-bold text-[#0f2744] mt-2 mb-1">Create Account</h2>
-            <p className="text-gray-400 text-sm">Register to Resort Management System</p>
+            <h2 className="text-2xl font-bold text-[#102A43] mt-2 mb-1">Create Account</h2>
+            <p className="text-[#829AB1] text-sm">Register to Resort Management System</p>
           </div>
 
           {/* Google Button */}
           {/* <button
             type="button"
             onClick={() => googleRegister()}
-            className="w-full flex items-center justify-center gap-3 h-11 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200 text-gray-700 font-medium text-sm cursor-pointer"
+            className="w-full flex items-center justify-center gap-3 h-11 border border-[#D9E2EC] rounded-lg hover:bg-[#F5F8FC] transition-colors duration-200 text-[#486581] font-medium text-sm cursor-pointer"
           >
             <svg className="w-5 h-5" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.86l6.08-6.08C34.46 3.09 29.5 1 24 1 14.82 1 7.07 6.48 3.64 14.22l7.08 5.5C12.43 13.61 17.74 9.5 24 9.5z"/>
@@ -116,7 +116,7 @@ export default function RegisterPage() {
             Continue with Google
           </button> */}
 
-          {/* <Divider className="!my-4 !text-gray-400 !text-xs">or register with email</Divider> */}
+          {/* <Divider className="!my-4 !text-[#829AB1] !text-xs">or register with email</Divider> */}
 
           <Form form={form} onFinish={onFinish} layout="vertical" requiredMark={false}>
 
@@ -182,18 +182,21 @@ export default function RegisterPage() {
             </Form.Item>
 
             <Form.Item className="!mb-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 bg-[#0f2744] hover:bg-[#1a3a5c] text-white font-semibold rounded-lg transition-colors duration-200 cursor-pointer disabled:opacity-60"
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                block
+                size="large"
+                className="!bg-[#FF6B00] !border-[#FF6B00] hover:!bg-[#e05e00]"
               >
                 Create Account
-              </button>
+              </Button>
             </Form.Item>
 
-            <p className="text-center text-gray-400 text-sm">
+            <p className="text-center text-[#829AB1] text-sm">
               Already have an account?{" "}
-              <Link to="/login" className="text-[#0f2744] font-semibold hover:underline">Sign In</Link>
+              <Link to="/login" className="text-[#102A43] font-semibold hover:underline">Sign In</Link>
             </p>
 
           </Form>
