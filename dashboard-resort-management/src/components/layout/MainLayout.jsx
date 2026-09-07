@@ -337,7 +337,7 @@ export default function MainLayout() {
             {(notifPage - 1) * NOTIF_PAGE_SIZE + 1}–{Math.min(notifPage * NOTIF_PAGE_SIZE, filteredNotifs.length)} of {filteredNotifs.length}
           </span>
           <div className="flex items-center gap-1">
-            <button
+            <Button
               disabled={notifPage === 1}
               onClick={() => setNotifPage((p) => p - 1)}
               className={`text-xs px-2 py-0.5 rounded ${
@@ -347,11 +347,11 @@ export default function MainLayout() {
               } ${darkMode ? "text-gray-400" : "text-[#829AB1]"}`}
             >
               Prev
-            </button>
+            </Button>
             <span className={`text-xs ${darkMode ? "text-gray-400" : "text-[#829AB1]"}`}>
               {notifPage} / {Math.ceil(filteredNotifs.length / NOTIF_PAGE_SIZE)}
             </span>
-            <button
+            <Button
               disabled={notifPage >= Math.ceil(filteredNotifs.length / NOTIF_PAGE_SIZE)}
               onClick={() => setNotifPage((p) => p + 1)}
               className={`text-xs px-2 py-0.5 rounded ${
@@ -361,14 +361,14 @@ export default function MainLayout() {
               } ${darkMode ? "text-gray-400" : "text-[#829AB1]"}`}
             >
               Next
-            </button>
+            </Button>
           </div>
-          <button
+          <Button
             onClick={() => { clearAll(); setNotifPage(1); }}
             className="text-xs text-red-400 hover:text-red-500"
           >
             Clear all
-          </button>
+          </Button>
         </div>
       )}
     </div>

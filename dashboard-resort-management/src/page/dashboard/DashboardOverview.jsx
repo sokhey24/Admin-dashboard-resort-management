@@ -32,16 +32,9 @@ import { BsShopWindow } from "react-icons/bs";
 import Chart_data_resort from "../Chart_Data/Chart_data_resort";
 import ChartCircleRestaurant from "../Chart_Data/Chart_cirlce";
 import ListCardRecently from "../customer/ListCardRecently";
+import NotificationCard from "../ManagerSystem/NotificationCard";
 
-// import {
-//   Line,
-//   LineChart,
-//   CartesianGrid,
-//   ResponsiveContainer,
-//   Tooltip,
-//   XAxis,
-//   YAxis,
-// } from "recharts";
+
 
 
 const { Option } = Select;
@@ -74,66 +67,6 @@ function Card({ title, children, dark, className = "" }) {
     </div>
   );
 }
-
-// const sampleNotifications = [
-//   {
-//     id: 1,
-//     user: "Sok Dara",
-//     action: "created",
-//     model_type: "Booking",
-//     description: "Created booking BK-1001 for Villa 101",
-//     created_at: "2026-08-28T09:30:00",
-//   },
-//   {
-//     id: 2,
-//     user: "John Smith",
-//     action: "created",
-//     model_type: "Food Order",
-//     description: "Placed restaurant order ORD-2031",
-//     created_at: "2026-08-28T09:20:00",
-//   },
-//   {
-//     id: 3,
-//     user: "Admin",
-//     action: "updated",
-//     model_type: "Room",
-//     description: "Updated Villa 205 information",
-//     created_at: "2026-08-28T09:10:00",
-//   },
-//   {
-//     id: 4,
-//     user: "Manager",
-//     action: "created",
-//     model_type: "Menu Item",
-//     description: "Added new menu item Chicken Burger",
-//     created_at: "2026-08-28T08:55:00",
-//   },
-//   {
-//     id: 5,
-//     user: "Staff",
-//     action: "updated",
-//     model_type: "Booking",
-//     description: "Changed booking BK-0998 status to Checked In",
-//     created_at: "2026-08-28T08:40:00",
-//   },
-//   {
-//     id: 6,
-//     user: "Admin",
-//     action: "deleted",
-//     model_type: "Menu Item",
-//     description: "Deleted menu item from restaurant menu",
-//     created_at: "2026-08-28T08:25:00",
-//   },
-//   {
-//     id: 7,
-//     user: "Sokha Guest",
-//     action: "created",
-//     model_type: "Food Order",
-//     description: "Ordered 2 Fried Rice and 1 Orange Juice",
-//     created_at: "2026-08-28T08:15:00",
-//   },
-// ];
-
 const orderOverviewData = [
   { month: "Jan", orders: 120 },
   { month: "Feb", orders: 145 },
@@ -301,98 +234,7 @@ function RecentActivityTable({ activities, dark }) {
   };
 
   return (
-    // <div className={`rounded-xl border overflow-hidden ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
-    //   {/* Header */}
-    //   <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? "border-gray-700" : "border-[#D9E2EC]"}`}>
-    //     <span className={`text-sm font-semibold ${dark ? "text-gray-200" : "text-[#102A43]"}`}>Notification</span>
-    //     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-    //       dark ? "bg-blue-900/40 text-blue-400" : "bg-blue-100 text-blue-700"
-    //     }`}>{filtered.length}</span>
-    //   </div>
 
-    //   {/* Search + Filter */}
-    //   <SearchBar
-    //     dark={dark}
-    //     value={search}
-    //     onChange={v => { setSearch(v); setPage(1); }}
-    //     placeholder="Search name, action, description…"
-    //     selectValue={actionFilter}
-    //     onSelectChange={v => { setActionFilter(v); setPage(1); }}
-    //     selectOptions={actionOptions}
-    //     selectPlaceholder="Filter by action"
-    //   />
-
-    //   {/* Card list */}
-    //   <div className="divide-y" style={{ maxHeight: 420, overflowY: "auto" }}>
-    //     {paged.length === 0 ? (
-    //       <div className={`py-10 text-center text-xs ${dark ? "text-[#829AB1]" : "text-gray-400"}`}>
-    //         No activities found
-    //       </div>
-    //     ) : paged.map((a, i) => {
-    //       const { icon, bg } = moduleIcon(a.model_type);
-    //       return (
-    //         <div
-    //           key={a.id ?? i}
-    //           className={`px-4 py-3 flex gap-3 transition-colors ${
-    //             dark ? "border-gray-700 hover:bg-gray-700/40" : "border-gray-100 hover:bg-[#F5F8FC]"
-    //           }`}
-    //         >
-    //           {/* Avatar / icon */}
-    //           <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm ${bg}`}>
-    //             {icon}
-    //           </div>
-
-    //           {/* Content */}
-    //           <div className="flex-1 min-w-0">
-    //             <div className="flex items-center gap-2 flex-wrap">
-    //               {/* User avatar initial + name */}
-    //               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
-    //                 dark ? "bg-[#1a3a5c]" : "bg-[#FF6B00]"
-    //               }`}>
-    //                 {(a.user ?? "S").charAt(0).toUpperCase()}
-    //               </div>
-    //               <span className={`text-xs font-semibold ${dark ? "text-gray-200" : "text-[#102A43]"}`}>
-    //                 {a.user ?? "System"}
-    //               </span>
-    //               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${actionBadge(a.action)}`}>
-    //                 {a.action ?? "—"}
-    //               </span>
-    //               <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-    //                 dark ? "bg-gray-700 text-gray-400" : "bg-[#F5F8FC] text-[#829AB1]"
-    //               }`}>
-    //                 {a.model_type ?? "System"}
-    //               </span>
-    //             </div>
-    //             <p
-    //               className={`text-xs mt-1 truncate ${dark ? "text-gray-400" : "text-[#829AB1]"}`}
-    //               title={a.description}
-    //             >
-    //               {a.description ?? "No description"}
-    //             </p>
-    //             <span className={`text-[10px] ${dark ? "text-[#829AB1]" : "text-gray-400"}`}>
-    //               {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
-    //             </span>
-    //           </div>
-    //         </div>
-    //       );
-    //     })}
-    //   </div>
-
-    //   {/* Pagination */}
-    //   <div className={`flex items-center justify-between px-4 py-3 border-t ${dark ? "border-gray-700" : "border-gray-100"}`}>
-    //     <span className={`text-xs ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
-    //       {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-    //     </span>
-    //     <Pagination
-    //       current={page}
-    //       pageSize={PAGE_SIZE}
-    //       total={filtered.length}
-    //       onChange={setPage}
-    //       size="small"
-    //       showSizeChanger={false}
-    //     />
-    //   </div>
-    // </div>
     <div>
       
     </div>
@@ -543,6 +385,10 @@ function OverviewTab({ dark }) {
       {/* ── Resort Management Section ── */}
       <div className={`rounded-xl border mb-4 overflow-hidden ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
         <LineChartPerformance/>
+      </div>
+
+      <div>
+        <NotificationCard/>
       </div>
 
       {/* ── Recent Bookings + Recent Activity ── */}
@@ -992,51 +838,6 @@ function RevenueTab({ dark }) {
 
       <ChartDataDashboard/>
       <AreaChartAnalaysisPerformance/>
-      {/* <Card title="Monthly Revenue" dark={dark} className="mb-4">
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={monthly}>
-            <CartesianGrid strokeDasharray="5 5" stroke={gridColor} />
-            <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 12 }} />
-            <YAxis tick={{ fill: axisColor, fontSize: 12 }} />
-            <Tooltip content={<DarkTooltip dark={dark} />} />
-            <Legend wrapperStyle={{ color: dark ? "#d1d5db" : "#374151", fontSize: 12 }} />
-            <Bar dataKey="revenue" name="Revenue" fill="#1677ff" radius={[4,4,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-
-      <Card title="Revenue Trend" dark={dark} className="mb-4">
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={monthly}>
-            <CartesianGrid strokeDasharray="5 5" stroke={gridColor} />
-            <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 12 }} />
-            <YAxis tick={{ fill: axisColor, fontSize: 12 }} />
-            <Tooltip content={<DarkTooltip dark={dark} />} />
-            <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#52c41a" strokeWidth={2} dot={{ r: 4, fill: "#52c41a" }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title="Monthly Revenue Breakdown" dark={dark}>
-        {monthly.length === 0
-          ? <p className={`text-sm text-center py-8 ${dark ? "text-[#829AB1]" : "text-gray-400"}`}>No revenue data yet</p>
-          : (
-            <>
-              <SimpleTable
-                dark={dark}
-                data={monthly.map((r, i) => ({ ...r, key: i }))}
-                searchKeys={["month"]}
-                columns={[
-                  { key: "month",   title: "Month" },
-                  { key: "revenue", title: "Revenue", render: v => `$${Number(v).toLocaleString()}` },
-                ]}
-              />
-              <div className={`flex gap-4 mt-3 pt-3 border-t text-sm font-semibold ${dark ? "border-gray-700 text-gray-200" : "border-[#D9E2EC] text-[#102A43]"}`}>
-                <span>Total: <span className="text-green-500">${totalRev.toLocaleString()}</span></span>
-              </div>
-            </>
-          )
-        }
-      </Card> */}
     </Spin>
   );
 }
@@ -1256,5 +1057,7 @@ export default function DashboardOverview() {
         ]}
       />
     </div>
+
+   
   );
 }
