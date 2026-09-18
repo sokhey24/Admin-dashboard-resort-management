@@ -3,28 +3,34 @@ import { Modal, Form, Input, Select, message, Button, InputNumber } from "antd";
 import { MdSearch, MdEdit, MdDelete } from "react-icons/md";
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
+import usePermission from "../../util/usePermission";
+import useRole from "../../util/useRole";
+import { ROOM_STATUSES, STATUS_STYLE, applyFormErrors, roomActionClass, roomModalOkClass, roomModalCancelClass } from "./roomHelpers";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
-const { Option } = Select;
-const PAGE_SIZE = 8;
-
-const STATUS_STYLE = {
-  available:   { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
-  occupied:    { dot: "bg-red-500",    light: "bg-red-50 text-red-700 ring-red-200",            dark: "bg-red-900/40 text-red-400 ring-red-700"         },
-  maintenance: { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200",  dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
-};
-
-function BadgeWithDot({ status, dark }) {
+export function RoomStatusBadge({ status, dark }) {
   const s = STATUS_STYLE[status] ?? STATUS_STYLE.maintenance;
+  const label = status ? status.replace(/_/g, " ") : "Unknown";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? s.dark : s.light}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 capitalize ${dark ? s.dark : s.light}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {status?.charAt(0).toUpperCase() + status?.slice(1)}
+      {label}
     </span>
   );
 }
 
+const PAGE_SIZE = 8;
+
+function BadgeWithDot({ status, dark }) {
+  return <RoomStatusBadge status={status} dark={dark} />;
+}
+
 export default function RoomStatus() {
   const dark = useDarkMode();
+  const { canAny } = usePermission();
+  const { isAdmin } = useRole();
+  const canEdit = isAdmin || canAny("admin.resorts.update", "resort.rooms.update");
+  const canDelete = isAdmin || canAny("admin.resorts.delete", "resort.rooms.delete");
   const [rooms,   setRooms]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState("");
@@ -32,6 +38,7 @@ export default function RoomStatus() {
   const [modal,   setModal]   = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving,  setSaving]  = useState(false);
+  const [confirm, setConfirm] = useState(null);
   const [form] = Form.useForm();
 
   const load = () => {
@@ -43,20 +50,49 @@ export default function RoomStatus() {
   };
   useEffect(() => { load(); }, []);
 
-  const openEdit = (r) => { setEditing(r); form.setFieldsValue(r); setModal(true); };
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this room?")) return;
+  const openEdit = (r) => {
+    setEditing(r);
+    form.setFieldsValue({
+      room_number: r.room_number,
+      floor: r.floor,
+      price_per_night: r.price_per_night != null ? Number(r.price_per_night) : undefined,
+      status: r.status,
+      notes: r.notes,
+    });
+    setModal(true);
+  };
+  const handleDelete = async () => {
+    if (!confirm) return;
+    const id = confirm.room.id;
+    setConfirm((c) => ({ ...c, loading: true }));
     const res = await request(`admin/rooms/${id}`, "delete");
-    if (res?.message) { message.success("Room deleted"); load(); }
-    else message.error("Failed to delete");
+    setConfirm(null);
+    if (res?.errors) {
+      message.error(res.errors.message ?? "Failed to delete");
+      return;
+    }
+    message.success("Room deleted");
+    load();
   };
   const handleSave = async () => {
     const values = await form.validateFields();
     setSaving(true);
-    const res = await request(`admin/rooms/${editing.id}`, "put", values);
+    const res = await request(`admin/rooms/${editing.id}`, "put", {
+      room_number: values.room_number,
+      floor: values.floor != null ? String(values.floor) : null,
+      price_per_night: values.price_per_night,
+      status: values.status,
+      notes: values.notes,
+    });
     setSaving(false);
-    if (res?.message) { message.success("Room updated"); setModal(false); load(); }
-    else message.error("Failed to update");
+    if (res?.errors) {
+      applyFormErrors(form, res.errors);
+      message.error(res.errors.message ?? "Unable to update room.");
+      return;
+    }
+    message.success("Room updated");
+    setModal(false);
+    load();
   };
 
   const filtered = useMemo(() => {
@@ -150,14 +186,16 @@ export default function RoomStatus() {
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={r.status} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button onClick={() => openEdit(r)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"}`}>
-                        <MdEdit size={14} /> Edit
-                      </Button>
-                      <Button onClick={() => handleDelete(r.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
-                        <MdDelete size={14} /> Delete
-                      </Button>
+                      {canEdit && (
+                        <Button className={roomActionClass(dark)} onClick={() => openEdit(r)}>
+                          <MdEdit size={14} /> Edit
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button className={roomActionClass(dark)} onClick={() => setConfirm({ room: r, loading: false })}>
+                          <MdDelete size={14} /> Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -179,21 +217,44 @@ export default function RoomStatus() {
         </div>
       </div>
 
-      <Modal title="Edit Room" open={modal} onOk={handleSave} onCancel={() => setModal(false)} confirmLoading={saving} okText="Save">
+      <Modal
+        title={<span className={titleCls} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>Edit Room</span>}
+        open={modal}
+        onOk={handleSave}
+        onCancel={() => setModal(false)}
+        confirmLoading={saving}
+        okText="Save"
+        okButtonProps={{ className: roomModalOkClass() }}
+        cancelButtonProps={{ className: roomModalCancelClass(dark) }}
+        className={dark ? "[&_.ant-modal-content]:!bg-gray-800 [&_.ant-modal-header]:!bg-gray-800 [&_.ant-modal-close]:!text-gray-300" : ""}
+        styles={{
+          content: { fontFamily: "Inter, Poppins, sans-serif" },
+          header: { fontFamily: "Inter, Poppins, sans-serif" },
+        }}
+      >
         <Form form={form} layout="vertical">
           <Form.Item name="room_number"     label="Room Number"  rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="floor"           label="Floor"><InputNumber className="w-full" /></Form.Item>
           <Form.Item name="price_per_night" label="Price/Night"><InputNumber className="w-full" prefix="$" /></Form.Item>
-          <Form.Item name="status"          label="Status">
-            <Select>
-              <Option value="available">Available</Option>
-              <Option value="occupied">Occupied</Option>
-              <Option value="maintenance">Maintenance</Option>
-            </Select>
+          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+            <Select options={ROOM_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))} />
           </Form.Item>
-          <Form.Item name="description" label="Description"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="notes" label="Notes"><Input.TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Room"
+        message={confirm ? `Are you sure you want to delete room ${confirm.room.room_number}?` : ""}
+        sub="This action cannot be undone."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        danger
+        loading={!!confirm?.loading}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

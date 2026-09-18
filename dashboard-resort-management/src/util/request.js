@@ -1,7 +1,5 @@
 import axios from "axios";
 import config from "./config";
-import { clearAuth } from "./auth";
-import { ProfileStore } from "../store/ProfileStore";
 
 const getToken = () => {
   try {
@@ -12,21 +10,13 @@ const getToken = () => {
   }
 };
 
-const isPublicAuthUrl = (url = "") =>
-  /^(auth\/login|auth\/register|auth\/two-factor\/challenge|auth\/forgot-password)/.test(url);
-
-const clearExpiredSession = () => {
-  clearAuth();
-  ProfileStore.getState().logout();
-};
-
 export const request = (url = "", method = "", data = {}) => {
   const token = getToken();
   let headers = { Accept: "application/json" };
   if (!(data instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  if (token && !isPublicAuthUrl(url)) {
+  if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
   const isLargeUpload = data instanceof FormData;
@@ -35,7 +25,7 @@ export const request = (url = "", method = "", data = {}) => {
     method,
     data,
     headers,
-    timeout: isLargeUpload ? 0 : 30000,
+    timeout: isLargeUpload ? 0 : 30000, // no timeout for file uploads, 30s for normal requests
   })
     .then((res) => res.data)
     .catch((error) => {
@@ -43,16 +33,7 @@ export const request = (url = "", method = "", data = {}) => {
       if (response) {
         const { status, data } = response;
         let errors = {};
-        if (status === 401) {
-          errors.message = data?.message ?? "Invalid email or password.";
-          if (!isPublicAuthUrl(url)) {
-            clearExpiredSession();
-            const path = window.location.pathname;
-            if (!["/login", "/register", "/forgot-password", "/verify-otp", "/reset-password"].includes(path)) {
-              window.location.assign("/login");
-            }
-          }
-        }
+        if (status === 401) errors.message = data?.message ?? "Invalid email or password.";
         if (status === 403) errors.message = data?.message ?? "Forbidden. You do not have permission to perform this action.";
         if (status === 422) errors.message = data?.message ?? "Validation failed.";
         if (status === 429) errors.message = data?.message ?? "Too many requests. Please wait before trying again.";

@@ -4,6 +4,7 @@ import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
 import usePermission from "../../util/usePermission";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
 const PAGE_SIZE = 8;
 
@@ -137,6 +138,7 @@ export default function ResortStaff() {
   const [page,    setPage]    = useState(1);
   const [editing, setEditing] = useState(null);
   const [adding,  setAdding]  = useState(false);
+  const [confirm, setConfirm] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -149,9 +151,12 @@ export default function ResortStaff() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this staff member?")) return;
-    await request(`resort/staff/${id}`, "delete");
+  const handleDelete = async () => {
+    if (!confirm) return;
+    setConfirm((c) => ({ ...c, loading: true }));
+    const res = await request(`resort/staff/${confirm.staff.id}`, "delete");
+    setConfirm(null);
+    if (res?.errors) return;
     load();
   };
 
@@ -180,15 +185,18 @@ export default function ResortStaff() {
   const pageBtn   = dark
     ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
     : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
+  const actionBtn = `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+    dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
+  }`;
 
   return (
     <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
-      <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>Resort Staff Management</h2>
+      <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>User Management</h2>
 
       <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
-            <span className={`text-[18px] font-semibold ${titleCls}`}>Resort Staff</span>
+            <span className={`text-[18px] font-semibold ${titleCls}`}>User Members : </span>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FF6B00]/10 text-[#102A43] ring-[#FF6B00]/20"}`}>
               {filtered.length} members
             </span>
@@ -217,7 +225,7 @@ export default function ResortStaff() {
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Role</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Phone</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Status</th>
-                {/* <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${thText}`}>Action</th> */}
+                <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${thText}`}>Action</th>
               </tr>
             </thead>
             <tbody className={`${tbody} divide-y`}>
@@ -247,18 +255,12 @@ export default function ResortStaff() {
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
                       {can("resort.staff.update") && (
-                        <Button onClick={() => setEditing(s)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
-                            dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
-                          }`}>
+                        <Button onClick={() => setEditing(s)} className={actionBtn}>
                           <MdEdit size={14} /> Edit
                         </Button>
                       )}
                       {can("resort.staff.delete") && (
-                        <Button onClick={() => handleDelete(s.id)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
-                            dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
-                          }`}>
+                        <Button onClick={() => setConfirm({ staff: s, loading: false })} className={actionBtn}>
                           <MdDelete size={14} /> Delete
                         </Button>
                       )}
@@ -293,6 +295,18 @@ export default function ResortStaff() {
           dark={dark}
         />
       )}
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Staff"
+        message={confirm ? `Are you sure you want to delete ${confirm.staff.name}?` : ""}
+        sub="This action cannot be undone."
+        confirmText="Yes, Delete"
+        danger
+        loading={!!confirm?.loading}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

@@ -1,0 +1,33 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery · Solara Resort</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="gallery">
+  <div id="site-header"></div>
+  <section class="page-hero" style="background-image:url('https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1800&q=80')">
+    <h1>Gallery</h1>
+  </section>
+  <section class="section">
+    <div class="container">
+      <p class="lead">Click a photo to open it. Images are stock placeholders for the demo.</p>
+      <select class="field" id="galleryCat" style="max-width:260px;margin-bottom:20px" aria-label="Gallery category"></select>
+      <div class="gallery-grid" id="galleryGrid"></div>
+    </div>
+  </section>
+  <div class="modal" id="lightbox"><img id="lightboxImg" alt="Gallery photo" style="max-width:min(900px,92vw);max-height:80vh;border-radius:12px"></div>
+  <div id="site-footer"></div>
+  <script src="script/data.js"></script>
+  <script src="script/store.js"></script>
+  <script src="script/api.js"></script>
+  <script src="script/app.js"></script>
+  <script src="script/content.js"></script>
+</body>
+</html>

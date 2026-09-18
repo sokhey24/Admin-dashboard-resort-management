@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -8,21 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import { useDarkMode } from "../../util/DarkModeContext";
-
-const data = [
-  { month: "Jan", revenue: 18500 },
-  { month: "Feb", revenue: 22400 },
-  { month: "Mar", revenue: 25800 },
-  { month: "Apr", revenue: 23100 },
-  { month: "May", revenue: 29500 },
-  { month: "Jun", revenue: 32800 },
-  { month: "Jul", revenue: 35600 },
-  { month: "Aug", revenue: 38200 },
-  { month: "Sep", revenue: 33400 },
-  { month: "Oct", revenue: 36800 },
-  { month: "Nov", revenue: 40500 },
-  { month: "Dec", revenue: 46800 },
-];
+import { request } from "../../util/request";
 
 const formatCurrency = (value) => {
   return `$${Number(value).toLocaleString()}`;
@@ -78,6 +65,17 @@ function CustomTooltip({ active, payload, label, dark }) {
 
 export default function Chart_data_resort() {
   const dark = useDarkMode();
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    request("resort/dashboard", "get").then((res) => {
+      if (res && !res.errors && Array.isArray(res.monthly_revenue)) {
+        setRows(res.monthly_revenue);
+      }
+    });
+  }, []);
+
+  const chartRows = rows.length ? rows : [{ month: "—", revenue: 0 }];
 
   const axisColor = dark ? "#9ca3af" : "#6b7280";
   const gridColor = dark ? "#374151" : "#e5e7eb";
@@ -128,7 +126,7 @@ export default function Chart_data_resort() {
       <div className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={data}
+            data={chartRows}
             margin={{
               top: 10,
               right: 10,

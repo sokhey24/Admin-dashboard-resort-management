@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react";
-import { MdAdd, MdSearch } from "react-icons/md";
+import { MdAdd, MdSearch, MdEdit, MdDelete } from "react-icons/md";
 import { useDarkMode } from "../../util/DarkModeContext";
-import ButtonDelete from "../../components/layout/Button/ButtonDelete";
-import ButtonEdit from "../../components/layout/Button/ButtonEdit";
 import { Button } from "antd";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
 const images = [
   { id: 1, name: "Swimming Pool",    category: "Outdoor",      imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQzeaMPwkVax3KT0WjfK89Fy3Brxd4ulCWGep2adVZihGLd56R2-6N-lXJX&s=10",                                                                                   imageAlt: "Swimming Pool",    description: "Olympic-size outdoor swimming pool for adults and children.",                              price: "$120", perTime: "day"     },
@@ -23,6 +22,7 @@ export default function Gallery() {
   const [search, setSearch] = useState("");
   const [list,   setList]   = useState(images);
   const [page,   setPage]   = useState(1);
+  const [confirm, setConfirm] = useState(null);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -34,7 +34,11 @@ export default function Gallery() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleDelete = (id) => setList(prev => prev.filter(img => img.id !== id));
+  const handleDelete = () => {
+    if (!confirm) return;
+    setList((prev) => prev.filter((img) => img.id !== confirm.image.id));
+    setConfirm(null);
+  };
 
   const bg         = dark ? "bg-gray-900"                 : "bg-[#F5F8FC]";
   const titleCls   = dark ? "text-gray-100"               : "text-[#102A43]";
@@ -54,6 +58,9 @@ export default function Gallery() {
   const pageNumCls = (isActive) => isActive
     ? "w-8 h-8 rounded-[10px] text-xs font-medium bg-[#FF6B00] text-white"
     : `w-8 h-8 rounded-[10px] text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
+  const actionBtn = `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+    dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
+  }`;
 
   return (
     <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${bg}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
@@ -112,8 +119,12 @@ export default function Gallery() {
                     <span className={`text-xs font-medium ${perCls}`}> / {image.perTime}</span>
                   </div>
                   <div className="flex gap-1.5">
-                    <ButtonEdit dark={dark} />
-                    <ButtonDelete dark={dark} onClick={() => handleDelete(image.id)} />
+                    <Button className={actionBtn}>
+                      <MdEdit size={14} /> Edit
+                    </Button>
+                    <Button onClick={() => setConfirm({ image })} className={actionBtn}>
+                      <MdDelete size={14} /> Delete
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -145,6 +156,17 @@ export default function Gallery() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Photo"
+        message={confirm ? `Are you sure you want to delete ${confirm.image.name}?` : ""}
+        sub="This action cannot be undone."
+        confirmText="Yes, Delete"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

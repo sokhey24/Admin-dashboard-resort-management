@@ -6,6 +6,7 @@ import {
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
 const STATUSES = ["all", "active", "inactive"];
 
@@ -144,38 +145,6 @@ function BranchModal({ branch, resorts, onClose, onSaved, dark }) {
   );
 }
 
-function DeleteConfirm({ branch, onClose, onDeleted, dark }) {
-  const [loading, setLoading] = useState(false);
-  const handleDelete = async () => {
-    setLoading(true);
-    const res = await request(`admin/branches/${branch.id}`, "delete");
-    setLoading(false);
-    if (!res?.errors) { onDeleted(); onClose(); }
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className={`rounded-xl shadow-2xl w-full max-w-sm p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
-        <h3 className={`text-base font-semibold mb-2 ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Delete Branch</h3>
-        <p className={`text-sm mb-6 ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
-          Are you sure you want to delete{" "}
-          <span className={`font-medium ${dark ? "text-gray-200" : "text-[#102A43]"}`}>{branch.name}</span>?
-          This action cannot be undone.
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button onClick={onClose}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>
-            Cancel
-          </Button>
-          <Button onClick={handleDelete} disabled={loading}
-            className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors">
-            {loading ? "Deleting…" : "Delete"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Branch() {
   const dark = useDarkMode();
 
@@ -189,7 +158,7 @@ export default function Branch() {
   const [page,     setPage]     = useState(1);
   const [editing,  setEditing]  = useState(null);
   const [adding,   setAdding]   = useState(false);
-  const [deleting, setDeleting] = useState(null);
+  const [confirm,  setConfirm]  = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -254,6 +223,18 @@ export default function Branch() {
   const pageNum   = (active) => active
     ? "w-8 h-8 rounded-[8px] text-xs font-semibold bg-[#FF6B00] text-white"
     : `w-8 h-8 rounded-lg text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
+  const actionBtn = `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+    dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
+  }`;
+
+  const handleDelete = async () => {
+    if (!confirm) return;
+    const id = confirm.branch.id;
+    setConfirm((c) => ({ ...c, loading: true }));
+    const res = await request(`admin/branches/${id}`, "delete");
+    setConfirm(null);
+    if (!res?.errors) load();
+  };
 
   const HeadCell = ({ col, label, className = "" }) => (
     <th onClick={() => handleSort(col)}
@@ -347,16 +328,10 @@ export default function Branch() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button onClick={() => setEditing(branch)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
-                        }`}>
+                      <Button onClick={() => setEditing(branch)} className={actionBtn}>
                         <MdEdit size={14} /> Edit
                       </Button>
-                      <Button onClick={() => setDeleting(branch)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
-                        }`}>
+                      <Button onClick={() => setConfirm({ branch, loading: false })} className={actionBtn}>
                         <MdDelete size={14} /> Delete
                       </Button>
                     </div>
@@ -402,14 +377,18 @@ export default function Branch() {
           dark={dark}
         />
       )}
-      {deleting && (
-        <DeleteConfirm
-          branch={deleting}
-          onClose={() => setDeleting(null)}
-          onDeleted={load}
-          dark={dark}
-        />
-      )}
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Branch"
+        message={confirm ? `Are you sure you want to delete ${confirm.branch.name}?` : ""}
+        sub="This action cannot be undone."
+        confirmText="Yes, Delete"
+        danger
+        loading={!!confirm?.loading}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

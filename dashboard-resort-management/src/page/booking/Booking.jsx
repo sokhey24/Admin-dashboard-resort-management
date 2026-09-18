@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Form, Select, InputNumber, message, Button, Input } from "antd";
-import { MdSearch, MdAdd, MdEdit, MdDelete, MdClose, MdPerson } from "react-icons/md";
+import { MdSearch, MdAdd, MdEdit, MdDelete, MdClose, MdPerson, MdPayment } from "react-icons/md";
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { fmtDateTime } from "../../util/fmtDateTime";
 import { useNotificationStore } from "../../store/NotificationStore";
 import { useBookingStore } from "../../store/BookingStore";
+import { fmtAmt } from "../Payment/paymentHelpers";
 
 const { Option } = Select;
 
@@ -75,9 +76,9 @@ function CheckoutDetailModal({ booking, onClose, onConfirm, loading, dark }) {
               {booking.booking_code ?? `BK-${booking.id}`} · Check-out time: <span className="font-medium text-purple-500">{now}</span>
             </p>
           </div>
-          <button onClick={onClose} className={`p-1 rounded-lg ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#829AB1]"}`}>
-            <MdClose size={14} />
-          </button>
+          <Button onClick={onClose} className={`p-1 rounded-lg ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#829AB1]"}`}>
+            <MdClose size={16} />
+          </Button>
         </div>
 
         <div className="px-6 py-4 space-y-5 max-h-[70vh] overflow-y-auto">
@@ -189,14 +190,14 @@ function CheckoutDetailModal({ booking, onClose, onConfirm, loading, dark }) {
         </div>
 
         <div className={`flex justify-end gap-2 px-6 py-4 border-t ${dark ? "border-gray-700" : "border-[#D9E2EC]"}`}>
-          <button onClick={onClose}
+          <Button onClick={onClose}
             className={`px-4 py-2 text-sm rounded-lg border transition-colors ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>
             Cancel
-          </button>
-          <button onClick={onConfirm} disabled={loading}
+          </Button>
+          <Button onClick={onConfirm} disabled={loading}
             className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60 transition-colors inline-flex items-center gap-1.5">
             <MdLogout size={14} /> {loading ? "Processing…" : "Confirm Check-out"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -256,27 +257,57 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
   const [selectedResort, setSelectedResort] = useState(booking?.resort_id ?? null);
   const { addBookingNotification } = useNotificationStore();
   const { updateBooking } = useBookingStore();
+  const checkInWatch = Form.useWatch("check_in", form);
+  const checkOutWatch = Form.useWatch("check_out", form);
+  const roomIdsWatch = Form.useWatch("room_ids", form);
+
+  const nights = useMemo(() => {
+    if (!checkInWatch || !checkOutWatch) return 0;
+    const a = new Date(checkInWatch);
+    const b = new Date(checkOutWatch);
+    const diff = Math.round((b - a) / 86400000);
+    return diff > 0 ? diff : 0;
+  }, [checkInWatch, checkOutWatch]);
+
+  const estimate = useMemo(() => {
+    const selected = rooms.filter((r) => (roomIdsWatch ?? []).includes(r.id));
+    const subtotal = selected.reduce((s, r) => s + Number(r.price_per_night ?? 0) * (nights || 0), 0);
+    return { subtotal, nights };
+  }, [rooms, roomIdsWatch, nights]);
+
+  const nextStatuses = {
+    pending: ["confirmed", "cancelled"],
+    confirmed: ["checked_in", "cancelled"],
+    checked_in: ["completed", "cancelled"],
+    checked_out: ["completed", "cancelled"],
+    cancelled: [],
+    completed: [],
+  };
 
   useEffect(() => {
     if (isEdit) { form.setFieldsValue({ status: booking.status }); return; }
     form.resetFields();
   }, [booking, isEdit, form]);
 
-  const fetchRooms = (resortId) => {
-    if (!resortId) { setRooms([]); return; }
+  const fetchRooms = (resortId, checkIn, checkOut) => {
+    if (!resortId || !checkIn || !checkOut) { setRooms([]); return; }
     setLoadingRooms(true);
-    request("admin/rooms", "get")
+    request(`admin/rooms?resort_id=${resortId}&check_in=${checkIn}&check_out=${checkOut}&per_page=50`, "get")
       .then((res) => {
         const all = Array.isArray(res?.data) ? res.data : [];
-        setRooms(all.filter((r) => r.resort_id === resortId && r.status === "available"));
+        setRooms(all.filter((r) => String(r.resort_id) === String(resortId) && r.status !== "maintenance"));
       })
       .finally(() => setLoadingRooms(false));
   };
 
+  useEffect(() => {
+    if (!isEdit) fetchRooms(selectedResort, checkInWatch, checkOutWatch);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedResort, checkInWatch, checkOutWatch, isEdit]);
+
   const handleResortChange = (value) => {
     setSelectedResort(value);
     form.setFieldValue("room_ids", []);
-    fetchRooms(value);
   };
 
   const handleSave = async () => {
@@ -289,6 +320,8 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
       children: values.children ?? 0,
       special_requests: values.special_requests ?? null,
       room_ids: values.room_ids ?? [],
+      check_in: values.check_in,
+      check_out: values.check_out,
     };
     const res = await request("admin/bookings", "post", payload);
     setSaving(false);
@@ -297,7 +330,7 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
       message.success("Booking created");
       onSaved(); onClose();
     } else {
-      message.error(res?.errors?.message ?? "Failed to create booking");
+      message.error(res?.errors?.message ?? res?.errors?.room_ids?.help ?? res?.errors?.check_out?.help ?? "Failed to create booking");
     }
   };
 
@@ -309,7 +342,7 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
     if (!res?.errors) {
       if (res?.data) updateBooking(res.data);
       message.success("Updated"); onSaved(); onClose();
-    } else message.error("Failed to update");
+    } else message.error(res?.errors?.message ?? res?.errors?.status?.[0] ?? "Failed to update");
   };
 
   const inputClass = `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40 ${dark ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-[#829AB1]" : "bg-white border-[#D9E2EC] text-[#102A43]"}`;
@@ -330,7 +363,7 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
           {isEdit ? (
             <Form.Item name="status" label="Status" rules={[{ required: true, message: "Select booking status" }]}>
               <Select className="w-full">
-                {BOOKING_STATUSES.map((s) => <Option key={s} value={s}>{formatStatus(s)}</Option>)}
+                {(nextStatuses[booking.status] ?? []).map((s) => <Option key={s} value={s}>{formatStatus(s)}</Option>)}
               </Select>
             </Form.Item>
           ) : (
@@ -343,6 +376,20 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
                   </Select>
                 </Form.Item>
               </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className={labelClass}>Check-in <span className="text-red-500">*</span></label>
+                  <Form.Item name="check_in" rules={[{ required: true, message: "Select check-in date." }]}>
+                    <Input type="date" className={inputClass} />
+                  </Form.Item>
+                </div>
+                <div>
+                  <label className={labelClass}>Check-out <span className="text-red-500">*</span></label>
+                  <Form.Item name="check_out" rules={[{ required: true, message: "Select check-out date." }]}>
+                    <Input type="date" className={inputClass} />
+                  </Form.Item>
+                </div>
+              </div>
               <div className="mb-4">
                 <label className={labelClass}>Rooms <span className="text-red-500">*</span></label>
                 <Form.Item 
@@ -351,11 +398,17 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
                   { required: true,
                    message: "Please select at least one room.", 
                    type: "array", min: 1 }]}>
-                  <Select mode="multiple" className="w-full" placeholder={selectedResort ? "Select rooms" : "Select a resort first"} disabled={!selectedResort} loading={loadingRooms} optionFilterProp="children" showSearch>
+                  <Select mode="multiple" className="w-full" placeholder={selectedResort && checkInWatch && checkOutWatch ? "Select available rooms" : "Select resort and dates first"} disabled={!selectedResort || !checkInWatch || !checkOutWatch} loading={loadingRooms} optionFilterProp="children" showSearch>
                     {rooms.map((r) => <Option key={r.id} value={r.id}>{r.room_number}{" — "}{r.roomType?.name ?? "Room"}{" ($"}{r.price_per_night}{"/night)"}</Option>)}
                   </Select>
                 </Form.Item>
               </div>
+              {nights > 0 && (
+                <p className={`text-xs mb-3 ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
+                  {nights} night{nights === 1 ? "" : "s"}
+                  {estimate.subtotal > 0 ? ` · estimated ${fmtAmt(estimate.subtotal)} (tax/discount applied on save)` : ""}
+                </p>
+              )}
               <div className="mb-4">
                 <label className={labelClass}>Guest (User)</label>
                 <Form.Item 
@@ -430,7 +483,12 @@ export default function Booking() {
   useEffect(() => {
     load();
     request("admin/resorts", "get").then((res) => { if (res?.data) setResorts(res.data); });
-    request("admin/users", "get").then((res) => { if (res?.data) setUsers(Array.isArray(res.data) ? res.data : []); });
+    request("admin/guests", "get").then((res) => {
+      if (res?.data) setUsers(Array.isArray(res.data) ? res.data : []);
+      else {
+        request("admin/users", "get").then((u) => { if (u?.data) setUsers(Array.isArray(u.data) ? u.data : []); });
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -496,7 +554,6 @@ export default function Booking() {
             <thead className={dark_thead}>
               <tr>
                 <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-12 ${dark_th}`}>No.</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${dark_th}`}>Booking </th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${dark_th}`}>Guest</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${dark_th}`}>Resort</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${dark_th}`}>Rooms</th>
@@ -509,14 +566,13 @@ export default function Booking() {
             </thead>
             <tbody className={`${dark_tbody} divide-y`}>
               {loading ? (
-                <tr><td colSpan={10} className={`py-16 text-center text-sm ${dark_sub}`}>Loading…</td></tr>
+                <tr><td colSpan={9} className={`py-16 text-center text-sm ${dark_sub}`}>Loading…</td></tr>
               ) : pageItems.length === 0 ? (
-                <tr><td colSpan={10} className={`py-16 text-center text-sm ${dark_sub}`}>No bookings found</td></tr>
+                <tr><td colSpan={9} className={`py-16 text-center text-sm ${dark_sub}`}>No bookings found</td></tr>
               ) : (
                 pageItems.map((booking, index) => (
                   <tr key={booking.id} className={`transition-colors ${dark_row}`}>
                     <td className={`px-4 py-4 text-sm font-medium ${dark_muted}`}>{(page - 1) * PAGE_SIZE + index + 1}</td>
-                    <td className={`px-6 py-4 text-sm font-mono font-medium ${dark_title}`}>{booking.booking_code ?? `BK-${booking.id}`}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs shrink-0 ${dark ? "bg-[#1a3a5c]" : "bg-[#FF6B00]"}`}>

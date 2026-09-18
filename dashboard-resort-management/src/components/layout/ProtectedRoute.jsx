@@ -11,20 +11,20 @@ export const getHomeByRole = (role) => {
 };
 
 export function ProtectedRoute({ children }) {
-  const { profile, access_token } = ProfileStore();
+  const { profile } = ProfileStore();
   const location    = useLocation();
 
-  if (!profile || !access_token) {
+  if (!profile) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
 }
 
 export function GuestRoute({ children }) {
-  const { profile, access_token } = ProfileStore();
+  const { profile } = ProfileStore();
   const { role }    = useRole();
 
-  if (profile && access_token) {
+  if (profile) {
     return <Navigate to={getHomeByRole(role)} replace />;
   }
   return children;

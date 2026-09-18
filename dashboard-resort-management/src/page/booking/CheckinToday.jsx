@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { message, Button, Form, Select } from "antd";
-import { MdSearch, MdLogin, MdEdit, MdDelete, MdClose } from "react-icons/md";
-const { Option } = Select;
+import { useNavigate } from "react-router-dom";
+import { message, Button } from "antd";
+import { MdSearch, MdLogin, MdLogout, MdDelete } from "react-icons/md";
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
@@ -10,9 +10,10 @@ import { fmtDateTime } from "../../util/fmtDateTime";
 const PAGE_SIZE = 8;
 
 const STATUS_STYLE = {
-  pending:   { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200", dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
-  confirmed: { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
-  cancelled: { dot: "bg-red-500",    light: "bg-red-50 text-red-700 ring-red-200",           dark: "bg-red-900/40 text-red-400 ring-red-700"         },
+  pending:     { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200", dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
+  confirmed:   { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
+  checked_in:  { dot: "bg-blue-500",   light: "bg-blue-50 text-blue-700 ring-blue-200",       dark: "bg-blue-900/40 text-blue-400 ring-blue-700"     },
+  cancelled:   { dot: "bg-red-500",    light: "bg-red-50 text-red-700 ring-red-200",           dark: "bg-red-900/40 text-red-400 ring-red-700"         },
 };
 
 function BadgeWithDot({ status, dark }) {
@@ -20,56 +21,19 @@ function BadgeWithDot({ status, dark }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? s.dark : s.light}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {status?.charAt(0).toUpperCase() + status?.slice(1)}
+      {status?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
     </span>
-  );
-}
-
-function EditModal({ booking, onClose, onSaved, dark }) {
-  const [form] = Form.useForm();
-  const [saving, setSaving] = useState(false);
-  useEffect(() => { form.setFieldsValue({ status: booking.status }); }, [booking, form]);
-  const handleSave = async () => {
-    const values = await form.validateFields();
-    setSaving(true);
-    const res = await request(`admin/bookings/${booking.id}`, "put", values);
-    setSaving(false);
-    if (!res?.errors) { message.success("Updated"); onSaved(); onClose(); }
-    else message.error("Failed to update");
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className={`rounded-xl shadow-2xl w-full max-w-sm p-6 ${dark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-base font-semibold ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Edit Booking</h3>
-          <Button onClick={onClose}><MdClose size={14} /></Button>
-        </div>
-        <Form form={form} layout="vertical">
-          <Form.Item name="status" label="Status" rules={[{ required: true, message: "Please select a status" }]}>
-            <Select>
-              <Option value="pending">Pending</Option>
-              <Option value="confirmed">Confirmed</Option>
-              <Option value="cancelled">Cancelled</Option>
-            </Select>
-          </Form.Item>
-        </Form>
-        <div className="flex justify-end gap-2 mt-4">
-          <Button onClick={onClose} className={`px-4 py-2 text-sm rounded-lg border ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] disabled:opacity-60">{saving ? "Saving…" : "Save"}</Button>
-        </div>
-      </div>
-    </div>
   );
 }
 
 export default function CheckinToday() {
   const dark = useDarkMode();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState("");
   const [page,     setPage]     = useState(1);
   const [confirm, setConfirm] = useState(null);
-  const [editing, setEditing] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -84,10 +48,28 @@ export default function CheckinToday() {
     if (!confirm) return;
     setConfirm(c => ({ ...c, loading: true }));
     if (confirm.type === "checkin") {
-      const res = await request(`admin/bookings/${confirm.booking.id}`, "put", { status: "confirmed" });
-      if (!res?.errors) message.success("Checked in successfully");
-      else message.error("Failed");
-    } else if (confirm.type === "delete") {
+      const res = await request(`admin/bookings/${confirm.booking.id}`, "put", { status: "checked_in" });
+      setConfirm(null);
+      if (res?.errors) {
+        message.error(res.errors.message ?? res.errors.status?.[0] ?? "Failed");
+        return;
+      }
+      message.success("Checked in successfully");
+      load();
+      return;
+    }
+    if (confirm.type === "checkout") {
+      const res = await request(`admin/bookings/${confirm.booking.id}`, "put", { status: "completed" });
+      setConfirm(null);
+      if (res?.errors) {
+        message.error(res.errors.message ?? res.errors.status?.[0] ?? "Cannot complete checkout.");
+        return;
+      }
+      message.success("Checked out. Guest moved to Check-out Today.");
+      navigate("/booking/checkout");
+      return;
+    }
+    if (confirm.type === "delete") {
       const res = await request(`admin/bookings/${confirm.booking.id}`, "delete");
       if (!res?.errors) message.success("Booking deleted");
       else message.error("Failed to delete");
@@ -107,8 +89,8 @@ export default function CheckinToday() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const checkedIn  = bookings.filter(b => b.status === "confirmed").length;
-  const arriving   = bookings.filter(b => b.status === "pending").length;
+  const arriving   = bookings.filter(b => b.status === "pending" || b.status === "confirmed").length;
+  const inHouse    = bookings.filter(b => b.status === "checked_in").length;
 
   const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
   const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
@@ -129,8 +111,9 @@ export default function CheckinToday() {
     : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
 
   const confirmConfig = {
-    checkin: { title: "Confirm Check-in", confirmText: "Yes, Check In", danger: false, sub: null },
-    delete:  { title: "Delete Booking",   confirmText: "Yes, Delete",   danger: true,  sub: "This action cannot be undone." },
+    checkin:  { title: "Confirm Check-in",  confirmText: "Yes, Check In",  danger: false, sub: "Room will be occupied." },
+    checkout: { title: "Confirm Check-out", confirmText: "Yes, Check Out", danger: false, sub: "Requires a zero balance. Guest will appear on Check-out Today." },
+    delete:   { title: "Delete Booking",    confirmText: "Yes, Delete",    danger: true,  sub: "This action cannot be undone." },
   };
 
   return (
@@ -140,7 +123,7 @@ export default function CheckinToday() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: "Total Check-ins Today", value: bookings.length, color: "#1677ff" },
-          { label: "Checked In",            value: checkedIn,       color: "#52c41a" },
+          { label: "Checked In",            value: inHouse,        color: "#52c41a" },
           { label: "Arriving",              value: arriving,        color: "#faad14" },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 ${card}`}>
@@ -188,15 +171,18 @@ export default function CheckinToday() {
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={b.status} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      {/* <Button onClick={() => setConfirm({ booking: b, type: "checkin", loading: false })}
-                        disabled={b.status === "confirmed"}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${dark ? "bg-green-900/40 text-green-400 hover:bg-green-900/70" : "bg-green-50 text-green-600 hover:bg-green-100"}`}>
-                        <MdLogin size={14} /> Check In
-                      </Button> */}
-                      <Button onClick={() => setEditing(b)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"}`}>
-                        <MdEdit size={14} /> Edit
-                      </Button>
+                      {["pending", "confirmed"].includes(b.status) ? (
+                        <Button type="button" onClick={() => setConfirm({ booking: b, type: "checkin", loading: false })}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-teal-900/40 text-teal-400 hover:bg-teal-900/70" : "bg-teal-50 text-teal-700 hover:bg-teal-100"}`}>
+                          <MdLogin size={14} /> Check In
+                        </Button>
+                      ) : (
+                        <Button type="button" onClick={() => setConfirm({ booking: b, type: "checkout", loading: false })}
+                          disabled={b.status !== "checked_in" || Number(b.balance_due ?? 0) > 0.009}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${dark ? "bg-purple-900/40 text-purple-400 hover:bg-purple-900/70" : "bg-purple-50 text-purple-700 hover:bg-purple-100"}`}>
+                          <MdLogout size={14} /> Check Out
+                        </Button>
+                      )}
                       <Button onClick={() => setConfirm({ booking: b, type: "delete", loading: false })}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
                         <MdDelete size={14} /> Delete
@@ -222,15 +208,13 @@ export default function CheckinToday() {
         </div>
       </div>
 
-      {editing && <EditModal booking={editing} dark={dark} onClose={() => setEditing(null)} onSaved={load} />}
-
       {confirm && (() => {
         const cfg = confirmConfig[confirm.type];
         const name = confirm.booking.user?.name ?? "this guest";
         const code = confirm.booking.booking_code ?? `BK-${confirm.booking.id}`;
         return (
           <ConfirmDialog open dark={dark} title={cfg.title}
-            message={`Are you sure you want to ${confirm.type === "checkin" ? "check in" : "delete"} booking ${code} for ${name}?`}
+            message={`Are you sure you want to ${confirm.type === "checkin" ? "check in" : confirm.type === "checkout" ? "check out" : "delete"} booking ${code} for ${name}?`}
             sub={cfg.sub} confirmText={cfg.confirmText} danger={cfg.danger}
             loading={confirm.loading} onConfirm={handleConfirm} onCancel={() => setConfirm(null)} />
         );

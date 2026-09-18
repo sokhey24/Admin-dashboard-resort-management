@@ -22,7 +22,7 @@ import ActionButtons from "../../components/ActionButtons";
 import ChartDataDashboard from "../Chart_Data/ChartDataDashboard";
 import useRole from "../../util/useRole";
 import { buildQS, DateFilter, SearchBar } from "../FilterData/Filter_data";
-import PaymentTab from "./PaymentTab";
+import PaymentTab from "../Payment/PaymentTab";
 import { fmtDateTime } from "../../util/fmtDateTime";
 import { useNotificationStore } from "../../store/NotificationStore";
 import { useBookingStore } from "../../store/BookingStore";
@@ -373,14 +373,15 @@ function OverviewTab({ dark }) {
         <StatCard title="Total Branches"   value={stats.total_branches}   icon={<FaHome />}               color="#13c2c2" dark={dark} loading={loading} />
         <StatCard title="Total Rooms"      value={stats.total_rooms}      icon={<FaBed />}                color="#fa8c16" dark={dark} loading={loading} />
         <StatCard title="Total Bookings"   value={stats.total_bookings}   icon={<FaCalendarAlt />}        color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Guests"           value={stats.total_users}      icon={<FaUsers />}              color="#52c41a" dark={dark} loading={loading} />
+        <StatCard title="Guests"           value={stats.total_guests ?? stats.total_users} icon={<FaUsers />}              color="#52c41a" dark={dark} loading={loading} />
       </div>
       {/* Top stat cards row 2 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard title="Total Revenue"    value={`$${Number(stats.total_revenue ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />}  color="#52c41a" dark={dark} loading={loading} />
         <StatCard title="Food Orders"      value={stats.restaurant_orders} icon={<FaConciergeBell />}   color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Tables"           value={stats.total_tables ?? 0} icon={<MdTableRestaurant />} color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Pending Payments" value={stats.pending_payments}  icon={<FaClock />}           color="#faad14" dark={dark} loading={loading} />
+        <StatCard title="Occupancy"        value={`${Number(stats.occupancy_rate ?? 0)}%`} icon={<FaBed />} color="#1677ff" dark={dark} loading={loading} />
+        <StatCard title="Current Stays"    value={stats.current_stays ?? 0} icon={<FaCalendarAlt />} color="#13c2c2" dark={dark} loading={loading} />
+        <StatCard title="Pending Payments" value={`$${Number(stats.pending_payments ?? 0).toLocaleString()}`}  icon={<FaClock />}           color="#faad14" dark={dark} loading={loading} />
       </div>
 
       {/* ── Resort Management Section ── */}
@@ -799,7 +800,7 @@ function ResortTab({ dark }) {
 
   useEffect(() => {
     request("resort/dashboard", "get")
-      .then(res => { if (res) setData(res); })
+      .then(res => { if (res && !res.errors) setData(res); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -816,6 +817,9 @@ function ResortTab({ dark }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard title="Check-in Today"  value={d.checkin_today     ?? 0} icon={<FaCheckCircle />}   color="#13c2c2" dark={dark} loading={loading} />
         <StatCard title="Check-out Today" value={d.checkout_today    ?? 0} icon={<FaTimesCircle />}   color="#ff4d4f" dark={dark} loading={loading} />
+        <StatCard title="Today's Revenue" value={`$${Number(d.revenue_today ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
+        <StatCard title="Room Revenue"    value={`$${Number(d.revenue_total ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#1677ff" dark={dark} loading={loading} />
+        <StatCard title="Outstanding"     value={`$${Number(d.outstanding_balance ?? 0).toLocaleString()}`} icon={<FaClock />} color="#faad14" dark={dark} loading={loading} />
         <StatCard title="Avg Rating"      value={d.average_rating ? Number(d.average_rating).toFixed(1) : "—"} icon={<FaChartBar />} color="#fa8c16" dark={dark} loading={loading} />
         <StatCard title="Coupons Used"    value={d.coupon_used       ?? 0} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
       </div>

@@ -19,12 +19,16 @@ import ResetPassword     from "./page/auth/ResetPassword";
 
 // Dashboard
 import DashboardOverview from "./page/dashboard/DashboardOverview";
-import PaymentRecords    from "./page/dashboard/PaymentRecords";
+import PaymentRoom       from "./page/Payment/PaymentRoom";
+import PaymentRestuarand from "./page/Payment/PaymentRestuarand";
+import InvoiceList       from "./page/Payment/InvoiceList";
 
 // Room
 import Room              from "./page/Room/Room";
 import RoomStatus        from "./page/Room/RoomStatus";
 import OccupancyRate     from "./page/Room/OccupancyRate";
+import RoomTypes         from "./page/Room/RoomTypes";
+import CustomerReviewRoom from "./page/Room/CustomerReviewRoom";
 
 // Booking
 import Booking           from "./page/booking/Booking";
@@ -88,12 +92,7 @@ export default function App() {
             </PermissionRoute>
           } />
 
-          {/* Payment Records — dedicated full page */}
-          <Route path="payments" element={
-            <PermissionRoute requires="payments.view">
-              <PaymentRecords />
-            </PermissionRoute>
-          } />
+          <Route path="payments" element={<Navigate to="/resort/payments" replace />} />
 
           {/* Manage system */}
           <Route path="manager/resort" element={
@@ -178,12 +177,20 @@ export default function App() {
             </PermissionRoute>
           } />
 
-          {/* Rooms */}
-          <Route path="room/room" element={
-            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+          {/* Rooms — menu: /room/list = Rooms, /room/room = Room Types */}
+          <Route path="room" element={<Navigate to="/room/list" replace />} />
+          <Route path="room/type" element={<Navigate to="/room/list" replace />} />
+          <Route path="room/list" element={
+            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view", "resort.rooms.view"]}>
               <Room />
             </PermissionRoute>
           } />
+          <Route path="room/room" element={
+            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+              <RoomTypes />
+            </PermissionRoute>
+          } />
+         
           <Route path="room/status" element={
             <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
               <RoomStatus />
@@ -194,26 +201,41 @@ export default function App() {
               <OccupancyRate />
             </PermissionRoute>
           } />
+          <Route path="room/reviews" element={
+            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view", "resort.rooms.view"]}>
+              <CustomerReviewRoom />
+            </PermissionRoute>
+          } />
 
           {/* Bookings */}
           <Route path="booking/bookings" element={
-            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+            <PermissionRoute requires={["admin.resorts.view", "resort.bookings.view", "resort.dashboard.view"]}>
               <Booking />
             </PermissionRoute>
           } />
           <Route path="booking/checkin" element={
-            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+            <PermissionRoute requires={["admin.resorts.view", "resort.checkin.manage", "resort.dashboard.view"]}>
               <CheckinToday />
             </PermissionRoute>
           } />
           <Route path="booking/checkout" element={
-            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+            <PermissionRoute requires={["admin.resorts.view", "resort.checkout.manage", "resort.dashboard.view"]}>
               <CheckoutToday />
             </PermissionRoute>
           } />
           <Route path="booking/pending" element={
-            <PermissionRoute requires={["admin.resorts.view", "resort.dashboard.view"]}>
+            <PermissionRoute requires={["admin.resorts.view", "resort.bookings.view", "resort.dashboard.view"]}>
               <PendingBooking />
+            </PermissionRoute>
+          } />
+          <Route path="resort/payments" element={
+            <PermissionRoute requires={["payments.view", "resort.payments.view", "admin.reports.view"]}>
+              <PaymentRoom />
+            </PermissionRoute>
+          } />
+          <Route path="resort/invoices" element={
+            <PermissionRoute requires={["resort.invoices.view", "admin.reports.view", "payments.view"]}>
+              <InvoiceList />
             </PermissionRoute>
           } />
 
@@ -251,6 +273,11 @@ export default function App() {
           <Route path="restaurant/billing" element={
             <PermissionRoute requires={["admin.resorts.view", "restaurant.dashboard.view"]}>
               <Billing />
+            </PermissionRoute>
+          } />
+          <Route path="restaurant/payments" element={
+            <PermissionRoute requires={["payments.view", "restaurant.billing.view", "restaurant.payments.view", "admin.reports.view"]}>
+              <PaymentRestuarand />
             </PermissionRoute>
           } />
 

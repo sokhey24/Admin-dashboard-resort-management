@@ -3,6 +3,8 @@ import { Modal, Form, Select, message, Button } from "antd";
 import { MdSearch, MdEdit, MdDelete } from "react-icons/md";
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
+import usePermission from "../../util/usePermission";
+import useRole from "../../util/useRole";
 
 const { Option } = Select;
 const PAGE_SIZE = 8;
@@ -27,6 +29,10 @@ function BadgeWithDot({ status, dark }) {
 
 export default function FoodOrder() {
   const dark = useDarkMode();
+  const { canAny } = usePermission();
+  const { isAdmin } = useRole();
+  const canEdit = isAdmin || canAny("admin.restaurand.update", "restaurant.orders.update");
+  const canDelete = isAdmin || canAny("admin.restaurand.delete", "restaurant.orders.delete");
   const [orders,    setOrders]    = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState("");
@@ -164,14 +170,18 @@ export default function FoodOrder() {
                   <td className={`px-6 py-4 text-sm ${cellMuted}`}>{o.created_at?.slice(0, 10) ?? "—"}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button onClick={() => openEdit(o)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"}`}>
-                        <MdEdit size={14} /> Edit
-                      </Button>
-                      <Button onClick={() => handleDelete(o.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
-                        <MdDelete size={14} /> Delete
-                      </Button>
+                      {canEdit && (
+                        <Button onClick={() => openEdit(o)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"}`}>
+                          <MdEdit size={14} /> Edit
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button onClick={() => handleDelete(o.id)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
+                          <MdDelete size={14} /> Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

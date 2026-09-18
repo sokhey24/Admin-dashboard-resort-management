@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Avatar, Badge, Button, Card, DatePicker, Empty, Form, Input, Modal,
-  Popconfirm, Select, Spin, Switch, Table, Tabs, Tag, Timeline, Upload, message,
+  Popconfirm, Select, Spin, Switch, Table, Tabs, Tag, Upload, message,
 } from "antd";
 import {
   CameraOutlined, DeleteOutlined, DesktopOutlined, HistoryOutlined,
-  LockOutlined, LogoutOutlined, MailOutlined, MobileOutlined, PhoneOutlined,
-  SafetyOutlined, SaveOutlined, SettingOutlined, UserOutlined,
+  BellOutlined, LockOutlined, LogoutOutlined, MailOutlined, MobileOutlined, PhoneOutlined,
+  SafetyOutlined, SaveOutlined, UserOutlined,
 } from "@ant-design/icons";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { ProfileStore } from "../../store/ProfileStore";
 import { request } from "../../util/request";
+import useRole, { ROLES } from "../../util/useRole";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -50,7 +51,9 @@ const formatStat = (value) => {
 
 export default function ProfileAccount() {
   const dark = useDarkMode();
-  const { profile, setProfile } = ProfileStore();
+  const { profile, setProfile, permission } = ProfileStore();
+  const { isAdmin, hasRole } = useRole();
+  const isAdminUser = isAdmin || hasRole(ROLES.ADMIN);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -67,6 +70,7 @@ export default function ProfileAccount() {
   const [twoFactorSetup, setTwoFactorSetup] = useState(null);
   const [twoFactorBusy, setTwoFactorBusy] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
+  const [devicePage, setDevicePage] = useState({ current: 1, pageSize: 8 });
 
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
@@ -82,7 +86,16 @@ export default function ProfileAccount() {
   const loadAll = async () => {
     setLoading(true);
     setLoadError("");
-    await Promise.all([loadProfile(), loadSessions(), loadActivities(), loadStatistics(), loadPreferences()]);
+    await Promise.all([loadProfile(), loadStatistics(), loadPreferences()]);
+    const store = ProfileStore.getState();
+    const admin = (store.roles || []).includes(ROLES.ADMIN)
+      || (Array.isArray(store.profile?.roles) && store.profile.roles.some((r) => (typeof r === "string" ? r : r?.name) === ROLES.ADMIN));
+    if (admin) {
+      await Promise.all([loadSessions(), loadActivities()]);
+    } else {
+      setSessions([]);
+      setActivities([]);
+    }
     setLoading(false);
   };
 
@@ -213,8 +226,10 @@ export default function ProfileAccount() {
     if (res?.success) {
       message.success(res.message || "Password changed successfully");
       passwordForm.resetFields();
-      loadSessions();
-      loadActivities();
+      if (isAdminUser) {
+        loadSessions();
+        loadActivities();
+      }
       return;
     }
     message.error(res?.message || "Failed to change password");
@@ -309,6 +324,12 @@ export default function ProfileAccount() {
 
   const sessionColumns = useMemo(() => [
     {
+      title: "No.",
+      key: "no",
+      width: 64,
+      render: (_, __, index) => (devicePage.current - 1) * devicePage.pageSize + index + 1,
+    },
+    {
       title: "Device",
       dataIndex: "name",
       key: "name",
@@ -316,7 +337,7 @@ export default function ProfileAccount() {
         const label = String(text || "");
         const isMobile = /mobile|android|iphone|ipad/i.test(label);
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {isMobile ? <MobileOutlined aria-hidden /> : <DesktopOutlined aria-hidden />}
             <span className="break-all">{label}</span>
             {record.is_current && <Tag color="green">Current</Tag>}
@@ -324,11 +345,20 @@ export default function ProfileAccount() {
         );
       },
     },
-    { title: "Last active", dataIndex: "last_used_at", key: "last_used_at" },
-    { title: "Signed in", dataIndex: "created_at", key: "created_at" },
+    {
+      title: "Last active",
+      key: "last_used_at",
+      render: (_, record) => record.last_used_at_full || record.last_used_at || "—",
+    },
+    {
+      title: "Signed in",
+      key: "created_at",
+      render: (_, record) => record.created_at_full || record.created_at || "—",
+    },
     {
       title: "Action",
       key: "action",
+      align: "center",
       render: (_, record) =>
         record.is_current ? (
           <span className={muted}>This device</span>
@@ -346,7 +376,36 @@ export default function ProfileAccount() {
           </Popconfirm>
         ),
     },
-  ], [muted]);
+  ], [muted, devicePage]);
+
+  const activityColumns = useMemo(() => [
+    {
+      title: "Action",
+      dataIndex: "description",
+      key: "description",
+      render: (text) => <span className={titleCls}>{text || "—"}</span>,
+    },
+    {
+      title: "Date",
+      key: "date",
+      render: (_, record) => record.created_at_full || record.created_at || "—",
+    },
+    {
+      title: "Device",
+      key: "device",
+      render: (_, record) => {
+        const ua = record.user_agent;
+        if (!ua?.browser) return "—";
+        return `${ua.browser} on ${ua.platform || "unknown"}`;
+      },
+    },
+    {
+      title: "IP",
+      dataIndex: "ip_address",
+      key: "ip_address",
+      render: (text) => text || "—",
+    },
+  ], [titleCls]);
 
   if (loading) {
     return (
@@ -385,7 +444,11 @@ export default function ProfileAccount() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
         <div>
           <h1 className={`text-[26px] font-bold leading-tight ${titleCls}`}>Profile Account</h1>
-          <p className={`text-sm mt-1 ${subText}`}>Manage your personal details, security, sessions, and notification preferences.</p>
+          <p className={`text-sm mt-1 ${subText}`}>
+            {isAdminUser
+              ? "Manage your personal details, security, notifications, activity, and device sessions."
+              : "Manage your personal details, security, and notification preferences."}
+          </p>
         </div>
       </div>
 
@@ -458,11 +521,11 @@ export default function ProfileAccount() {
               {[
                 ["Bookings", formatStat(statistics.total_bookings)],
                 ["Reviews", formatStat(statistics.total_reviews)],
-                ["Sessions", formatStat(statistics.active_sessions)],
-                ["Days", formatStat(statistics.account_age_days)],
+                ["Permission", formatStat(Array.isArray(permission) ? permission.length : 0)],
+                ["Day", profile?.created_at ? dayjs(profile.created_at).format("DD MMM YYYY") : "—"],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <div className="text-2xl font-bold text-[#FF6B00]">{value}</div>
+                  <div className={`text-2xl font-bold text-[#FF6B00] ${label === "Day" ? "text-lg sm:text-xl" : ""}`}>{value}</div>
                   <div className={`text-sm ${muted}`}>{label}</div>
                 </div>
               ))}
@@ -622,41 +685,12 @@ export default function ProfileAccount() {
                     </Button>
                   )}
                 </Card>
-
-                <Card
-                  title="Active sessions"
-                  className={`shadow-sm xl:col-span-2 ${card}`}
-                  bordered={false}
-                  extra={
-                    sessions.filter((s) => !s.is_current).length > 0 && (
-                      <Popconfirm
-                        title="Sign out other devices?"
-                        description="All sessions except this one will be revoked."
-                        onConfirm={handleRevokeAllOtherSessions}
-                        okText="Sign out others"
-                        cancelText="Cancel"
-                      >
-                        <Button size="small" danger icon={<LogoutOutlined />}>Logout other sessions</Button>
-                      </Popconfirm>
-                    )
-                  }
-                >
-                  <Table
-                    dataSource={sessions}
-                    columns={sessionColumns}
-                    rowKey="id"
-                    loading={sessionsLoading}
-                    pagination={false}
-                    size="small"
-                    locale={{ emptyText: <Empty description="No active sessions" /> }}
-                  />
-                </Card>
               </div>
             ),
           },
           {
             key: "preferences",
-            label: <span><SettingOutlined /> Preferences</span>,
+            label: <span><BellOutlined /> Notification</span>,
             children: (
               <Card className={`shadow-sm ${card}`} bordered={false}>
                 <Form form={preferencesForm} layout="vertical" onFinish={handleUpdatePreferences} size="large">
@@ -698,39 +732,69 @@ export default function ProfileAccount() {
                     <Switch />
                   </Form.Item>
                   <Button type="primary" htmlType="submit" loading={savingPrefs} icon={<SaveOutlined />} className="!bg-[#FF6B00] !border-[#FF6B00] mt-2">
-                    Save preferences
+                    Save notifications
                   </Button>
                 </Form>
               </Card>
             ),
           },
-          {
+          ...(isAdminUser ? [{
             key: "activity",
-            label: <span><HistoryOutlined /> Activity</span>,
+            label: <span><HistoryOutlined /> Activity & Active Log Devices</span>,
             children: (
-              <Card className={`shadow-sm ${card}`} bordered={false} loading={activityLoading}>
-                {activities.length ? (
-                  <Timeline
-                    items={activities.map((activity) => ({
-                      color: String(activity.action || "").includes("login") ? "green" : "blue",
-                      children: (
-                        <div>
-                          <div className={`font-medium ${titleCls}`}>{activity.description}</div>
-                          <div className={`text-sm mt-1 ${muted}`}>
-                            {activity.created_at_full || activity.created_at}
-                            {activity.user_agent?.browser ? ` · ${activity.user_agent.browser} on ${activity.user_agent.platform}` : ""}
-                          </div>
-                          <div className={`text-xs ${muted}`}>IP: {activity.ip_address || "—"}</div>
-                        </div>
-                      ),
-                    }))}
+              <div className="space-y-5">
+                <Card title="Activity log" className={`shadow-sm ${card}`} bordered={false}>
+                  <Table
+                    dataSource={activities}
+                    columns={activityColumns}
+                    rowKey={(row, index) => row.id ?? `${row.created_at}-${index}`}
+                    loading={activityLoading}
+                    pagination={{ pageSize: 8, hideOnSinglePage: true }}
+                    size="small"
+                    scroll={{ x: true }}
+                    locale={{ emptyText: <Empty description="No login or activity history yet" /> }}
                   />
-                ) : (
-                  <Empty description="No login or activity history yet" />
-                )}
-              </Card>
+                </Card>
+                <Card
+                  title="Active log devices"
+                  className={`shadow-sm ${card}`}
+                  bordered={false}
+                  extra={
+                    sessions.filter((s) => !s.is_current).length > 0 && (
+                      <Popconfirm
+                        title="Sign out other devices?"
+                        description="All sessions except this one will be revoked."
+                        onConfirm={handleRevokeAllOtherSessions}
+                        okText="Sign out others"
+                        cancelText="Cancel"
+                      >
+                        <Button size="small" danger icon={<LogoutOutlined />}>Logout other sessions</Button>
+                      </Popconfirm>
+                    )
+                  }
+                >
+                  <Table
+                    dataSource={sessions}
+                    columns={sessionColumns}
+                    rowKey="id"
+                    loading={sessionsLoading}
+                    pagination={{
+                      current: devicePage.current,
+                      pageSize: devicePage.pageSize,
+                      showSizeChanger: true,
+                      pageSizeOptions: ["8", "10", "20"],
+                      showTotal: (total, range) => `${range[0]}–${range[1]} of ${total} devices`,
+                      position: ["bottomRight"],
+                      onChange: (current, pageSize) => setDevicePage({ current, pageSize }),
+                    }}
+                    size="small"
+                    scroll={{ x: true }}
+                    locale={{ emptyText: <Empty description="No active sessions" /> }}
+                  />
+                </Card>
+              </div>
             ),
-          },
+          }] : []),
         ]}
       />
 

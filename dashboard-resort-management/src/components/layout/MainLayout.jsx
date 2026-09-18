@@ -60,15 +60,17 @@ if (isAdmin) {
   if (userMgmt.length) menu.push(item("User Management", "user_management", <MdPeople size={14} />, userMgmt));
 
   if (can("resort.staff.view")) {
-    menu.push(item("Resort Staff", "/resort/staff", <MdPeople size={14} />));
+    menu.push(item("User Guest ", "/resort/staff", <MdPeople size={14} />));
   }
 
   // Resort sub-groups
   const roomItems = [];
-  if (can("resort.rooms.view")) {
+  if (can("resort.rooms.view") || can("admin.resorts.view") || isAdmin) {
+    roomItems.push(item("Rooms", "/room/list"));
     roomItems.push(item("Room Types", "/room/room"));
     roomItems.push(item("Room Status", "/room/status"));
     roomItems.push(item("Occupancy Rate", "/room/occupancy"));
+    roomItems.push(item("Customer Reviews", "/room/reviews"));
   }
   if (roomItems.length) menu.push(item("Room Management", "room", <MdOutlineBedroomParent size={14} />, roomItems));
 
@@ -78,6 +80,13 @@ if (isAdmin) {
   if (can("resort.checkin.manage"))   bookingItems.push(item("Check-in ",   "/booking/checkin"));
   if (can("resort.checkout.manage"))  bookingItems.push(item("Check-out ",  "/booking/checkout"));
   if (bookingItems.length) menu.push(item("Booking Management", "booking", <MdCalendarMonth size={14} />, bookingItems));
+
+  if (can("resort.payments.view") || can("payments.view") || can("admin.reports.view")) {
+    menu.push(item("Payment", "/resort/payments", <MdAccountBalance size={14} />));
+  }
+  if (can("resort.invoices.view") || can("admin.reports.view") || can("payments.view")) {
+    menu.push(item("Invoices", "/resort/invoices", <MdAccountBalance size={14} />));
+  }
 
   const resortInfoItems = [];
   if (can("admin.resorts.view") || can("resort.dashboard.view")) {
@@ -102,6 +111,9 @@ if (isAdmin) {
   if (can("restaurant.tables.view"))        restaurantItems.push(item("Table Reservation", "/restaurant/table"));
   if (can("restaurant.orders.view"))        restaurantItems.push(item("Food Order",        "/restaurant/order"));
   if (can("restaurant.billing.view"))       restaurantItems.push(item("Billing",           "/restaurant/billing"));
+  if (can("restaurant.billing.view") || can("restaurant.payments.view") || can("payments.view")) {
+      restaurantItems.push(item("Payment", "/restaurant/payments"));
+  }
   if (restaurantItems.length) menu.push(item("Restaurant", "restaurant", <BsShopWindow size={14} />, restaurantItems));
 
   // Products
@@ -114,11 +126,6 @@ if (isAdmin) {
   // Reports / Logs
   if (can("admin.reports.view")) {
     menu.push(item("Reports", "/reports", <MdBarChart size={14} />));
-  }
-
-  // Payment Records — payments.view permission
-  if (can("payments.view")) {
-    menu.push(item("Payment Records", "/payments", <MdAccountBalance size={14} />));
   }
 
   // Settings (always visible for authenticated users)
@@ -450,7 +457,9 @@ export default function MainLayout() {
               openKeys={collapsed ? [] : openKeys}
               onOpenChange={setOpenKeys}
               items={currentMenu}
-              onClick={({ key }) => navigate(key)}
+              onClick={({ key }) => {
+                if (String(key).startsWith("/")) navigate(key);
+              }}
               className="!border-r-0"
             style={{ background: siderBg }}
             />
@@ -463,7 +472,7 @@ export default function MainLayout() {
         >
           {/* ── Navbar  and full screen layout── */}
           <div
-            className="flex items-center justify-between px-5 h-16 shrink-0 sticky top-0 mb-4 z-[99] shadow-md"
+            className="flex items-center justify-between px-5 h-16 shrink-0 sticky top-0 z-[99] shadow-md"
             style={{ background: darkMode ? "#1f1f1f" : "linear-gradient(135deg, #1a3c5e 0%, #2d6a9f 100%)" }}
           >
             {/* Left */}

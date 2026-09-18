@@ -3,6 +3,7 @@ import { MdAdd, MdEdit, MdDelete, MdUnfoldMore, MdKeyboardArrowUp, MdKeyboardArr
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
 import { IoEyeOutline } from "react-icons/io5";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
 const facilities = [
   { id: 1,  name: "Swimming Pool",    category: "Outdoor",  description: "Olympic-size outdoor swimming pool for adults and children.",        active: true,  imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQzeaMPwkVax3KT0WjfK89Fy3Brxd4ulCWGep2adVZihGLd56R2-6N-lXJX&s=10" },
@@ -44,10 +45,12 @@ function SortIcon({ column, sortCol, sortDir, dark }) {
 
 export default function Facilities() {
   const dark = useDarkMode();
+  const [list,    setList]    = useState(facilities);
   const [page,    setPage]    = useState(1);
   const [sortCol, setSortCol] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
   const [search,  setSearch]  = useState("");
+  const [confirm, setConfirm] = useState(null);
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -57,13 +60,13 @@ export default function Facilities() {
 
   const sorted = useMemo(() => {
     const q = search.toLowerCase();
-    return [...facilities]
+    return [...list]
       .filter(f => !q || f.name?.toLowerCase().includes(q) || f.category?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q))
       .sort((a, b) => {
         const cmp = String(a[sortCol] ?? "").localeCompare(String(b[sortCol] ?? ""));
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [search, sortCol, sortDir]);
+  }, [list, search, sortCol, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const pageItems  = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -89,6 +92,9 @@ export default function Facilities() {
   const pageNum   = (isActive) => isActive
     ? "w-8 h-8 rounded-[10px] text-xs font-medium bg-[#FF6B00] text-white"
     : `w-8 h-8 rounded-[10px] text-xs font-medium transition-colors ${dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`;
+  const actionBtn = `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+    dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
+  }`;
 
   const HeadCell = ({ col, label }) => (
     <th onClick={() => handleSort(col)}
@@ -161,15 +167,11 @@ export default function Facilities() {
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot active={f.active} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
-                        dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-[#F5F8FC] text-[#486581] hover:bg-[#F5F8FC]"
-                      }`}><IoEyeOutline size={14} /> View</Button>
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
-                        dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"
-                      }`}><MdEdit size={14} /> Edit</Button>
-                      <Button className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-xs font-medium transition-colors ${
-                        dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"
-                      }`}><MdDelete size={14} /> Delete</Button>
+                      <Button className={actionBtn}><IoEyeOutline size={14} /> View</Button>
+                      <Button className={actionBtn}><MdEdit size={14} /> Edit</Button>
+                      <Button onClick={() => setConfirm({ facility: f })} className={actionBtn}>
+                        <MdDelete size={14} /> Delete
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -200,6 +202,21 @@ export default function Facilities() {
         </div>
 
       </div>
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Facility"
+        message={confirm ? `Are you sure you want to delete ${confirm.facility.name}?` : ""}
+        sub="This action cannot be undone."
+        confirmText="Yes, Delete"
+        danger
+        onConfirm={() => {
+          if (!confirm) return;
+          setList((prev) => prev.filter((f) => f.id !== confirm.facility.id));
+          setConfirm(null);
+        }}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }
