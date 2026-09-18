@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Print: hide dashboard, show receipt only ── */
+@media print {
+  /* Hide everything by default */
+  body > *,
+  #root > * { display: none !important; }
+
+  /* Show the printable receipt wrapper */
+  .print\:block { display: block !important; }
+
+  /* When receipt is inside Modal/Drawer, surface it */
+  .ant-modal-root { display: block !important; }
+  .ant-modal-mask { display: none !important; }
+  .ant-modal-wrap { display: block !important; position: static !important; overflow: visible !important; }
+  .ant-modal       { display: block !important; position: static !important; box-shadow: none !important; }
+  .ant-modal-content { box-shadow: none !important; padding: 0 !important; }
+
+  /* Ant Design Drawer print support */
+  .ant-drawer { display: block !important; position: static !important; }
+  .ant-drawer-mask { display: none !important; }
+  .ant-drawer-content-wrapper { display: block !important; position: static !important; transform: none !important; box-shadow: none !important; width: 100% !important; }
+
+  /* Hide all non-receipt UI inside modal/drawer */
+  .ant-modal-header,
+  .ant-modal-footer,
+  .ant-drawer-header,
+  .ant-drawer-footer,
+  .no-print { display: none !important; }
+}

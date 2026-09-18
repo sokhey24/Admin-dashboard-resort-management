@@ -22,6 +22,7 @@ import ActionButtons from "../../components/ActionButtons";
 import ChartDataDashboard from "../Chart_Data/ChartDataDashboard";
 import useRole from "../../util/useRole";
 import { buildQS, DateFilter, SearchBar } from "../FilterData/Filter_data";
+import PaymentTab from "./PaymentTab";
 import { fmtDateTime } from "../../util/fmtDateTime";
 import { useNotificationStore } from "../../store/NotificationStore";
 import { useBookingStore } from "../../store/BookingStore";
@@ -584,7 +585,7 @@ function ReservationTab({ dark }) {
             <thead className={thead}>
               <tr>
                 <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-12 ${thText}`}>No.</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Booking</th>
+                {/* <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Booking</th> */}
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Guest</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Room</th>
                 <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText}`}>Check-in</th>
@@ -601,7 +602,7 @@ function ReservationTab({ dark }) {
               ) : pageItems.map((b, idx) => (
                 <tr key={b.id} className={`transition-colors ${rowHover}`}>
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * RES_PAGE_SIZE + idx + 1}</td>
-                  <td className={`px-6 py-4 text-sm font-medium ${titleCls}`}>{b.booking_code ?? `BK-${b.id}`}</td>
+                  {/* <td className={`px-6 py-4 text-sm font-medium ${titleCls}`}>{b.booking_code ?? `BK-${b.id}`}</td> */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs shrink-0 ${
@@ -744,57 +745,6 @@ function GuestTab({ dark }) {
           data={users}
           dark={dark}
           searchKeys={["name", "email", "phone", "gender", "status"]}
-        />
-      </Card>
-    </Spin>
-  );
-}
-
-// ── Payment Tab ────────────────────────────────────────────────
-function PaymentTab({ dark }) {
-  const [payments, setPayments] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState({ date: null, month: null, year: null });
-
-  const load = (f = filter) => {
-    setLoading(true);
-    const qs = buildQS(f);
-    request(`admin/payments${qs}`, "get")
-      .then(res => { if (res?.data) setPayments(res.data); })
-      .finally(() => setLoading(false));
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
-
-  const handleFilter = (f) => { setFilter(f); load(f); };
-
-  const totalPaid    = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const totalPending = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
-  const totalRefund  = payments.filter(p => p.status === "refunded").reduce((s, p) => s + Number(p.amount), 0);
-
-  const columns = [
-    { key: "user",   title: "Guest",  render: (_, r) => r.user?.name ?? r.booking?.user?.name ?? "—" },
-    { key: "amount", title: "Amount", render: v => `$${Number(v).toLocaleString()}` },
-    { key: "method", title: "Method" },
-    { key: "paid_at",title: "Date",   render: v => v ? new Date(v).toLocaleDateString() : "—" },
-    { key: "status", title: "Status", render: v => <StatusBadge value={v} dark={dark} /> },
-  ];
-
-  return (
-    <Spin spinning={loading}>
-      <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Total Collected" value={`$${totalPaid.toLocaleString()}`}    icon={<FaDollarSign />}    color="#52c41a" dark={dark} />
-        <StatCard title="Pending"         value={`$${totalPending.toLocaleString()}`} icon={<FaClock />}         color="#faad14" dark={dark} />
-        <StatCard title="Refunded"        value={`$${totalRefund.toLocaleString()}`}  icon={<FaMoneyBillWave />} color="#ff4d4f" dark={dark} />
-      </div>
-      <Card title="Payment Records" dark={dark}>
-        <SimpleTable
-          columns={columns}
-          data={payments}
-          dark={dark}
-          searchKeys={["method", "status", "paid_at"]}
         />
       </Card>
     </Spin>

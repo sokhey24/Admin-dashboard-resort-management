@@ -12,13 +12,14 @@ function RoleHome() {
 // Auth
 import LoginPage         from "./page/auth/LoginPage";
 import RegisterPage      from "./page/auth/RegisterPage";
-import ProfileSetting    from "./page/auth/Profile_Setting";
+import ProfileSetting    from "./page/auth/ProfileAccount";
 import ForgotPassword    from "./page/auth/ForgotPassword";
 import VerifyOtp         from "./page/auth/VerifyOtp";
 import ResetPassword     from "./page/auth/ResetPassword";
 
 // Dashboard
 import DashboardOverview from "./page/dashboard/DashboardOverview";
+import PaymentRecords    from "./page/dashboard/PaymentRecords";
 
 // Room
 import Room              from "./page/Room/Room";
@@ -84,6 +85,13 @@ export default function App() {
           <Route path="dashboard" element={
             <PermissionRoute requires="admin.dashboard.view">
               <DashboardOverview />
+            </PermissionRoute>
+          } />
+
+          {/* Payment Records — dedicated full page */}
+          <Route path="payments" element={
+            <PermissionRoute requires="payments.view">
+              <PaymentRecords />
             </PermissionRoute>
           } />
 

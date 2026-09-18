@@ -116,8 +116,14 @@ if (isAdmin) {
     menu.push(item("Reports", "/reports", <MdBarChart size={14} />));
   }
 
+  // Payment Records — payments.view permission
+  if (can("payments.view")) {
+    menu.push(item("Payment Records", "/payments", <MdAccountBalance size={14} />));
+  }
+
   // Settings (always visible for authenticated users)
   menu.push(item("Settings", "settings", <MdSettings size={14} />, [
+    item("Profile Account",        "/profile"),
     item("General Settings",      "/settings/general_settings"),
     item("Notification Settings", "/settings/notification"),
   ]));
@@ -165,7 +171,26 @@ export default function MainLayout() {
     notifPage * NOTIF_PAGE_SIZE
   );
   const [collapsed, setCollapsed] = useState(false);
-  const [darkMode,  setDarkMode]  = useState(false);
+  const [darkMode,  setDarkMode]  = useState(() => {
+    const saved = localStorage.getItem("rms-theme");
+    if (saved === "dark") return true;
+    if (saved === "light") return false;
+    if (saved === "auto") return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+    return false;
+  });
+
+  useEffect(() => {
+    const applyTheme = (theme) => {
+      if (theme === "dark") setDarkMode(true);
+      else if (theme === "light") setDarkMode(false);
+      else if (theme === "auto") {
+        setDarkMode(window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false);
+      }
+    };
+    const onTheme = (e) => applyTheme(e.detail);
+    window.addEventListener("rms-theme-change", onTheme);
+    return () => window.removeEventListener("rms-theme-change", onTheme);
+  }, []);
   const [openKeys,  setOpenKeys]  = useState([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -365,7 +390,7 @@ export default function MainLayout() {
           </div>
           <Button
             onClick={() => { clearAll(); setNotifPage(1); }}
-            className="text-xs text-red-400 hover:text-red-500"
+            className="text-ms text-red-400 hover:text-red-500"
           >
             Clear all
           </Button>
@@ -458,7 +483,11 @@ export default function MainLayout() {
                   icon={darkMode
                     ? <MdLightMode className="text-yellow-300 text-xl" />
                     : <MdDarkMode  className="text-white text-xl" />}
-                  onClick={() => setDarkMode(!darkMode)}
+                  onClick={() => setDarkMode((d) => {
+                    const next = !d;
+                    localStorage.setItem("rms-theme", next ? "dark" : "light");
+                    return next;
+                  })}
                   className="!bg-white/10 hover:!bg-white/20"
                 />
               </Tooltip>
@@ -482,8 +511,9 @@ export default function MainLayout() {
                 menu={{
                   items: userMenuItems,
                   onClick: ({ key }) => {
-                    if (key === "logout")  handleLogout();
-                    if (key === "profile") navigate("/profile");
+                    if (key === "logout")   handleLogout();
+                    if (key === "profile")  navigate("/profile");
+                    if (key === "setting")  navigate("/settings/general_settings");
                   },
                 }}
                 placement="bottomRight" arrow
