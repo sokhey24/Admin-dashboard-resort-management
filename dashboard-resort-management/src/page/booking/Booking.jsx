@@ -178,9 +178,10 @@ function CheckoutDetailModal({ booking, onClose, onConfirm, loading, dark }) {
               <SectionTitle icon={<MdReceipt size={14} />} label="Invoice" dark={dark} />
               <div className={`rounded-xl p-3 ${dark ? "bg-gray-700/50" : "bg-[#F5F8FC]"}`}>
                 <InfoRow label="Invoice #" value={invoice.invoice_number}                                                   dark={dark} />
-                <InfoRow label="Subtotal"  value={`$${Number(invoice.subtotal  ?? 0).toLocaleString()}`}                    dark={dark} />
-                <InfoRow label="Tax"       value={`$${Number(invoice.tax       ?? 0).toLocaleString()}`}                    dark={dark} />
-                <InfoRow label="Discount"  value={`$${Number(invoice.discount  ?? 0).toLocaleString()}`}                    dark={dark} />
+                <InfoRow label="Subtotal"       value={`$${Number(invoice.amount         ?? 0).toLocaleString()}`} dark={dark} />
+                <InfoRow label="Discount"       value={`-$${Number(invoice.discount      ?? 0).toLocaleString()}`} dark={dark} />
+                <InfoRow label="Tax"            value={`$${Number(invoice.tax            ?? 0).toLocaleString()}`} dark={dark} />
+                <InfoRow label="Service Charge" value={`$${Number(invoice.service_charge ?? 0).toLocaleString()}`} dark={dark} />
                 <div className={`border-t mt-1 pt-1 ${dark ? "border-gray-600" : "border-[#D9E2EC]"}`}>
                   <InfoRow label="Total" value={<span className="text-green-500 font-bold">${Number(invoice.total ?? 0).toLocaleString()}</span>} dark={dark} />
                 </div>
@@ -269,10 +270,18 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
     return diff > 0 ? diff : 0;
   }, [checkInWatch, checkOutWatch]);
 
+  // Preview only — the API recalculates discount, tax and service charge on save.
   const estimate = useMemo(() => {
     const selected = rooms.filter((r) => (roomIdsWatch ?? []).includes(r.id));
-    const subtotal = selected.reduce((s, r) => s + Number(r.price_per_night ?? 0) * (nights || 0), 0);
-    return { subtotal, nights };
+    let subtotal = 0;
+    let discount = 0;
+    selected.forEach((r) => {
+      const gross = Number(r.price_per_night ?? 0) * (nights || 0);
+      const pct = Math.min(100, Math.max(0, Number(r.effective_discount_percent ?? 0) || 0));
+      subtotal += gross;
+      discount += Math.round(((gross * pct) / 100) * 100) / 100;
+    });
+    return { subtotal, discount, net: Math.round((subtotal - discount) * 100) / 100, nights };
   }, [rooms, roomIdsWatch, nights]);
 
   const nextStatuses = {
@@ -406,7 +415,11 @@ function BookingModal({ booking, resorts, users, onClose, onSaved, dark }) {
               {nights > 0 && (
                 <p className={`text-xs mb-3 ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
                   {nights} night{nights === 1 ? "" : "s"}
-                  {estimate.subtotal > 0 ? ` · estimated ${fmtAmt(estimate.subtotal)} (tax/discount applied on save)` : ""}
+                  {estimate.subtotal > 0
+                    ? estimate.discount > 0
+                      ? ` · ${fmtAmt(estimate.subtotal)} − ${fmtAmt(estimate.discount)} discount = ${fmtAmt(estimate.net)} (tax/service applied on save)`
+                      : ` · estimated ${fmtAmt(estimate.subtotal)} (tax/service applied on save)`
+                    : ""}
                 </p>
               )}
               <div className="mb-4">

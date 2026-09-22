@@ -1,0 +1,216 @@
+{
+  "info": {
+    "name": "Bakong KHQR - Local App + Bakong API",
+    "description": "Routes from routes/web.php plus the Bakong NBC endpoints the khqr-gateway library calls.\n\nSet `bakong_token` in the collection variables before running the Bakong API folder. Copy the value from bakong-ecom/.env (BAKONG_TOKEN). Do not commit it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "bakong_url", "value": "https://api-bakong.nbc.gov.kh" },
+    { "key": "bakong_sit_url", "value": "https://sit-api-bakong.nbc.gov.kh" },
+    { "key": "bakong_token", "value": "" },
+    { "key": "product_id", "value": "1" },
+    { "key": "account_id", "value": "sokhey_van@bkrt" },
+    { "key": "md5", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Local App",
+      "item": [
+        {
+          "name": "Home - product list",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          }
+        },
+        {
+          "name": "Product detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/product/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["product", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Checkout - generate KHQR",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Laravel web routes need CSRF. Pull the XSRF-TOKEN cookie set by a prior GET.",
+                  "const jar = pm.cookies.jar();",
+                  "jar.get(pm.variables.replaceIn('{{base_url}}'), 'XSRF-TOKEN', (err, value) => {",
+                  "    if (!err && value) {",
+                  "        pm.request.headers.upsert({ key: 'X-XSRF-TOKEN', value: decodeURIComponent(value) });",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The md5 is embedded in the page's verify script. Capture it for the next request.",
+                  "const match = pm.response.text().match(/md5:\\s*\"([a-f0-9]{32})\"/);",
+                  "if (match) {",
+                  "    pm.collectionVariables.set('md5', match[1]);",
+                  "    console.log('md5 captured:', match[1]);",
+                  "}",
+                  "pm.test('checkout renders', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "text/html" }],
+            "url": {
+              "raw": "{{base_url}}/checkout/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["checkout", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Verify form (currently 500 - view missing)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+          }
+        },
+        {
+          "name": "Verify transaction",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const jar = pm.cookies.jar();",
+                  "jar.get(pm.variables.replaceIn('{{base_url}}'), 'XSRF-TOKEN', (err, value) => {",
+                  "    if (!err && value) {",
+                  "        pm.request.headers.upsert({ key: 'X-XSRF-TOKEN', value: decodeURIComponent(value) });",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n    \"md5\": \"{{md5}}\"\n}" },
+            "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+          }
+        },
+        {
+          "name": "Payment result",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/payments/result",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "result"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Bakong API (direct, no CSRF)",
+      "item": [
+        {
+          "name": "Check transaction by MD5",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bakong_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n    \"md5\": \"{{md5}}\"\n}" },
+            "url": {
+              "raw": "{{bakong_url}}/v1/check_transaction_by_md5",
+              "host": ["{{bakong_url}}"],
+              "path": ["v1", "check_transaction_by_md5"]
+            }
+          }
+        },
+        {
+          "name": "Check Bakong account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bakong_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n    \"accountId\": \"{{account_id}}\"\n}" },
+            "url": {
+              "raw": "{{bakong_url}}/v1/check_bakong_account",
+              "host": ["{{bakong_url}}"],
+              "path": ["v1", "check_bakong_account"]
+            }
+          }
+        },
+        {
+          "name": "Renew token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n    \"email\": \"your@email.com\"\n}" },
+            "url": {
+              "raw": "{{bakong_url}}/v1/renew_token",
+              "host": ["{{bakong_url}}"],
+              "path": ["v1", "renew_token"]
+            }
+          }
+        },
+        {
+          "name": "Generate deeplink by QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bakong_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"qr\": \"PASTE_KHQR_PAYLOAD_HERE\",\n    \"sourceInfo\": {\n        \"appIconUrl\": \"https://example.com/icon.png\",\n        \"appName\": \"KHQR Phone Shop\",\n        \"appDeepLinkCallback\": \"https://example.com/callback\"\n    }\n}"
+            },
+            "url": {
+              "raw": "{{bakong_url}}/v1/generate_deeplink_by_qr",
+              "host": ["{{bakong_url}}"],
+              "path": ["v1", "generate_deeplink_by_qr"]
+            }
+          }
+        },
+        {
+          "name": "Check transaction by MD5 (SIT sandbox)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bakong_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n    \"md5\": \"{{md5}}\"\n}" },
+            "url": {
+              "raw": "{{bakong_sit_url}}/v1/check_transaction_by_md5",
+              "host": ["{{bakong_sit_url}}"],
+              "path": ["v1", "check_transaction_by_md5"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

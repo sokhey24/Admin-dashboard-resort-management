@@ -7,10 +7,11 @@ import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { RoomFeaturePanel } from "./RoomFeature.jsx";
+import { DiscountPreview } from "./RoomPrice.jsx";
 import RoomCard from "./RoomCard.jsx";
 import RoomImageUploader from "./RoomImageUploader.jsx";
 import ReviewPagination from "./reviews/ReviewPagination";
-import { ROOM_STATUSES, applyFormErrors, asList, paginationFrom, roomPrimaryBtnClass, roomModalOkClass, roomModalCancelClass, roomSearchClass, roomActionClass } from "./roomHelpers";
+import { MAX_DISCOUNT_PERCENT, ROOM_STATUSES, applyFormErrors, asList, clampPercent, paginationFrom, roomPrimaryBtnClass, roomModalOkClass, roomModalCancelClass, roomSearchClass, roomActionClass } from "./roomHelpers";
 
 const EMPTY_FILTERS = {
   status: undefined,
@@ -51,6 +52,15 @@ export default function Room() {
   const [reviewsByRoom, setReviewsByRoom] = useState({});
   const [form] = Form.useForm();
   const watchResort = Form.useWatch("resort_id", form);
+  const priceWatch = Form.useWatch("price_per_night", form);
+  const discountWatch = Form.useWatch("discount_percent", form);
+  const roomTypeWatch = Form.useWatch("room_type_id", form);
+
+  // What the room would inherit if its own discount is left empty.
+  const inheritedTypeDiscount = useMemo(() => {
+    const type = roomTypes.find((t) => String(t.id) === String(roomTypeWatch));
+    return clampPercent(type?.discount_percent ?? 0);
+  }, [roomTypes, roomTypeWatch]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -120,6 +130,9 @@ export default function Room() {
   const formBranches = watchResort
     ? branches.filter((b) => String(b.resort_id) === String(watchResort))
     : branches;
+  const formRoomTypes = watchResort
+    ? roomTypes.filter((t) => String(t.resort_id) === String(watchResort))
+    : roomTypes;
   const filterBranches = filters.resort_id
     ? branches.filter((b) => String(b.resort_id) === String(filters.resort_id))
     : branches;
@@ -143,6 +156,7 @@ export default function Room() {
       floor: room.floor,
       view: room.view,
       price_per_night: room.price_per_night != null ? Number(room.price_per_night) : undefined,
+      discount_percent: room.discount_percent != null ? Number(room.discount_percent) : undefined,
       status: room.status,
       notes: room.notes,
     });
@@ -316,20 +330,52 @@ export default function Room() {
       >
         <Form form={form} layout="vertical">
           <Form.Item name="resort_id" label="Resort" rules={[{ required: true, message: "Select a resort" }]}>
-            <Select showSearch optionFilterProp="label" options={resorts.map((r) => ({ value: r.id, label: r.name }))} onChange={() => form.setFieldValue("branch_id", undefined)} />
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={resorts.map((r) => ({ value: r.id, label: r.name }))}
+              onChange={() => {
+                form.setFieldValue("branch_id", undefined);
+                form.setFieldValue("room_type_id", undefined);
+              }}
+            />
           </Form.Item>
           <Form.Item name="branch_id" label="Branch">
             <Select allowClear showSearch optionFilterProp="label" options={formBranches.map((b) => ({ value: b.id, label: b.name }))} />
           </Form.Item>
           <Form.Item name="room_type_id" label="Room Type" rules={[{ required: true, message: "Select a room type" }]}>
-            <Select showSearch optionFilterProp="label" options={roomTypes.map((t) => ({ value: t.id, label: t.name }))} />
+            <Select
+              showSearch
+              optionFilterProp="label"
+              disabled={!watchResort}
+              placeholder={watchResort ? "Select room type" : "Select a resort first"}
+              options={formRoomTypes.map((t) => ({ value: t.id, label: t.name }))}
+            />
           </Form.Item>
           <Form.Item name="room_number" label="Room Number" rules={[{ required: true, message: "Enter a room number" }]}><Input maxLength={20} /></Form.Item>
           <Form.Item name="floor" label="Floor"><Input maxLength={50} /></Form.Item>
-          <Form.Item name="view" label="View"><Input maxLength={100} /></Form.Item>
+          <Form.Item name="view" label="View (first amenity pill)" tooltip="e.g. Garden view, Ocean view — shown on the guest resort room list.">
+            <Input maxLength={100} placeholder="Garden view" />
+          </Form.Item>
           <Form.Item name="price_per_night" label="Price per night" rules={[{ required: true, message: "Enter a price" }]}>
             <InputNumber min={0} className="w-full" prefix="$" />
           </Form.Item>
+          <Form.Item
+            name="discount_percent"
+            label="Discount (%)"
+            tooltip="Leave empty to inherit the room type discount. 0 forces no discount on this room."
+            rules={[{ type: "number", min: 0, max: MAX_DISCOUNT_PERCENT, message: "Discount must be between 0 and 100." }]}
+          >
+            <InputNumber min={0} max={MAX_DISCOUNT_PERCENT} step={0.5} className="w-full" suffix="%" placeholder="Inherit from room type" />
+          </Form.Item>
+          <div className="mb-4">
+            <DiscountPreview
+              price={priceWatch ?? 0}
+              percent={discountWatch ?? inheritedTypeDiscount}
+              dark={dark}
+              label="Discounted price / night"
+            />
+          </div>
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select options={ROOM_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))} />
           </Form.Item>

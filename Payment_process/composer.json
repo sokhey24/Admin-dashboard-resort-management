@@ -1,0 +1,5 @@
+{
+    "require": {
+        "khqr-gateway/bakong-khqr-php": "^1.0"
+    }
+}

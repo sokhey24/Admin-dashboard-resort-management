@@ -1,39 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solara Resort</title>
-  <link rel="stylesheet" href="css/theme.css">
-  <link rel="stylesheet" href="css/pages.css">
+  <script src="script/preferences-init.js"></script>
+  <link rel="stylesheet" href="CSS_Style/theme.css">
+  <link rel="stylesheet" href="CSS_Style/pages.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body data-page="home">
   <div id="site-header"></div>
 
   <section class="hero-banner">
-    <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1800&q=80" alt="Solara Resort villas">
+    <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1800&q=80"
+      alt="Solara Resort villas">
     <div class="scrim"></div>
     <div class="hero-copy">
-      <h1>Welcome to Solara Resort</h1>
-      <p>Beachfront villas, a calm spa, and a kitchen that cooks for the gulf. Book a stay on this guest site — reservations are saved in your browser until a hotel API is connected.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="booking.html">Book now</a>
-        <a class="btn btn-ghost" href="room.html">Explore rooms</a>
-      </div>
+      <h1>Find your next resort stay</h1>
+      <p>Search and compare beach, river, island and mountain resorts across Cambodia. Book in a few taps — reservations
+        are saved in your browser until a hotel API is connected.</p>
     </div>
   </section>
 
   <section class="section" style="padding-top:0">
     <div class="container">
-      <form class="search-widget" id="homeSearch">
-        <div><label>Check-in</label><input class="field" type="date" name="checkIn" required></div>
-        <div><label>Check-out</label><input class="field" type="date" name="checkOut" required></div>
-        <div><label>Adults</label><input class="field" type="number" name="adults" min="1" value="2" required></div>
-        <div><label>Children</label><input class="field" type="number" name="children" min="0" value="0" required></div>
-        <div><label>&nbsp;</label><button class="btn btn-primary" type="submit" style="width:100%">Search rooms</button></div>
-      </form>
+      <div id="heroSearch" class="hero-search"></div>
+      <div class="popular-chips" id="popularDestinations"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2>Popular resorts</h2>
+      <p class="lead">Guest-favourite properties across the RMS network.</p>
+      <div class="resort-grid" id="popularResorts"></div>
+      <p style="text-align:center;margin-top:22px"><a class="btn btn-ghost" href="resorts.html">Browse all resorts</a>
+      </p>
     </div>
   </section>
 
@@ -51,7 +57,8 @@
       <h2>Resort activities</h2>
       <p class="lead">Water, wellness, and slow evenings on the sand.</p>
       <div class="grid-3" id="homeActivities"></div>
-      <p style="text-align:center;margin-top:22px"><a class="btn btn-ghost" href="activities.html">All activities</a></p>
+      <p style="text-align:center;margin-top:22px"><a class="btn btn-ghost" href="activities.html">All activities</a>
+      </p>
     </div>
   </section>
 
@@ -81,6 +88,7 @@
     </div>
   </section>
 
+  <a id="promotions" class="anchor-offset" aria-hidden="true"></a>
   <section class="promo-band" id="homePromo"></section>
 
   <section class="section">
@@ -102,7 +110,12 @@
   <script src="script/data.js"></script>
   <script src="script/store.js"></script>
   <script src="script/api.js"></script>
+  <script src="script/preferences.js"></script>
+  <script src="script/i18n.js"></script>
   <script src="script/app.js"></script>
+  <script src="script/search.js"></script>
+  <script src="script/resorts.js"></script>
   <script src="script/content.js"></script>
 </body>
+
 </html>

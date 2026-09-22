@@ -7,12 +7,16 @@ import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { RoomTypeAmenityChips } from "./RoomFeature.jsx";
+import { DiscountPreview, PriceWithDiscount } from "./RoomPrice.jsx";
 import ReviewPagination from "./reviews/ReviewPagination";
 import {
+  MAX_DISCOUNT_PERCENT,
   TYPE_STATUSES,
   TYPE_STATUS_STYLE,
   applyFormErrors,
   asList,
+  formatPercent,
+  GUEST_AMENITY_PRESETS,
   paginationFrom,
   roomActionClass,
 } from "./roomHelpers";
@@ -56,6 +60,8 @@ export default function RoomTypes() {
   const [confirm, setConfirm] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [form] = Form.useForm();
+  const basePriceWatch = Form.useWatch("base_price", form);
+  const discountWatch = Form.useWatch("discount_percent", form);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -109,7 +115,15 @@ export default function RoomTypes() {
   const openCreate = () => {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ status: "active", max_occupancy: 2, bed_count: 1 });
+    form.setFieldsValue({
+      status: "active",
+      max_occupancy: 2,
+      bed_count: 1,
+      discount_percent: 0,
+      amenities: [],
+      breakfast_included: false,
+      free_cancellation: true,
+    });
     setFormOpen(true);
   };
 
@@ -120,19 +134,29 @@ export default function RoomTypes() {
       name: row.name,
       description: row.description,
       base_price: row.base_price != null ? Number(row.base_price) : undefined,
+      discount_percent: row.discount_percent != null ? Number(row.discount_percent) : 0,
       max_occupancy: row.max_occupancy,
       bed_count: row.bed_count,
       bed_type: row.bed_type,
       size_sqm: row.size_sqm != null ? Number(row.size_sqm) : undefined,
       status: row.status || "active",
+      amenities: Array.isArray(row.amenities) ? row.amenities : [],
+      breakfast_included: !!row.breakfast_included,
+      free_cancellation: row.free_cancellation !== false,
     });
     setFormOpen(true);
   };
 
   const saveType = async () => {
     const values = await form.validateFields();
+    const payload = {
+      ...values,
+      amenities: Array.isArray(values.amenities) ? values.amenities.filter(Boolean) : [],
+      breakfast_included: values.breakfast_included === true,
+      free_cancellation: values.free_cancellation !== false,
+    };
     setSaving(true);
-    const res = await request(editing ? `admin/room-types/${editing.id}` : "admin/room-types", editing ? "put" : "post", values);
+    const res = await request(editing ? `admin/room-types/${editing.id}` : "admin/room-types", editing ? "put" : "post", payload);
     setSaving(false);
     if (res?.errors) {
       applyFormErrors(form, res.errors);
@@ -218,7 +242,7 @@ export default function RoomTypes() {
             <table className={`min-w-full divide-y ${divider}`}>
               <thead className={thead}>
                 <tr>
-                  {["No.", "Room Type", "Resort", "Base Price", "Max Occupancy", "Bed Count", "Bed Type", "Size (sqm)", "Status", "Action"].map((h) => (
+                  {["No.", "Room Type", "Resort", "Base Price", "Discount", "Max Occupancy", "Bed Count", "Bed Type", "Size (sqm)", "Status", "Action"].map((h) => (
                     <th key={h} className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap ${thText} ${h === "No." ? "w-12" : ""} ${h === "Action" ? "text-center" : ""}`}>{h}</th>
                   ))}
                 </tr>
@@ -231,7 +255,12 @@ export default function RoomTypes() {
                       <p className={`text-sm font-semibold ${titleCls}`}>{row.name}</p>
                     </td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.resort?.name || "—"}</td>
-                    <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>${Number(row.base_price ?? 0).toFixed(2)}</td>
+                    <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>
+                      <PriceWithDiscount price={row.base_price} percent={row.discount_percent} dark={dark} />
+                    </td>
+                    <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>
+                      {Number(row.discount_percent ?? 0) > 0 ? `${formatPercent(row.discount_percent)}%` : "—"}
+                    </td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.max_occupancy != null ? row.max_occupancy : "—"}</td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.bed_count != null ? row.bed_count : "—"}</td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.bed_type || "—"}</td>
@@ -274,7 +303,45 @@ export default function RoomTypes() {
           <Form.Item name="bed_count" label="Bed count"><InputNumber min={1} max={20} className="w-full" /></Form.Item>
           <Form.Item name="bed_type" label="Bed type"><Input /></Form.Item>
           <Form.Item name="size_sqm" label="Size (sqm)"><InputNumber min={0} className="w-full" /></Form.Item>
+          <Form.Item
+            name="amenities"
+            label="Amenity tags (guest site pills)"
+            tooltip="Shown on the resort “Choose your room” cards — e.g. Wi-Fi, Garden view."
+          >
+            <Select
+              mode="tags"
+              placeholder="Select or type amenities"
+              options={GUEST_AMENITY_PRESETS.map((a) => ({ value: a, label: a }))}
+            />
+          </Form.Item>
+          <Form.Item name="breakfast_included" label="Breakfast on guest card">
+            <Select
+              options={[
+                { value: true, label: "Breakfast included" },
+                { value: false, label: "Breakfast available (not included)" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="free_cancellation" label="Cancellation policy">
+            <Select
+              options={[
+                { value: true, label: "Free cancellation" },
+                { value: false, label: "Non-refundable" },
+              ]}
+            />
+          </Form.Item>
           <Form.Item name="base_price" label="Base price" rules={[{ required: true }]}><InputNumber min={0} prefix="$" className="w-full" /></Form.Item>
+          <Form.Item
+            name="discount_percent"
+            label="Discount (%)"
+            tooltip="Applies to every room of this type unless a room sets its own discount."
+            rules={[{ type: "number", min: 0, max: MAX_DISCOUNT_PERCENT, message: "Discount must be between 0 and 100." }]}
+          >
+            <InputNumber min={0} max={MAX_DISCOUNT_PERCENT} step={0.5} className="w-full" suffix="%" />
+          </Form.Item>
+          <div className="mb-4">
+            <DiscountPreview price={basePriceWatch ?? 0} percent={discountWatch ?? 0} dark={dark} />
+          </div>
           <Form.Item name="status" label="Status"><Select options={TYPE_STATUSES.map((s) => ({ value: s, label: s }))} /></Form.Item>
         </Form>
       </Modal>
@@ -285,7 +352,9 @@ export default function RoomTypes() {
             <div className="flex justify-between"><h3 className={`text-lg font-bold ${titleCls}`}>{viewing.name}</h3><TypeStatusBadge status={viewing.status} dark={dark} /></div>
             <p className={`text-sm ${cellText}`}>{viewing.description || "No description provided."}</p>
             <p className={`text-sm ${cellText}`}>Resort: {viewing.resort?.name || "—"}</p>
-            <p className={`text-sm ${cellText}`}>${Number(viewing.base_price ?? 0).toFixed(2)} / night</p>
+            <p className={`text-sm ${cellText}`}>
+              <PriceWithDiscount price={viewing.base_price} percent={viewing.discount_percent} dark={dark} suffix=" / night" />
+            </p>
             <p className={`text-sm ${cellText}`}>Max occupancy: {viewing.max_occupancy ?? "—"} · Beds: {viewing.bed_count ?? "—"} · {viewing.bed_type || "—"} · {viewing.size_sqm != null ? `${viewing.size_sqm} sqm` : "—"}</p>
             <p className={`text-sm ${cellText}`}>{viewing.rooms_count ?? 0} rooms assigned</p>
             <RoomTypeAmenityChips type={viewing} facilities={facilities} />

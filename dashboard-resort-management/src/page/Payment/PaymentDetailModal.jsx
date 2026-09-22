@@ -342,12 +342,21 @@ export default function PaymentDetailModal({ payment, open, onClose, dark, autoP
                   {Array.isArray(p.reference?.rooms) && p.reference.rooms.length > 0 && (
                     <Section title="Rooms" dark={dark}>
                       {p.reference.rooms.map((r, i) => (
-                        <InfoRow
-                          key={`${r.room_number}-${i}`}
-                          label={`${r.room_number} · ${r.room_type ?? "Room"}`}
-                          value={`${fmtAmt(r.price_per_night)} × ${r.nights ?? 1} = ${fmtAmt(r.subtotal)}`}
-                          dark={dark}
-                        />
+                        <div key={`${r.room_number}-${i}`}>
+                          <InfoRow
+                            label={`${r.room_number} · ${r.room_type ?? "Room"}`}
+                            value={`${fmtAmt(r.price_per_night)} × ${r.nights ?? 1} = ${fmtAmt(r.subtotal)}`}
+                            dark={dark}
+                          />
+                          {Number(r.discount_percent ?? 0) > 0 && (
+                            <InfoRow
+                              label={`   Discount ${Number(r.discount_percent)}%`}
+                              value={`-${fmtAmt(r.discount_amount)} = ${fmtAmt(r.net_subtotal)}`}
+                              dark={dark}
+                              colorCls="text-[#FF6B00]"
+                            />
+                          )}
+                        </div>
                       ))}
                     </Section>
                   )}
@@ -358,8 +367,29 @@ export default function PaymentDetailModal({ payment, open, onClose, dark, autoP
                     {p.invoice?.invoice_number && (
                       <InfoRow label="Invoice" value={p.invoice.invoice_number} dark={dark} />
                     )}
-                    <InfoRow label="Subtotal"          value={fmtAmt(p.breakdown?.subtotal)}                                                                               dark={dark} />
-                    <InfoRow label="Discount"          value={`-${fmtAmt(p.breakdown?.discount)}`}                                                                         dark={dark} />
+                    <InfoRow label="Original Subtotal" value={fmtAmt(p.breakdown?.subtotal)} dark={dark} />
+                    {Number(p.breakdown?.room_discount_total ?? 0) > 0 && (
+                      <InfoRow
+                        label={`Room Discount (${Number(p.breakdown?.room_discount_percent ?? 0)}%)`}
+                        value={`-${fmtAmt(p.breakdown?.room_discount_total)}`}
+                        dark={dark}
+                        colorCls="text-[#FF6B00]"
+                      />
+                    )}
+                    {Number(p.breakdown?.coupon_discount ?? 0) > 0 && (
+                      <InfoRow
+                        label={`Coupon${p.breakdown?.coupon_code ? ` (${p.breakdown.coupon_code})` : ""}`}
+                        value={`-${fmtAmt(p.breakdown?.coupon_discount)}`}
+                        dark={dark}
+                        colorCls="text-[#FF6B00]"
+                      />
+                    )}
+                    {p.breakdown?.room_discount_total === undefined && (
+                      <InfoRow label="Discount" value={`-${fmtAmt(p.breakdown?.discount)}`} dark={dark} />
+                    )}
+                    {Number(p.breakdown?.discount ?? 0) > 0 && (
+                      <InfoRow label="Discounted Subtotal" value={fmtAmt(p.breakdown?.discounted_subtotal)} dark={dark} />
+                    )}
                     <InfoRow label="Tax"               value={fmtAmt(p.breakdown?.tax)}                                                                                    dark={dark} />
                     <InfoRow label="Service Charge"    value={fmtAmt(p.breakdown?.service_charge)}                                                                         dark={dark} />
                     <div className={`border-t my-1.5 ${divider}`} />

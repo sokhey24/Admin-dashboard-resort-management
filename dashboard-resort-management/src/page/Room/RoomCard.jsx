@@ -3,7 +3,8 @@ import { Button } from "antd";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
 import RoomFeatureChips from "./RoomFeature.jsx";
-import { primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
+import { PriceWithDiscount } from "./RoomPrice.jsx";
+import { effectiveDiscountPercent, primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
 import ReviewRating from "./reviews/ReviewRating";
 
 export default function RoomCard({
@@ -52,7 +53,13 @@ export default function RoomCard({
             <MdPeople size={14} /> {capacity != null ? `${capacity} guests` : "—"}
           </span>
           <span className="inline-flex items-center gap-1 font-semibold text-[#FF6B00]">
-            <MdAttachMoney size={14} /> {Number(room.price_per_night ?? 0).toFixed(2)}/night
+            <MdAttachMoney size={14} />
+            <PriceWithDiscount
+              price={room.price_per_night}
+              percent={room.effective_discount_percent ?? effectiveDiscountPercent(room)}
+              dark={dark}
+              suffix="/night"
+            />
           </span>
         </div>
         <RoomFeatureChips room={room} compact />

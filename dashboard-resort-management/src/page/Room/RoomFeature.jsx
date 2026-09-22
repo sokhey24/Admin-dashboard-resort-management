@@ -2,6 +2,7 @@ import { MdClose, MdEdit, MdDelete, MdPeople, MdSquareFoot, MdHotel, MdLayers, M
 import { Button } from "antd";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
+import { PriceWithDiscount } from "./RoomPrice.jsx";
 import { primaryRoomImage, roomActionClass, roomFeatures, roomImageSrc, roomTypeAmenities } from "./roomHelpers";
 
 export default function RoomFeatureChips({ room, compact = false }) {
@@ -102,7 +103,11 @@ export function RoomFeaturePanel({ room, onClose, onEdit, onDelete, canEdit, can
 
         <div className={`mb-4 pb-4 border-b ${divider}`}>
           <p className={`text-2xl sm:text-3xl font-extrabold leading-none tracking-tight ${titleCls}`}>
-            ${Number(room.price_per_night ?? 0).toFixed(2)}
+            <PriceWithDiscount
+              price={room.price_per_night}
+              percent={room.effective_discount_percent}
+              dark={dark}
+            />
           </p>
           <p className={`text-xs mt-1.5 uppercase tracking-wide ${subText}`}>per night</p>
         </div>

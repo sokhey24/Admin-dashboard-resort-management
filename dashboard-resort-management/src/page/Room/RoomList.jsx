@@ -1,7 +1,8 @@
 import { Button } from "antd";
 import { MdDelete, MdEdit, MdVisibility } from "react-icons/md";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
-import { primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
+import { PriceWithDiscount } from "./RoomPrice.jsx";
+import { effectiveDiscountPercent, formatPercent, primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
 
 export default function RoomList({
   rooms,
@@ -32,6 +33,7 @@ export default function RoomList({
     "Floor",
     "View",
     "Price/Night",
+    "Discount",
     "Status",
     "Action",
   ];
@@ -82,7 +84,16 @@ export default function RoomList({
                   {room.view || "—"}
                 </td>
                 <td className="px-4 py-4 text-sm whitespace-nowrap font-semibold text-[#FF6B00]">
-                  ${Number(room.price_per_night ?? 0).toFixed(2)}
+                  <PriceWithDiscount
+                    price={room.price_per_night}
+                    percent={room.effective_discount_percent ?? effectiveDiscountPercent(room)}
+                    dark={dark}
+                  />
+                </td>
+                <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>
+                  {(room.effective_discount_percent ?? effectiveDiscountPercent(room)) > 0
+                    ? `${formatPercent(room.effective_discount_percent ?? effectiveDiscountPercent(room))}%${room.discount_percent == null ? " (type)" : ""}`
+                    : "—"}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   <RoomStatusBadge status={room.status} dark={dark} />

@@ -15,6 +15,38 @@ export const TYPE_STATUS_STYLE = {
   inactive: { dot: "bg-gray-400",  light: "bg-gray-100 text-gray-600 ring-gray-200",   dark: "bg-gray-700 text-gray-300 ring-gray-600" },
 };
 
+export const MAX_DISCOUNT_PERCENT = 100;
+
+// Preview-only helpers. Laravel recalculates every figure on quote and on save,
+// so these exist purely so the form can show the effect while it is being typed.
+export function clampPercent(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(MAX_DISCOUNT_PERCENT, Math.max(0, n));
+}
+
+/** A room's own percentage, or its room type's when the room has no override. */
+export function effectiveDiscountPercent(room) {
+  const own = room?.discount_percent;
+  if (own !== null && own !== undefined && own !== "") return clampPercent(own);
+  return clampPercent(room?.room_type?.discount_percent ?? 0);
+}
+
+export function discountedPrice(price, percent) {
+  const base = Number(price) || 0;
+  const pct = clampPercent(percent);
+  return Math.round((base - (base * pct) / 100) * 100) / 100;
+}
+
+export function formatPercent(value) {
+  const n = clampPercent(value);
+  return String(Number(n.toFixed(2)));
+}
+
+export function formatMoney(value) {
+  return `$${(Number(value) || 0).toFixed(2)}`;
+}
+
 export const ROOM_IMAGE_MAX_KB = 2048;
 export const ROOM_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp,image/bmp";
 
@@ -65,16 +97,32 @@ export function paginationFrom(res) {
 }
 
 export function roomFeatures(room) {
-  const fromType = [room?.room_type?.bed_type, room?.view].filter(Boolean);
-  const fromResort = Array.isArray(room?.resort?.facilities)
-    ? room.resort.facilities.map((f) => f.name).filter(Boolean)
-    : [];
-  return [...new Set([...fromType, ...fromResort])];
+  const type = room?.room_type ?? {};
+  const fromType = roomTypeAmenities(type, room?.resort?.facilities ?? []);
+  const fromRoom = [room?.view].filter(Boolean);
+  return [...new Set([...fromRoom, ...fromType])];
 }
 
+export const GUEST_AMENITY_PRESETS = [
+  "Garden view",
+  "Ocean view",
+  "Lagoon view",
+  "Wi-Fi",
+  "Air conditioning",
+  "Mini bar",
+  "Balcony",
+  "Bathtub",
+  "Outdoor shower",
+  "Lagoon deck",
+  "Terrace",
+  "Work desk",
+  "Rainfall shower",
+];
+
 export function roomTypeAmenities(type, facilities = []) {
+  const stored = Array.isArray(type?.amenities) ? type.amenities.filter(Boolean) : [];
+  if (stored.length) return [...new Set(stored)];
   const names = [];
-  if (type?.bed_type) names.push(type.bed_type);
   const resortId = type?.resort_id ?? type?.resort?.id;
   facilities
     .filter((f) => !resortId || String(f.resort_id) === String(resortId))

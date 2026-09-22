@@ -5,7 +5,8 @@ import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
-import { ROOM_STATUSES, STATUS_STYLE, applyFormErrors, roomActionClass, roomModalOkClass, roomModalCancelClass } from "./roomHelpers";
+import { PriceWithDiscount } from "./RoomPrice.jsx";
+import { MAX_DISCOUNT_PERCENT, ROOM_STATUSES, STATUS_STYLE, applyFormErrors, effectiveDiscountPercent, roomActionClass, roomModalOkClass, roomModalCancelClass } from "./roomHelpers";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 export function RoomStatusBadge({ status, dark }) {
@@ -56,6 +57,7 @@ export default function RoomStatus() {
       room_number: r.room_number,
       floor: r.floor,
       price_per_night: r.price_per_night != null ? Number(r.price_per_night) : undefined,
+      discount_percent: r.discount_percent != null ? Number(r.discount_percent) : undefined,
       status: r.status,
       notes: r.notes,
     });
@@ -81,6 +83,7 @@ export default function RoomStatus() {
       room_number: values.room_number,
       floor: values.floor != null ? String(values.floor) : null,
       price_per_night: values.price_per_night,
+      discount_percent: values.discount_percent ?? null,
       status: values.status,
       notes: values.notes,
     });
@@ -182,7 +185,13 @@ export default function RoomStatus() {
                   <td className={`px-6 py-4 text-sm font-medium ${titleCls}`}>{r.room_number}</td>
                   <td className={`px-6 py-4 text-sm ${cellText}`}>{r.room_type?.name ?? "—"}</td>
                   <td className={`px-6 py-4 text-sm ${cellText}`}>{r.floor ?? "—"}</td>
-                  <td className={`px-6 py-4 text-sm ${cellText}`}>${r.price_per_night ?? 0}</td>
+                  <td className={`px-6 py-4 text-sm ${cellText}`}>
+                    <PriceWithDiscount
+                      price={r.price_per_night}
+                      percent={r.effective_discount_percent ?? effectiveDiscountPercent(r)}
+                      dark={dark}
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={r.status} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
@@ -236,6 +245,14 @@ export default function RoomStatus() {
           <Form.Item name="room_number"     label="Room Number"  rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="floor"           label="Floor"><InputNumber className="w-full" /></Form.Item>
           <Form.Item name="price_per_night" label="Price/Night"><InputNumber className="w-full" prefix="$" /></Form.Item>
+          <Form.Item
+            name="discount_percent"
+            label="Discount (%)"
+            tooltip="Leave empty to inherit the room type discount."
+            rules={[{ type: "number", min: 0, max: MAX_DISCOUNT_PERCENT, message: "Discount must be between 0 and 100." }]}
+          >
+            <InputNumber min={0} max={MAX_DISCOUNT_PERCENT} step={0.5} className="w-full" suffix="%" placeholder="Inherit from room type" />
+          </Form.Item>
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select options={ROOM_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))} />
           </Form.Item>
