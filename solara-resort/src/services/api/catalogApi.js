@@ -6,6 +6,21 @@ export async function fetchResorts(params = {}) {
   return data;
 }
 
+export async function fetchBranches(params = {}) {
+  const { data } = await axiosClient.get('customer/branches', { params });
+  return data;
+}
+
+export async function fetchBranch(branchId) {
+  const { data } = await axiosClient.get(`customer/branches/${branchId}`);
+  return data?.data ?? data;
+}
+
+export async function fetchBranchRooms(branchId, params = {}) {
+  const { data } = await axiosClient.get(`customer/branches/${branchId}/rooms`, { params });
+  return data;
+}
+
 export async function fetchResort(resortId) {
   const { data } = await axiosClient.get(`customer/resorts/${resortId}`);
   return data?.data ?? data;

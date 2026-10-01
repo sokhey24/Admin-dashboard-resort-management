@@ -44,6 +44,19 @@ class BookingQuoteController extends Controller
             throw ValidationException::withMessages(['room_ids' => ['All rooms must belong to the same resort.']]);
         }
 
+        if ($rooms->pluck('branch_id')->filter()->unique()->count() > 1) {
+            throw ValidationException::withMessages(['room_ids' => ['All rooms must belong to the same branch.']]);
+        }
+
+        $branchId = (int) $data['branch_id'];
+        foreach ($rooms as $room) {
+            if ($room->branch_id && (int) $room->branch_id !== $branchId) {
+                throw ValidationException::withMessages([
+                    'room_ids' => ["Room {$room->room_number} is not located at the selected branch."],
+                ]);
+            }
+        }
+
         $this->assertOccupancyFits($rooms, (int) ($data['adults'] ?? 1), (int) ($data['children'] ?? 0));
 
         // Same availability rules the booking itself will enforce.
@@ -63,6 +76,7 @@ class BookingQuoteController extends Controller
         return response()->json([
             'data' => $quote + [
                 'resort_id' => (int) $rooms->first()->resort_id,
+                'branch_id' => (int) ($rooms->first()->branch_id ?? $data['branch_id'] ?? 0) ?: null,
                 'check_in' => $checkIn->toDateString(),
                 'check_out' => $checkOut->toDateString(),
                 'adults' => (int) ($data['adults'] ?? 1),

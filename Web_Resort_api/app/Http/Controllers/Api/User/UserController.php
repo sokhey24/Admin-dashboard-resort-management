@@ -22,7 +22,7 @@ class UserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = User::with('roles');
+        $q = User::with(['roles', 'branches']);
 
         if ($date = $request->query('date')) {
             $q->whereDate('created_at', $date);
@@ -59,13 +59,13 @@ class UserController extends Controller
             if ($role) $user->roles()->syncWithoutDetaching($role->id);
         }
 
-        $user->load('roles');
+        $user->load(['roles', 'branches']);
         return response()->json(['data' => $this->withImageUrl($user)], 201);
     }
 
     public function show(User $user): JsonResponse
     {
-        $user->load('roles');
+        $user->load(['roles', 'branches']);
         return response()->json(['data' => $this->withImageUrl($user)]);
     }
 
@@ -102,7 +102,30 @@ class UserController extends Controller
             if ($role) $user->roles()->sync($role->id);
         }
 
-        return response()->json(['data' => $this->withImageUrl($user->fresh()->load('roles'))]);
+        return response()->json(['data' => $this->withImageUrl($user->fresh()->load(['roles', 'branches']))]);
+    }
+
+    public function syncBranches(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'branches' => 'required|array',
+            'branches.*.branch_id' => 'required|integer|exists:branches,id',
+            'branches.*.role' => 'nullable|string|max:64',
+            'branches.*.is_primary' => 'nullable|boolean',
+        ]);
+
+        $sync = [];
+        foreach ($validated['branches'] as $row) {
+            $sync[(int) $row['branch_id']] = [
+                'role' => $row['role'] ?? null,
+                'is_primary' => (bool) ($row['is_primary'] ?? false),
+                'assigned_at' => now(),
+            ];
+        }
+
+        $user->branches()->sync($sync);
+
+        return response()->json(['data' => $this->withImageUrl($user->fresh()->load(['roles', 'branches']))]);
     }
 
     public function assignRole(Request $request, User $user): JsonResponse

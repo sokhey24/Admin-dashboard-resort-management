@@ -25,6 +25,7 @@ class BookingQuoteRequest extends FormRequest
             'adults' => ['nullable', 'integer', 'min:1', 'max:50'],
             'children' => ['nullable', 'integer', 'min:0', 'max:50'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
         ];
     }
 
@@ -32,6 +33,7 @@ class BookingQuoteRequest extends FormRequest
     {
         return [
             'room_ids.required' => 'Select at least one room.',
+            'branch_id.required' => 'A valid resort branch is required for price quotes.',
             'check_out.after' => 'Check-out must be after check-in.',
         ];
     }

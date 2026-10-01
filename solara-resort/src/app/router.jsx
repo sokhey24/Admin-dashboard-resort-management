@@ -3,8 +3,8 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout.jsx';
 import { CustomerRoute } from '../components/auth/CustomerRoute.jsx';
 import { HomePage } from '../pages/HomePage.jsx';
-import { ResortsPage } from '../pages/ResortsPage.jsx';
-import { ResortDetailPage } from '../pages/ResortDetailPage.jsx';
+import { BranchesPage } from '../pages/BranchesPage.jsx';
+import { BranchDetailPage } from '../pages/BranchDetailPage.jsx';
 import { RoomsPage } from '../pages/RoomsPage.jsx';
 import { RoomDetailPage } from '../pages/RoomDetailPage.jsx';
 import { AboutPage } from '../pages/AboutPage.jsx';
@@ -41,8 +41,13 @@ export function AppRouter() {
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
-          <Route path="resorts" element={<ResortsPage />} />
-          <Route path="resort/:id" element={<ResortDetailPage />} />
+          <Route path="branches" element={<BranchesPage />} />
+          <Route path="resorts" element={<BranchesPage />} />
+          <Route path="locations" element={<BranchesPage />} />
+          <Route path="branches/:id" element={<BranchDetailPage />} />
+          <Route path="branch/:id" element={<BranchDetailPage />} />
+          <Route path="locations/:slug" element={<BranchDetailPage />} />
+          <Route path="resort/:id" element={<BranchDetailPage />} />
           <Route path="rooms" element={<RoomsPage />} />
           <Route path="room/:id" element={<RoomDetailPage />} />
           <Route path="about" element={<AboutPage />} />

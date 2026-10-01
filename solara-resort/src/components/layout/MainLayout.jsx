@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar.jsx';
 import { Footer } from './Footer.jsx';
 import { ToastContainer } from '../toast/ToastContainer.jsx';
+import { GeminiAssistantWidget } from '../ai/GeminiAssistantWidget.jsx';
 
 export const MainLayout = () => {
   return (
@@ -13,6 +14,7 @@ export const MainLayout = () => {
       </main>
       <Footer />
       <ToastContainer />
+      <GeminiAssistantWidget />
     </div>
   );
 };

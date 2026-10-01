@@ -17,6 +17,7 @@ import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { useApp } from '../context/AppContext.jsx';
 import { formatCurrency } from '../util/currency.js';
 import { useBookingQuote, useCreateBooking } from '../hooks/useBooking.js';
+import { useRoomDetail } from '../hooks/useCatalog.js';
 import { buildSpecialRequests } from '../util/mapBooking.js';
 import { resolveSafeInternalPath } from '../util/safeRedirect.js';
 import {
@@ -51,8 +52,34 @@ export const BookingPage = () => {
 
   const [paymentMethod, setPaymentMethod] = useState('khqr');
 
+  const { room: currentRoom } = useRoomDetail(bookingDraft.roomId);
+
+  useEffect(() => {
+    if (currentRoom) {
+      const updates = {};
+      if (!bookingDraft.branchId && currentRoom.branchId) {
+        updates.branchId = currentRoom.branchId;
+      }
+      if (!bookingDraft.roomName && currentRoom.name) {
+        updates.roomName = currentRoom.name;
+      }
+      if (!bookingDraft.resortName && currentRoom.resortName) {
+        updates.resortName = currentRoom.resortName;
+      }
+      if (!bookingDraft.roomImage && currentRoom.featuredImage) {
+        updates.roomImage = currentRoom.featuredImage;
+      }
+      if (Object.keys(updates).length > 0) {
+        updateBookingDraft(updates);
+      }
+    }
+  }, [currentRoom, bookingDraft.branchId, bookingDraft.roomName, bookingDraft.resortName, bookingDraft.roomImage, updateBookingDraft]);
+
+  const activeBranchId = bookingDraft.branchId || currentRoom?.branchId;
+
   const { quote, loading: quoteLoading, error: quoteError, refetch: refetchQuote } = useBookingQuote({
     roomId: bookingDraft.roomId,
+    branchId: activeBranchId,
     checkIn: bookingDraft.checkIn,
     checkOut: bookingDraft.checkOut,
     adults: bookingDraft.adults,
@@ -165,8 +192,10 @@ export const BookingPage = () => {
 
       const coupon = (bookingDraft.couponCode || '').trim();
 
+      const branchId = quote?.branchId || activeBranchId;
       const result = await createBooking({
-        resort_id: quote.resortId || bookingDraft.resortId,
+        resort_id: quote?.resortId || bookingDraft.resortId,
+        ...(branchId ? { branch_id: Number(branchId) } : {}),
         room_ids: [Number(bookingDraft.roomId)],
         check_in: bookingDraft.checkIn,
         check_out: bookingDraft.checkOut,
@@ -293,9 +322,12 @@ export const BookingPage = () => {
                       className="w-full sm:w-48 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
                     />
                   )}
-                  <div className="space-y-2 flex-1">
-                    <span className="text-[10px] uppercase tracking-wider text-gold font-semibold">
-                      {displayResortName}
+                  <div className="space-y-1.5 flex-1">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold block">
+                      Solara Resort & Spa
+                    </span>
+                    <span className="text-xs text-slate-300 font-medium block">
+                      {displayResortName || currentRoom?.resortName || 'Sanctuary Branch'}
                     </span>
                     <h3 className="text-xl font-serif font-bold text-text">{displayRoomName}</h3>
                   </div>

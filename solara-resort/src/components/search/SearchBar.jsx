@@ -24,6 +24,7 @@ const fieldControlClass =
   'w-full bg-transparent text-sm sm:text-[15px] font-semibold text-white focus:outline-none cursor-pointer';
 
 export const SearchBar = ({
+  initialBranchId = '',
   initialDestination = '',
   initialCheckIn = '',
   initialCheckOut = '',
@@ -32,6 +33,7 @@ export const SearchBar = ({
   initialRooms = 1,
   onSearch,
   destinationOptions = [],
+  branchOptions = [],
   destinationsLoading = false,
   className = '',
 }) => {
@@ -39,6 +41,7 @@ export const SearchBar = ({
   const [searchParams] = useSearchParams();
   const { updateBookingDraft, t } = useApp();
 
+  const [selectedBranchId, setSelectedBranchId] = useState(initialBranchId ? String(initialBranchId) : '');
   const [destination, setDestination] = useState(initialDestination);
   const [checkIn, setCheckIn] = useState(initialCheckIn);
   const [checkOut, setCheckOut] = useState(initialCheckOut);
@@ -47,6 +50,7 @@ export const SearchBar = ({
   const [rooms, setRooms] = useState(initialRooms);
 
   useEffect(() => {
+    setSelectedBranchId(initialBranchId ? String(initialBranchId) : '');
     setDestination(initialDestination);
     setCheckIn(initialCheckIn);
     setCheckOut(initialCheckOut);
@@ -54,6 +58,7 @@ export const SearchBar = ({
     setChildren(initialChildren);
     setRooms(initialRooms);
   }, [
+    initialBranchId,
     initialDestination,
     initialCheckIn,
     initialCheckOut,
@@ -62,9 +67,23 @@ export const SearchBar = ({
     initialRooms,
   ]);
 
+  const handleBranchChange = (val) => {
+    const foundBranch = (branchOptions.length > 0 ? branchOptions : []).find(
+      (b) => String(b.value) === String(val) || String(b.branchId) === String(val)
+    );
+    if (foundBranch && foundBranch.branchId) {
+      setSelectedBranchId(String(foundBranch.branchId));
+      setDestination(foundBranch.destination || '');
+    } else {
+      setSelectedBranchId('');
+      setDestination(val);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const payload = {
+      branchId: selectedBranchId ? Number(selectedBranchId) : '',
       destination,
       checkIn,
       checkOut,
@@ -75,6 +94,7 @@ export const SearchBar = ({
     };
 
     updateBookingDraft({
+      ...(selectedBranchId ? { branchId: Number(selectedBranchId) } : {}),
       checkIn,
       checkOut,
       adults: guests,
@@ -88,6 +108,7 @@ export const SearchBar = ({
     }
 
     const criteria = {
+      branchId: selectedBranchId ? Number(selectedBranchId) : '',
       destination,
       checkIn,
       checkOut,
@@ -96,8 +117,10 @@ export const SearchBar = ({
       rooms,
     };
     const next = applySearchCriteria(searchParams, criteria);
-    navigate(buildResortsSearchPath(criteria, next));
+    navigate(buildBranchesSearchPath(criteria, next));
   };
+
+  const optionsList = branchOptions.length > 0 ? branchOptions : destinationOptions;
 
   return (
     <form
@@ -105,18 +128,18 @@ export const SearchBar = ({
       className={`w-full rounded-2xl border border-slate-600/60 bg-[#0f1419]/92 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.45)] p-2 sm:p-2.5 transition-all ${className}`}
     >
       <div className="flex flex-col lg:flex-row lg:items-stretch gap-2">
-        <SearchField icon={MapPin} label={t('search.destination', 'Destination')}>
+        <SearchField icon={MapPin} label={t('search.branchLocation', 'Select Branch / Location')}>
           <div className="relative flex items-center">
             <select
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
+              value={selectedBranchId || destination}
+              onChange={(e) => handleBranchChange(e.target.value)}
               disabled={destinationsLoading}
               className={`${fieldControlClass} appearance-none pr-7 disabled:opacity-60 truncate`}
             >
               <option value="" className="bg-slate-900 text-white">
-                {t('search.allDestinations', 'All Destinations')}
+                {t('search.allDestinations', 'All Branches / Locations')}
               </option>
-              {destinationOptions
+              {optionsList
                 .filter((opt) => opt.value)
                 .map((opt) => (
                   <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">

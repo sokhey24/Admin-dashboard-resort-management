@@ -6,7 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class Facility extends Model
 {
-    protected $fillable = ['resort_id', 'name', 'description', 'icon', 'status'];
+    protected $fillable = 
+    [
+        'resort_id',
+         'name', 
+         'description', 
+         'icon', 
+         'status'
+        ];
 
-    public function resort() { return $this->belongsTo(Resort::class); }
+    public function resort() { 
+        return $this->belongsTo(Resort::class);
+     }
 }

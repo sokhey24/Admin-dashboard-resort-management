@@ -11,6 +11,10 @@ class BookingRoom extends Model
         'discount_percent', 'discount_amount', 'subtotal', 'net_subtotal',
     ];
 
-    public function booking() { return $this->belongsTo(Booking::class); }
-    public function room()    { return $this->belongsTo(Room::class); }
+    public function booking() { 
+        return $this->belongsTo(Booking::class);
+     }
+    public function room()    { 
+        return $this->belongsTo(Room::class); 
+    }
 }

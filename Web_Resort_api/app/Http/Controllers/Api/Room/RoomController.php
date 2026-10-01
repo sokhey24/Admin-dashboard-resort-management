@@ -44,8 +44,12 @@ class RoomController extends Controller
         return response()->json($payload);
     }
 
-    public function show(Room $room): JsonResponse
+    public function show(Request $request, Room $room): JsonResponse
     {
+        if ($request->user() && str_contains($request->path(), 'admin/') && $room->branch_id) {
+            app(\App\Services\BranchAccessService::class)->assertBranchAccessible($request->user(), (int) $room->branch_id);
+        }
+
         return response()->json([
             'data' => $room->load(['roomType', 'branch', 'images', 'resort.facilities']),
         ]);
@@ -54,13 +58,13 @@ class RoomController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'resort_id'       => 'required|exists:resorts,id',
-            'branch_id'       => 'nullable|exists:branches,id',
+            'resort_id'       => 'nullable|exists:resorts,id',
+            'branch_id'       => 'required|exists:branches,id',
             'room_type_id'    => 'required|exists:room_types,id',
             'room_number'     => [
                 'required', 'string', 'max:20',
                 Rule::unique('rooms', 'room_number')->where(
-                    fn ($q) => $q->where('resort_id', $request->input('resort_id'))
+                    fn ($q) => $q->where('branch_id', $request->input('branch_id'))
                 ),
             ],
             'floor'           => 'nullable|string|max:50',
@@ -71,6 +75,15 @@ class RoomController extends Controller
             'status'          => 'required|in:available,occupied,maintenance,reserved',
             'notes'           => 'nullable|string',
         ]);
+
+        if (empty($data['resort_id'])) {
+            $data['resort_id'] = \App\Models\Branch::find($data['branch_id'])?->resort_id ?? \App\Models\Resort::getBrand()?->id;
+        }
+
+        if (! empty($data['branch_id'])) {
+            app(\App\Services\BranchAccessService::class)->assertBranchAccessible($request->user(), (int) $data['branch_id']);
+        }
+
         $this->rooms->assertWritable($data);
         $room = Room::create($data);
         return response()->json(['data' => $room->load(['roomType', 'branch', 'images', 'resort.facilities'])], 201);
@@ -78,6 +91,10 @@ class RoomController extends Controller
 
     public function update(Request $request, Room $room): JsonResponse
     {
+        if ($room->branch_id) {
+            app(\App\Services\BranchAccessService::class)->assertBranchAccessible($request->user(), (int) $room->branch_id);
+        }
+
         $data = $request->validate([
             'resort_id'       => 'sometimes|exists:resorts,id',
             'branch_id'       => 'nullable|exists:branches,id',
@@ -85,8 +102,8 @@ class RoomController extends Controller
             'room_number'     => [
                 'sometimes', 'string', 'max:20',
                 Rule::unique('rooms', 'room_number')
-                    ->ignore($room->id)
-                    ->where(fn ($q) => $q->where('resort_id', $request->input('resort_id', $room->resort_id))),
+                    ->where(fn ($q) => $q->where('branch_id', $request->input('branch_id', $room->branch_id)))
+                    ->ignore($room->id),
             ],
             'floor'           => 'nullable|string|max:50',
             'view'            => 'nullable|string|max:100',
@@ -95,6 +112,11 @@ class RoomController extends Controller
             'status'          => 'sometimes|in:available,occupied,maintenance,reserved',
             'notes'           => 'nullable|string',
         ]);
+
+        if (! empty($data['branch_id'])) {
+            app(\App\Services\BranchAccessService::class)->assertBranchAccessible($request->user(), (int) $data['branch_id']);
+        }
+
         $this->rooms->assertWritable($data, $room);
         $room->update($data);
         return response()->json(['data' => $room->fresh()->load(['roomType', 'branch', 'images', 'resort.facilities'])]);

@@ -35,32 +35,32 @@ export const Footer = () => {
           {/* Column 2: Quick Links */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
-              {t('nav.resorts', 'Destinations')} & {t('nav.rooms', 'Rooms')}
+              {t('nav.branches', 'Our Locations')} & {t('nav.rooms', 'Rooms')}
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link to="/resorts" className="hover:text-gold transition-colors">
-                  {t('resorts.pageTitle', 'All Luxury Resorts')}
+                <Link to="/branches" className="hover:text-gold transition-colors">
+                  {t('branches.pageTitle', 'All Branch Sanctuaries')}
                 </Link>
               </li>
               <li>
                 <Link to="/rooms" className="hover:text-gold transition-colors">
-                  {t('rooms.pageTitle', 'Villas & Bungalows')}
+                  {t('rooms.pageTitle', 'Villas & Quarters')}
                 </Link>
               </li>
               <li>
-                <Link to="/resorts?destination=Koh+Rong" className="hover:text-gold transition-colors">
-                  Koh Rong Island
+                <Link to="/branches?destination=Koh+Rong" className="hover:text-gold transition-colors">
+                  Koh Rong Island Branch
                 </Link>
               </li>
               <li>
-                <Link to="/resorts?destination=Siem+Reap" className="hover:text-gold transition-colors">
-                  Siem Reap Retreat
+                <Link to="/branches?destination=Siem+Reap" className="hover:text-gold transition-colors">
+                  Siem Reap Heritage Branch
                 </Link>
               </li>
               <li>
-                <Link to="/resorts?destination=Bokor" className="hover:text-gold transition-colors">
-                  Bokor Mountain
+                <Link to="/branches?destination=Kampot" className="hover:text-gold transition-colors">
+                  Kampot Riverside Branch
                 </Link>
               </li>
             </ul>

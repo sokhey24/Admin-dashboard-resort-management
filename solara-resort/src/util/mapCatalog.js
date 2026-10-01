@@ -1,4 +1,5 @@
 import { resolveStorageUrl } from './media.js';
+import { MARKETING_IMAGES } from '../constants/marketingImages.js';
 
 /** Neutral placeholder when the API omits media (not a catalogue fixture). */
 export const CATALOG_IMAGE_PLACEHOLDER = null;
@@ -6,6 +7,40 @@ export const CATALOG_IMAGE_PLACEHOLDER = null;
 function facilityNames(facilities) {
   if (!Array.isArray(facilities)) return [];
   return facilities.map((f) => f?.name).filter(Boolean);
+}
+
+function defaultBranchImage(row) {
+  const text = `${row?.name || ''} ${row?.city || ''} ${row?.slug || ''}`.toLowerCase();
+  if (text.includes('rong') || text.includes('island') || text.includes('beach')) {
+    return MARKETING_IMAGES.villa;
+  }
+  if (text.includes('kampot') || text.includes('mountain') || text.includes('bokor')) {
+    return MARKETING_IMAGES.spa;
+  }
+  if (text.includes('siem') || text.includes('angkor') || text.includes('heritage')) {
+    return MARKETING_IMAGES.hero;
+  }
+  if (text.includes('kep') || text.includes('ave') || text.includes('restaurant')) {
+    return MARKETING_IMAGES.dining;
+  }
+  return MARKETING_IMAGES.hero;
+}
+
+function defaultBranchAmenities(row) {
+  const text = `${row?.name || ''} ${row?.city || ''} ${row?.slug || ''}`.toLowerCase();
+  if (text.includes('rong') || text.includes('island')) {
+    return ['Beachfront Sanctuary', 'Infinity Pool', 'Private Speedboat', 'Coral Diving'];
+  }
+  if (text.includes('kampot')) {
+    return ['Riverside Panorama', 'Mountain View', 'Infinity Pool', 'Bokor Excursions'];
+  }
+  if (text.includes('siem')) {
+    return ['Heritage Pavilion', 'Lotus Flower Spa', 'Saltwater Pool', 'Temple Concierge'];
+  }
+  if (text.includes('kep')) {
+    return ['Coastal Sunset View', 'Oceanfront Dining', 'Crab Market Access', 'Infinity Pool'];
+  }
+  return ['Infinity Pool', 'Dedicated Butler', 'Mindful Wellness Spa', 'Gourmet Dining'];
 }
 
 function roomDisplayName(room) {
@@ -23,6 +58,98 @@ function primaryRoomImage(room) {
 function roomGallery(room) {
   const images = room?.images || [];
   return images.map((img) => img.url || resolveStorageUrl(img.image_path)).filter(Boolean);
+}
+
+/** Branch destination card — same UI shape as resort cards. */
+export function mapBranchFromApi(row) {
+  if (!row) return null;
+
+  const brand = row.brand || row.resort || {};
+  const startingPrice = Number(row.price_from ?? 0);
+  const startingPriceOriginal = Number(row.price_from_original ?? startingPrice);
+  const startingPriceDiscountPercent = Number(row.price_from_discount_percent ?? 0);
+  const rating = Number(row.rating ?? row.stars ?? 4.9);
+  const reviewsCount = Number(row.review_count ?? 28);
+  const facilities = facilityNames(row.facilities);
+  const amenities = facilities.length > 0 ? facilities : defaultBranchAmenities(row);
+
+  return {
+    id: row.id,
+    branchId: row.id,
+    catalogKind: 'branch',
+    detailPath: `/branches/${row.slug || row.id}`,
+    slug: row.slug,
+    name: row.name,
+    description: row.description || row.tagline || brand.tagline || brand.description || '',
+    tagline: row.tagline || brand.tagline || row.city || '',
+    destination: row.city || '',
+    city: row.city || '',
+    province: row.province || row.city || '',
+    location: [row.city, row.province].filter((v, i, a) => v && a.indexOf(v) === i).join(', ') || row.address || '',
+    address: row.address,
+    contactPhone: row.phone || brand.central_phone || brand.phone,
+    contactEmail: row.email || brand.central_email || brand.email,
+    checkinTime: row.checkin_time || '14:00',
+    checkoutTime: row.checkout_time || '12:00',
+    featuredImage:
+      row.cover_image_url ||
+      resolveStorageUrl(row.cover_image) ||
+      resolveStorageUrl(brand.cover_image) ||
+      defaultBranchImage(row),
+    logoUrl: brand.logo_url || resolveStorageUrl(brand.logo),
+    startingPrice,
+    startingPriceOriginal,
+    startingPriceDiscountPercent,
+    hasStartingDiscount:
+      startingPriceDiscountPercent > 0 &&
+      startingPriceOriginal > 0 &&
+      startingPrice < startingPriceOriginal - 0.001,
+    rating,
+    reviewsCount,
+    badge: row.city || brand.promo_tag || null,
+    amenities,
+    stars: row.stars ?? 5,
+    brandName: brand.brand_name || brand.name || 'Solara Resort & Spa',
+    latitude: row.latitude,
+    longitude: row.longitude,
+    resortId: row.resort_id ?? brand.id,
+    roomsCount: Number(row.rooms_count ?? 0),
+    availableRoomsCount: Number(row.available_rooms_count ?? 0),
+    raw: row,
+  };
+}
+
+export function mapBranchDetailFromApi(data) {
+  const base = mapBranchFromApi(data);
+  if (!base) return null;
+
+  const gallery = [base.featuredImage, base.logoUrl].filter(
+    (url, idx, arr) => url && arr.indexOf(url) === idx
+  );
+
+  return {
+    ...base,
+    gallery,
+    facilities: facilityNames(data.facilities),
+  };
+}
+
+export function buildBranchFilterOptions(branches, allLabel) {
+  const cities = new Set();
+  branches.forEach((b) => {
+    if (b.destination) cities.add(b.destination);
+  });
+
+  return [
+    { value: '', label: allLabel, count: branches.length },
+    ...Array.from(cities)
+      .sort((a, b) => a.localeCompare(b))
+      .map((city) => ({
+        value: city,
+        label: city,
+        count: branches.filter((b) => b.destination === city).length,
+      })),
+  ];
 }
 
 export function mapResortFromApi(row) {
@@ -116,6 +243,7 @@ export function mapRoomFromApi(room) {
 
   const mapped = {
     id: room.id,
+    branchId: room.branch_id ?? room.branch?.id ?? null,
     resortId: room.resort_id ?? resort.id,
     resortName: resort.name || '',
     name: roomDisplayName(room),

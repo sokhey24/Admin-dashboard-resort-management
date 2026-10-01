@@ -31,6 +31,12 @@ class BookingController extends Controller
             $q->where('status', $status);
         }
 
+        app(\App\Services\BranchAccessService::class)->applyBookingBranchScope(
+            $q,
+            $request->user(),
+            $request->filled('branch_id') ? (int) $request->query('branch_id') : null
+        );
+
         if ($request->query('filter') === 'checkin_today') {
             $q->where(function ($q) {
                 $q->where('status', 'checked_in')
@@ -83,6 +89,7 @@ class BookingController extends Controller
             'special_requests' => 'nullable|string',
             'room_ids' => 'required|array|min:1',
             'room_ids.*' => 'exists:rooms,id',
+            'branch_id' => 'nullable|integer|exists:branches,id',
             'source' => 'nullable|in:walk_in,website,phone,ota,staff',
         ]);
 

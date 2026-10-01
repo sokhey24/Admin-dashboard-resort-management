@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 import { HeroSection } from '../components/ui/HeroSection.jsx';
 import { SearchWidget } from '../features/search/components/SearchWidget.jsx';
-import { ResortCard } from '../components/resort/ResortCard.jsx';
+import { BranchCard } from '../components/branch/BranchCard.jsx';
 import { RoomCard } from '../components/room/RoomCard.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { formatCurrency } from '../util/currency.js';
 import { useApp } from '../context/AppContext.jsx';
-import { useResorts, useRoomsList } from '../hooks/useCatalog.js';
+import { useBranches, useRoomsList } from '../hooks/useCatalog.js';
 import { buildDestinationTiles } from '../util/mapCatalog.js';
 import { useWebsiteContent } from '../hooks/useWebsiteContent.js';
 import { MARKETING_IMAGES } from '../constants/marketingImages.js';
@@ -29,11 +29,11 @@ export const HomePage = () => {
   const { currency, t, localize } = useApp();
 
   const {
-    resorts: catalogResorts,
-    loading: resortsLoading,
-    error: resortsError,
-    reload: reloadResorts,
-  } = useResorts({ per_page: 50 });
+    branches: catalogBranches,
+    loading: branchesLoading,
+    error: branchesError,
+    reload: reloadBranches,
+  } = useBranches({ per_page: 50 });
 
   const {
     rooms: catalogRooms,
@@ -49,8 +49,8 @@ export const HomePage = () => {
     reviews: cmsReviews,
   } = useWebsiteContent();
 
-  const destinations = buildDestinationTiles(catalogResorts);
-  const featuredResorts = catalogResorts.slice(0, 3);
+  const destinations = buildDestinationTiles(catalogBranches);
+  const featuredBranches = catalogBranches.slice(0, 4);
   const activities = cmsActivities.map((a) => (localize ? localize(a) : a));
   const services = cmsServices.map((s) => (localize ? localize(s) : s));
   const diningVenues = cmsDining.map((dv) => (localize ? localize(dv) : dv));
@@ -119,20 +119,20 @@ export const HomePage = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/resorts')}
+              onClick={() => navigate('/branches')}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              {t('home.allDestinations', 'All Destinations')}
+              {t('home.allDestinations', 'All Locations')}
             </Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {resortsError && (
+            {branchesError && (
               <div className="col-span-full">
-                <ErrorState message={resortsError} onRetry={reloadResorts} />
+                <ErrorState message={branchesError} onRetry={reloadBranches} />
               </div>
             )}
-            {!resortsError && resortsLoading && (
+            {!branchesError && branchesLoading && (
               <>
                 <ResortCardSkeleton />
                 <ResortCardSkeleton />
@@ -140,17 +140,17 @@ export const HomePage = () => {
                 <ResortCardSkeleton />
               </>
             )}
-            {!resortsError && !resortsLoading && destinations.length === 0 && (
+            {!branchesError && !branchesLoading && destinations.length === 0 && (
               <p className="col-span-full text-center text-xs text-muted py-8">
-                {t('home.noDestinations', 'Destinations will appear when resorts are published.')}
+                {t('home.noDestinations', 'Destinations will appear when branches are published.')}
               </p>
             )}
-            {!resortsError &&
-              !resortsLoading &&
+            {!branchesError &&
+              !branchesLoading &&
               destinations.map((dest) => (
               <div
                 key={dest.name}
-                onClick={() => navigate(`/resorts?destination=${encodeURIComponent(dest.name)}`)}
+                onClick={() => navigate(`/branches?destination=${encodeURIComponent(dest.name)}`)}
                 className="group relative h-96 rounded-[var(--radius-card)] overflow-hidden cursor-pointer border border-border/80 shadow-md hover:shadow-2xl transition-all duration-300"
               >
                 <img
@@ -177,13 +177,13 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {/* 4. POPULAR RESORTS */}
+      {/* 4. POPULAR BRANCHES */}
       <section className="py-20 bg-surface/30 border-y border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
               <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
-                {t('home.resortsTag', 'Curated Collection')}
+                {t('brand.name', 'Solara Resort & Spa')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
                 {t('home.resortsTitle', 'Our Signature Sanctuaries')}
@@ -194,18 +194,17 @@ export const HomePage = () => {
             </p>
           </div>
 
-          {resortsError ? (
-            <ErrorState message={resortsError} onRetry={reloadResorts} />
-          ) : resortsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <ResortCardSkeleton />
+          {branchesError ? (
+            <ErrorState message={branchesError} onRetry={reloadBranches} />
+          ) : branchesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
               <ResortCardSkeleton />
               <ResortCardSkeleton />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredResorts.map((resort, idx) => (
-                <ResortCard key={resort.id} resort={resort} featured={idx === 0} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {featuredBranches.map((branch, idx) => (
+                <BranchCard key={branch.id} branch={branch} featured={false} />
               ))}
             </div>
           )}
@@ -214,7 +213,7 @@ export const HomePage = () => {
             <Button
               variant="outline"
               size="md"
-              onClick={() => navigate('/resorts')}
+              onClick={() => navigate('/branches')}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
               {t('home.viewAllResorts', 'View All Solara Sanctuaries')}

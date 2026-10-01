@@ -9,7 +9,7 @@ import {
 import { mapBookingFromApi, mapQuoteToSummary } from '../util/mapBooking.js';
 import { isBookingAvailabilityError, validateBookingStay } from '../util/bookingSelection.js';
 
-function buildQuotePayload({ roomId, checkIn, checkOut, adults, children, couponCode }) {
+function buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode }) {
   const code = typeof couponCode === 'string' ? couponCode.trim() : '';
   return {
     room_ids: [Number(roomId)],
@@ -17,11 +17,12 @@ function buildQuotePayload({ roomId, checkIn, checkOut, adults, children, coupon
     check_out: checkOut,
     adults: adults ?? 1,
     children: children ?? 0,
+    ...(branchId ? { branch_id: Number(branchId) } : {}),
     ...(code ? { coupon_code: code } : {}),
   };
 }
 
-export function useBookingQuote({ roomId, checkIn, checkOut, adults, children, couponCode }) {
+export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, children, couponCode }) {
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -46,7 +47,7 @@ export function useBookingQuote({ roomId, checkIn, checkOut, adults, children, c
       setError(null);
       try {
         const data = await fetchBookingQuote(
-          buildQuotePayload({ roomId, checkIn, checkOut, adults, children, couponCode })
+          buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode })
         );
         if (!cancelled) {
           setQuote(mapQuoteToSummary(data));
@@ -65,7 +66,7 @@ export function useBookingQuote({ roomId, checkIn, checkOut, adults, children, c
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [roomId, checkIn, checkOut, adults, children, couponCode, refreshNonce]);
+  }, [roomId, branchId, checkIn, checkOut, adults, children, couponCode, refreshNonce]);
 
   return { quote, loading, error, refetch };
 }

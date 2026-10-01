@@ -19,6 +19,7 @@ class BookingService
         protected CouponService $coupons,
         protected GuestProfileService $guestProfiles,
         protected ResortAccessService $resortAccess,
+        protected BranchAccessService $branchAccess,
     ) {}
 
     public function applyResortScope($query, ?User $user): void
@@ -32,6 +33,12 @@ class BookingService
             return;
         }
         $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id');
+        $branchFilter = request()->query('branch_id');
+        $this->branchAccess->applyBookingBranchScope(
+            $query,
+            $user,
+            $branchFilter ? (int) $branchFilter : null
+        );
     }
 
     public function assertAccessible(Booking $booking, ?User $user): void
@@ -153,6 +160,14 @@ class BookingService
         unset($data['room_ids']);
         if ($roomIds === []) {
             throw ValidationException::withMessages(['room_ids' => ['Select at least one room.']]);
+        }
+
+        $roomsForBranch = Room::query()->whereIn('id', $roomIds)->get(['id', 'branch_id', 'resort_id']);
+        if (empty($data['branch_id'])) {
+            $branchIds = $roomsForBranch->pluck('branch_id')->filter()->unique()->values();
+            if ($branchIds->count() === 1) {
+                $data['branch_id'] = (int) $branchIds->first();
+            }
         }
 
         $this->assertRoomsAvailable($roomIds, $checkIn, $checkOut);

@@ -16,6 +16,7 @@ class ReportService
 {
     public function __construct(
         protected ResortAccessService $resortAccess,
+        protected BranchAccessService $branchAccess,
         protected PaymentService $payments,
     ) {}
 
@@ -330,9 +331,7 @@ class ReportService
             ->whereBetween('created_at', [$filters['date_from'].' 00:00:00', $filters['date_to'].' 23:59:59'])
             ->whereHas('bookings', function ($q) use ($filters, $user) {
                 $this->resortAccess->applyResortColumnScope($q, $user, 'resort_id', $filters['resort_id'] ?? null);
-                if (! empty($filters['branch_id'])) {
-                    $q->whereHas('rooms', fn ($r) => $r->where('branch_id', (int) $filters['branch_id']));
-                }
+                $this->branchAccess->applyBookingBranchScope($q, $user, $filters['branch_id'] ?? null);
             })
             ->count();
 
@@ -459,11 +458,7 @@ class ReportService
     {
         $query = Booking::query();
         $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id', $filters['resort_id'] ?? null);
-
-        if (! empty($filters['branch_id'])) {
-            $branchId = (int) $filters['branch_id'];
-            $query->whereHas('rooms', fn ($q) => $q->where('branch_id', $branchId));
-        }
+        $this->branchAccess->applyBookingBranchScope($query, $user, $filters['branch_id'] ?? null);
 
         return $query;
     }
@@ -473,9 +468,7 @@ class ReportService
     {
         $query = Room::query();
         $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id', $filters['resort_id'] ?? null);
-        if (! empty($filters['branch_id'])) {
-            $query->where('branch_id', (int) $filters['branch_id']);
-        }
+        $this->branchAccess->applyBranchColumnScope($query, $user, 'branch_id', $filters['branch_id'] ?? null);
 
         return $query;
     }
@@ -503,7 +496,11 @@ class ReportService
             $query->whereHas('booking', fn ($b) => $b->where('resort_id', (int) $filters['resort_id']));
         }
 
-        if (! empty($filters['branch_id'])) {
+        if ($user && ! $this->branchAccess->bypassesBranchScope($user)) {
+            $query->whereHas('booking', function ($b) use ($user, $filters) {
+                $this->branchAccess->applyBookingBranchScope($b, $user, $filters['branch_id'] ?? null);
+            });
+        } elseif (! empty($filters['branch_id'])) {
             $branchId = (int) $filters['branch_id'];
             $query->whereHas('booking.rooms', fn ($r) => $r->where('branch_id', $branchId));
         }

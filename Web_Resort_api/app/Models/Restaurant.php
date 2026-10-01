@@ -7,12 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class Restaurant extends Model
 {
     protected $fillable = [
-        'resort_id', 'name', 'slug', 'description',
+        'resort_id', 'branch_id', 'name', 'slug', 'description',
         'phone', 'email', 'address', 'logo', 'status',
     ];
 
     public function resort()
     {
         return $this->belongsTo(Resort::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

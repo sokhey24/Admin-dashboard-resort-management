@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Models\FoodOrder;
 use App\Models\FoodOrderItem;
 use App\Models\MenuItem;
+use App\Models\RestaurantTable;
+use Illuminate\Support\Facades\Schema;
 
 class RestaurantService
 {
     public function createOrder(array $data): FoodOrder
     {
-        $order = FoodOrder::create([
+        $table = RestaurantTable::findOrFail($data['table_id']);
+
+        $payload = [
             'restaurant_table_id' => $data['table_id'],
             'user_id'             => auth()->id(),
             'order_code'          => 'ORD-' . strtoupper(uniqid()),
@@ -19,7 +23,13 @@ class RestaurantService
             'subtotal'            => 0,
             'tax'                 => 0,
             'total'               => 0,
-        ]);
+        ];
+
+        if (Schema::hasColumn('food_orders', 'branch_id') && $table->branch_id) {
+            $payload['branch_id'] = $table->branch_id;
+        }
+
+        $order = FoodOrder::create($payload);
 
         $subtotal = 0;
         foreach ($data['items'] as $item) {

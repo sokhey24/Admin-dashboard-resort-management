@@ -26,6 +26,8 @@ Route::prefix('customer')->group(function () {
     Route::get('/resorts',    [ResortController::class, 'index']);
     Route::get('/resorts/{resort}', [ResortController::class, 'show']);
     Route::get('/branches',   [BranchController::class, 'index']);
+    Route::get('/branches/{branch}', [BranchController::class, 'show']);
+    Route::get('/branches/{branch}/rooms', [BranchController::class, 'rooms']);
     Route::get('/facilities', [FacilityController::class, 'index']);
     Route::get('/gallery',    [GalleryController::class, 'index']);
     Route::get('/rooms',      [RoomController::class, 'index']);

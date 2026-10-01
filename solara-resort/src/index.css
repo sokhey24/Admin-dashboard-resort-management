@@ -106,8 +106,31 @@ html[lang="km"] {
   font-family: 'Kantumruy Pro', 'Poppins', system-ui, sans-serif;
 }
 
-html[lang="km"] body {
-  line-height: 1.65;
+html[lang="km"] body,
+html[lang="km"] p,
+html[lang="km"] span,
+html[lang="km"] a,
+html[lang="km"] label,
+html[lang="km"] table,
+html[lang="km"] td,
+html[lang="km"] th {
+  line-height: 1.75 !important;
+}
+
+html[lang="km"] input,
+html[lang="km"] select,
+html[lang="km"] textarea {
+  min-height: 42px !important;
+  line-height: 1.75 !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+html[lang="km"] button {
+  min-height: 42px !important;
+  line-height: 1.65 !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
 }
 
 html[lang="km"] .font-serif,
@@ -117,5 +140,6 @@ html[lang="km"] h3,
 html[lang="km"] h4 {
   font-family: 'Kantumruy Pro', 'Playfair Display', Georgia, serif;
   letter-spacing: normal;
+  line-height: 1.45 !important;
 }
 

@@ -78,6 +78,16 @@ export const AccountPage = () => {
     loading: favoritesLoading,
   } = useFavoriteCatalog(favoriteResortIds, favoriteRoomIds);
 
+  const memberSinceYear = user?.raw?.created_at
+    ? new Date(user.raw.created_at).getFullYear()
+    : (user?.created_at ? new Date(user.created_at).getFullYear() : 2025);
+
+  const uniqueDestinations = new Set(
+    (bookings || [])
+      .map((b) => b.branchName || b.branchId || b.resortName || b.resortId)
+      .filter(Boolean)
+  ).size;
+
   const [bookingFilter, setBookingFilter] = useState('all');
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
 
@@ -206,7 +216,11 @@ export const AccountPage = () => {
                     <span>·</span>
                   </>
                 )}
-                <span>{t('account.memberSince', 'Member since 2025')}</span>
+                <span>
+                  {language === 'km'
+                    ? `សមាជិកតាំងពីឆ្នាំ ${memberSinceYear}`
+                    : `Member since ${memberSinceYear}`}
+                </span>
               </div>
             </div>
           </div>
@@ -414,7 +428,13 @@ export const AccountPage = () => {
                       {bookings.length}
                     </span>
                     <span className="text-[11px] text-muted">
-                      {language === 'km' ? 'នៅទូទាំង ២ គោលដៅ' : 'Across 2 destinations'}
+                      {language === 'km'
+                        ? uniqueDestinations > 0
+                          ? `នៅទូទាំង ${uniqueDestinations} គោលដៅ`
+                          : 'មិនទាន់មានការស្នាក់នៅ'
+                        : uniqueDestinations > 0
+                          ? `Across ${uniqueDestinations} destination${uniqueDestinations > 1 ? 's' : ''}`
+                          : 'No destinations yet'}
                     </span>
                   </div>
 
@@ -884,8 +904,8 @@ export const AccountPage = () => {
                     disabled
                     helperText={
                       language === 'km'
-                        ? 'អ៊ីមែលនេះភ្ជាប់ជាមួយកម្រិតសមាជិក Gold Concierge របស់អ្នក។'
-                        : 'Email is bound to your Gold Concierge membership tier.'
+                        ? `អ៊ីមែលនេះភ្ជាប់ជាមួយគណនី${user?.memberTier ? ' ' + user.memberTier : ''} របស់អ្នក។`
+                        : `Email is bound to your ${user?.memberTier || 'resident'} account.`
                     }
                   />
                   <div className="pt-2">

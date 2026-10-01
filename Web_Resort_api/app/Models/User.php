@@ -51,6 +51,12 @@ class User extends Authenticatable
             ->withPivot(['role', 'is_primary', 'assigned_at']);
     }
 
+    public function branches()
+    {
+        return $this->belongsToMany(Branch::class, 'user_branch')
+            ->withPivot(['role', 'is_primary', 'assigned_at']);
+    }
+
     public function userPermissions()
     {
         return $this->hasMany(UserPermission::class);
@@ -123,6 +129,11 @@ class User extends Authenticatable
     public function assignedResortIds(): array
     {
         return $this->resorts()->pluck('resorts.id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    public function assignedBranchIds(): array
+    {
+        return app(\App\Services\BranchAccessService::class)->assignedBranchIds($this);
     }
 
     public function passwordResetOtps()

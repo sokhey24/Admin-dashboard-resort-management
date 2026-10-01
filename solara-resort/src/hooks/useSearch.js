@@ -3,14 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../context/AppContext.jsx';
 import { catalogKeys } from '../features/catalog/queryKeys.js';
-import { queryResortsPage } from '../features/catalog/catalogQueries.js';
-import { usePaginationMeta, useResorts } from './useCatalog.js';
+import { queryBranchesPage } from '../features/catalog/catalogQueries.js';
+import { usePaginationMeta, useBranches } from './useCatalog.js';
 import {
   applySearchCriteria,
+  buildBranchesSearchPath,
   buildResortsSearchPath,
   parseSearchCriteria,
 } from '../util/searchParams.js';
-import { buildCityFilterOptions, mapSortToApi, sortResortsClient } from '../util/mapCatalog.js';
+import { buildBranchFilterOptions, mapSortToApi, sortResortsClient } from '../util/mapCatalog.js';
 
 /**
  * Resolved criteria: URL wins; dates/guests fall back to booking draft on marketing pages.
@@ -22,6 +23,7 @@ export function useSearchCriteria() {
   return useMemo(() => {
     const fromUrl = parseSearchCriteria(searchParams);
     return {
+      branchId: fromUrl.branchId || bookingDraft.branchId || '',
       destination: fromUrl.destination,
       checkIn: fromUrl.checkIn || bookingDraft.checkIn || '',
       checkOut: fromUrl.checkOut || bookingDraft.checkOut || '',
@@ -35,20 +37,41 @@ export function useSearchCriteria() {
 export function useSearchDestinationOptions() {
   const { t } = useApp();
   const query = useQuery({
-    queryKey: catalogKeys.resorts({ per_page: 50, facet: 'destinations' }),
-    queryFn: () => queryResortsPage({ per_page: 50 }),
+    queryKey: catalogKeys.branches({ per_page: 50, facet: 'destinations' }),
+    queryFn: () => queryBranchesPage({ per_page: 50 }),
     staleTime: 5 * 60_000,
   });
 
-  const options = useMemo(() => {
-    const resorts = query.data?.rows ?? [];
-    return buildCityFilterOptions(resorts, t('search.allDestinations', 'All Destinations')).filter(
-      (opt) => opt.value
+  const rawBranches = query.data?.rows ?? [];
+
+  const destinationOptions = useMemo(() => {
+    return buildBranchFilterOptions(rawBranches, t('search.allDestinations', 'All Destinations')).filter(
+      (opt) => opt.value !== undefined
     );
-  }, [query.data?.rows, t]);
+  }, [rawBranches, t]);
+
+  const branchOptions = useMemo(() => {
+    return [
+      {
+        value: '',
+        branchId: '',
+        destination: '',
+        label: t('search.allDestinations', 'All Locations & Branches'),
+      },
+      ...rawBranches.map((b) => ({
+        value: String(b.id),
+        branchId: b.id,
+        destination: b.city || b.destination,
+        label: `${b.name} (${b.city || b.location})`,
+        branch: b,
+      })),
+    ];
+  }, [rawBranches, t]);
 
   return {
-    destinationOptions: options,
+    destinationOptions,
+    branchOptions,
+    branches: rawBranches,
     loading: query.isLoading,
     error: query.isError,
   };
@@ -58,12 +81,13 @@ export function useSearch() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const criteria = useSearchCriteria();
-  const { updateBookingDraft } = useApp();
-  const { destinationOptions, loading: destinationsLoading } = useSearchDestinationOptions();
+  const { updateBookingDraft, bookingDraft } = useApp();
+  const { destinationOptions, branchOptions, loading: destinationsLoading } = useSearchDestinationOptions();
 
   const persistDraft = useCallback(
     (next) => {
       updateBookingDraft({
+        ...(next.branchId ? { branchId: Number(next.branchId) } : {}),
         checkIn: next.checkIn,
         checkOut: next.checkOut,
         adults: next.adults,
@@ -77,6 +101,7 @@ export function useSearch() {
   const submitSearch = useCallback(
     (partial) => {
       const nextCriteria = {
+        branchId: partial.branchId !== undefined ? partial.branchId : criteria.branchId,
         destination: partial.destination ?? criteria.destination,
         checkIn: partial.checkIn ?? criteria.checkIn,
         checkOut: partial.checkOut ?? criteria.checkOut,
@@ -88,9 +113,9 @@ export function useSearch() {
       persistDraft(nextCriteria);
 
       const mergedParams = applySearchCriteria(searchParams, nextCriteria);
-      const path = buildResortsSearchPath(nextCriteria, mergedParams);
+      const path = buildBranchesSearchPath(nextCriteria, mergedParams);
 
-      if (window.location.pathname.startsWith('/resorts')) {
+      if (window.location.pathname.startsWith('/resorts') || window.location.pathname.startsWith('/branches')) {
         setSearchParams(mergedParams);
       } else {
         navigate(path);
@@ -104,6 +129,7 @@ export function useSearch() {
   return {
     criteria,
     destinationOptions,
+    branchOptions,
     destinationsLoading,
     submitSearch,
     status: destinationsLoading ? 'loading' : 'idle',
@@ -111,7 +137,7 @@ export function useSearch() {
 }
 
 /**
- * Resort search results (server: destination/city only; dates/guests are draft + informational).
+ * Resort / branch search results.
  */
 export function useResortSearchResults({
   page,
@@ -125,25 +151,26 @@ export function useResortSearchResults({
     () => ({
       page,
       per_page: 12,
+      ...(criteria.branchId ? { branch_id: criteria.branchId } : {}),
       ...(criteria.destination
         ? { city: criteria.destination, destination: criteria.destination }
         : {}),
       sort: mapSortToApi(sort),
     }),
-    [page, criteria.destination, sort]
+    [page, criteria.branchId, criteria.destination, sort]
   );
 
-  const { resorts, meta, loading, error, reload, isFetching } = useResorts(apiParams);
+  const { branches, meta, loading, error, reload, isFetching } = useBranches(apiParams);
   const { total } = usePaginationMeta(meta);
 
   const filteredResorts = useMemo(() => {
-    const list = resorts.filter((r) => {
+    const list = branches.filter((r) => {
       if (r.startingPrice > maxPrice) return false;
       if (minRating > 0 && (r.rating ?? 0) < minRating) return false;
       return true;
     });
     return sortResortsClient(list, sort);
-  }, [resorts, maxPrice, minRating, sort]);
+  }, [branches, maxPrice, minRating, sort]);
 
   const status = useMemo(() => {
     if (loading) return 'loading';

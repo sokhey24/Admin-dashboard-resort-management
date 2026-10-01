@@ -84,8 +84,14 @@ export const ConfirmationPage = () => {
           <div className="p-6 rounded-[var(--radius-card)] bg-surface-elevated border border-border/60 text-xs text-left space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-border/60">
               <div>
-                <h3 className="text-base font-serif font-bold text-text">{booking.roomName}</h3>
-                <p className="text-xs text-gold-light">{booking.resortName}</p>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold block mb-0.5">
+                  {booking.brandName || 'Solara Resort & Spa'}
+                </span>
+                <h3 className="text-lg font-serif font-bold text-text">{booking.roomName}</h3>
+                <p className="text-xs text-gold-light font-medium">
+                  {booking.branchName ? `Branch: ${booking.branchName}` : booking.resortName}
+                  {booking.branchLocation ? ` · ${booking.branchLocation}` : ''}
+                </p>
               </div>
               <div className="sm:text-right">
                 <span className="text-[10px] uppercase text-muted block">

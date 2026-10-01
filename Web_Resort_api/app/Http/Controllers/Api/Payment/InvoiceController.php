@@ -31,6 +31,10 @@ class InvoiceController extends Controller
             }
         }
 
+        if ($branchId = $request->query('branch_id')) {
+            $q->whereHas('booking.rooms', fn ($r) => $r->where('branch_id', (int) $branchId));
+        }
+
         return response()->json(['data' => $q->latest()->get()]);
     }
 

@@ -16,7 +16,10 @@ export function parseSearchCriteria(searchParams) {
     adults = Number(guestsLegacy) || 2;
   }
 
+  const branchRaw = searchParams.get('branchId') || searchParams.get('branch_id');
+
   return {
+    branchId: branchRaw ? Number(branchRaw) || '' : '',
     destination: searchParams.get('destination') || '',
     checkIn: searchParams.get('checkIn') || '',
     checkOut: searchParams.get('checkOut') || '',
@@ -37,6 +40,7 @@ export function applySearchCriteria(baseParams, criteria) {
     }
   };
 
+  setOrDelete('branchId', criteria.branchId);
   setOrDelete('destination', criteria.destination);
   setOrDelete('checkIn', criteria.checkIn);
   setOrDelete('checkOut', criteria.checkOut);
@@ -49,19 +53,24 @@ export function applySearchCriteria(baseParams, criteria) {
   return next;
 }
 
-export function buildResortsSearchPath(criteria, existingParams = '') {
+export function buildBranchesSearchPath(criteria, existingParams = '') {
   const base =
     existingParams instanceof URLSearchParams
       ? existingParams
       : new URLSearchParams(existingParams || '');
   const next = applySearchCriteria(base, criteria);
   const qs = next.toString();
-  return qs ? `/resorts?${qs}` : '/resorts';
+  return qs ? `/branches?${qs}` : '/branches';
+}
+
+export function buildResortsSearchPath(criteria, existingParams = '') {
+  return buildBranchesSearchPath(criteria, existingParams);
 }
 
 /** Room catalogue query (snake_case for Laravel). */
 export function roomCatalogParamsFromCriteria(criteria, extra = {}) {
   const out = { ...extra };
+  if (criteria.branchId) out.branch_id = Number(criteria.branchId);
   if (criteria.checkIn) out.check_in = criteria.checkIn;
   if (criteria.checkOut) out.check_out = criteria.checkOut;
   if (criteria.checkIn && criteria.checkOut) {

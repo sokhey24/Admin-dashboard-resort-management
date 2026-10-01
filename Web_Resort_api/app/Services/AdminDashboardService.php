@@ -19,6 +19,7 @@ class AdminDashboardService
 {
     public function __construct(
         protected ResortAccessService $resortAccess,
+        protected BranchAccessService $branchAccess,
     ) {}
 
     public function getSummary(array $filters = [], ?User $user = null): array
@@ -29,7 +30,7 @@ class AdminDashboardService
             'statistics'            => $this->getStatistics($today, $filters, $user),
             'monthly_revenue'       => $this->getMonthlyRevenue($filters, $user),
             'booking_statistics'    => $this->getBookingStatistics($filters, $user),
-            'room_statistics'       => $this->getRoomStatistics($user),
+            'room_statistics'       => $this->getRoomStatistics($filters, $user),
             'restaurant_statistics' => $this->getRestaurantStatistics($filters, $user),
             'recent_activities'     => $this->getRecentActivities($filters, $user),
             'recent_bookings'       => $this->getRecentBookings($filters, $user),
@@ -56,18 +57,35 @@ class AdminDashboardService
         return $query;
     }
 
-    private function scopedBookings(?User $user): Builder
+    private function scopedBookings(?User $user, array $filters = []): Builder
     {
         $query = Booking::query();
-        $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id');
+        $this->resortAccess->applyResortColumnScope(
+            $query,
+            $user,
+            'resort_id',
+            $filters['resort_id'] ?? null
+        );
+        $this->branchAccess->applyBookingBranchScope($query, $user, $filters['branch_id'] ?? null);
 
         return $query;
     }
 
-    private function scopedRooms(?User $user): Builder
+    private function scopedRooms(?User $user, array $filters = []): Builder
     {
         $query = Room::query();
-        $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id');
+        $this->resortAccess->applyResortColumnScope(
+            $query,
+            $user,
+            'resort_id',
+            $filters['resort_id'] ?? null
+        );
+        $this->branchAccess->applyBranchColumnScope(
+            $query,
+            $user,
+            'branch_id',
+            $filters['branch_id'] ?? null
+        );
 
         return $query;
     }
@@ -110,7 +128,7 @@ class AdminDashboardService
         return $query;
     }
 
-    private function scopedFoodOrders(?User $user): Builder
+    private function scopedFoodOrders(?User $user, array $filters = []): Builder
     {
         $query = FoodOrder::query();
         if ($user && ! $this->resortAccess->bypassesResortScope($user)) {
@@ -125,13 +143,21 @@ class AdminDashboardService
             }
         }
 
+        $this->branchAccess->applyFoodOrderBranchScope($query, $user, $filters['branch_id'] ?? null);
+
         return $query;
     }
 
-    private function scopedRestaurantTables(?User $user): Builder
+    private function scopedRestaurantTables(?User $user, array $filters = []): Builder
     {
         $query = RestaurantTable::query();
-        $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id');
+        $this->resortAccess->applyResortColumnScope($query, $user, 'resort_id', $filters['resort_id'] ?? null);
+        $this->branchAccess->applyBranchColumnScope(
+            $query,
+            $user,
+            'branch_id',
+            $filters['branch_id'] ?? null
+        );
 
         return $query;
     }
@@ -141,8 +167,8 @@ class AdminDashboardService
         $checkinDate  = ! empty($filters['date']) ? $filters['date'] : $today;
         $checkoutDate = ! empty($filters['date']) ? $filters['date'] : $today;
 
-        $bookings = $this->scopedBookings($user);
-        $rooms    = $this->scopedRooms($user);
+        $bookings = $this->scopedBookings($user, $filters);
+        $rooms    = $this->scopedRooms($user, $filters);
         $payments = $this->scopedPayments($user)->where('status', 'paid');
 
         $guestQuery = (clone $bookings)->whereNotNull('user_id')->distinct('user_id');
@@ -156,16 +182,16 @@ class AdminDashboardService
             'active_resorts'    => $this->scopedResorts($user)->where('status', 'active')->count(),
             'total_branches'    => $this->scopedBranches($user)->count(),
             'total_rooms'       => (clone $rooms)->count(),
-            'total_tables'      => $this->scopedRestaurantTables($user)->count(),
+            'total_tables'      => $this->scopedRestaurantTables($user, $filters)->count(),
             'total_bookings'    => $this->applyDateFilter(clone $bookings, $filters, 'created_at')->count(),
             'pending_bookings'  => (clone $bookings)->where('status', 'pending')->count(),
             'today_checkins'    => (clone $bookings)->whereDate('check_in', $checkinDate)->whereIn('status', ['confirmed', 'checked_in'])->count(),
             'today_checkouts'   => (clone $bookings)->whereDate('check_out', $checkoutDate)->whereIn('status', ['checked_in', 'completed'])->count(),
             'current_stays'     => (clone $bookings)->where('status', 'checked_in')->count(),
-            'occupancy_rate'    => $this->occupancyRate($user),
+            'occupancy_rate'    => $this->occupancyRate($user, $filters),
             'total_revenue'     => (float) $this->applyDateFilter(clone $payments, $filters, 'paid_at')->sum('paid_amount'),
             'pending_payments'  => (float) (clone $bookings)->sum('balance_due'),
-            'restaurant_orders' => $this->applyDateFilter($this->scopedFoodOrders($user), $filters, 'created_at')->count(),
+            'restaurant_orders' => $this->applyDateFilter($this->scopedFoodOrders($user, $filters), $filters, 'created_at')->count(),
         ];
     }
 
@@ -199,7 +225,7 @@ class AdminDashboardService
 
     private function getBookingStatistics(array $filters, ?User $user): array
     {
-        return $this->applyDateFilter($this->scopedBookings($user), $filters, 'created_at')
+        return $this->applyDateFilter($this->scopedBookings($user, $filters), $filters, 'created_at')
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->get()
@@ -211,9 +237,9 @@ class AdminDashboardService
             ->toArray();
     }
 
-    private function getRoomStatistics(?User $user): array
+    private function getRoomStatistics(array $filters, ?User $user): array
     {
-        return $this->scopedRooms($user)
+        return $this->scopedRooms($user, $filters)
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->get()
@@ -227,7 +253,7 @@ class AdminDashboardService
 
     private function getRestaurantStatistics(array $filters, ?User $user): array
     {
-        return $this->applyDateFilter($this->scopedFoodOrders($user), $filters, 'created_at')
+        return $this->applyDateFilter($this->scopedFoodOrders($user, $filters), $filters, 'created_at')
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->get()
@@ -242,7 +268,7 @@ class AdminDashboardService
     private function getRecentBookings(array $filters, ?User $user): array
     {
         return $this->applyDateFilter(
-            $this->scopedBookings($user)->with('user:id,name,email', 'rooms:id,room_number'),
+            $this->scopedBookings($user, $filters)->with('user:id,name,email', 'rooms:id,room_number'),
             $filters,
             'created_at'
         )
@@ -295,9 +321,9 @@ class AdminDashboardService
             ->toArray();
     }
 
-    private function occupancyRate(?User $user): float
+    private function occupancyRate(?User $user, array $filters = []): float
     {
-        $rooms = $this->scopedRooms($user);
+        $rooms = $this->scopedRooms($user, $filters);
         $total = (clone $rooms)->count();
         $maintenance = (clone $rooms)->where('status', 'maintenance')->count();
         $occupied = (clone $rooms)->where('status', 'occupied')->count();

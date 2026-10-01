@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RoomType extends Model
 {
     protected $fillable = [
-        'resort_id', 'name', 'description', 'base_price', 'discount_percent', 'max_occupancy',
+        'resort_id', 'branch_id', 'name', 'description', 'base_price', 'discount_percent', 'max_occupancy',
         'bed_count', 'bed_type', 'size_sqm', 'amenities', 'breakfast_included', 'free_cancellation',
         'status',
     ];
@@ -30,5 +30,6 @@ class RoomType extends Model
     }
 
     public function resort() { return $this->belongsTo(Resort::class); }
+    public function branch() { return $this->belongsTo(Branch::class); }
     public function rooms()  { return $this->hasMany(Room::class); }
 }

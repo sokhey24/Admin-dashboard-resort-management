@@ -28,6 +28,7 @@ class PaymentController extends Controller
             'source' => 'nullable|in:resort,restaurant,all',
             'payment_method' => 'nullable|string|max:50',
             'resort_id' => 'nullable|integer|exists:resorts,id',
+            'branch_id' => 'nullable|integer|exists:branches,id',
             'booking_id' => 'nullable|integer|exists:bookings,id',
             'date' => 'nullable|date',
             'month' => 'nullable|integer|min:1|max:12',
@@ -38,7 +39,7 @@ class PaymentController extends Controller
 
         $filters = $request->only([
             'page', 'per_page', 'search', 'status', 'payment_method',
-            'source', 'resort_id', 'booking_id', 'date', 'month', 'year', 'date_from', 'date_to',
+            'source', 'resort_id', 'branch_id', 'booking_id', 'date', 'month', 'year', 'date_from', 'date_to',
         ]);
         $filters['source'] = $request->input('source', 'resort');
 

@@ -23,7 +23,7 @@ class Booking extends Model
     ];
 
     protected $fillable = [
-        'user_id', 'guest_id', 'resort_id', 'coupon_id', 'booking_code', 'source',
+        'user_id', 'guest_id', 'resort_id', 'branch_id', 'coupon_id', 'booking_code', 'source',
         'check_in', 'check_out', 'adults', 'children', 'nights',
         'subtotal', 'discount', 'room_discount_total', 'tax_amount', 'service_charge_amount',
         'total_amount', 'deposit_amount', 'balance_due',
@@ -58,13 +58,35 @@ class Booking extends Model
         return 'unpaid';
     }
 
-    public function user()       { return $this->belongsTo(User::class); }
-    public function resort()     { return $this->belongsTo(Resort::class); }
-    public function coupon()     { return $this->belongsTo(Coupon::class); }
-    public function rooms()      { return $this->belongsToMany(Room::class, 'booking_rooms')->withPivot('price_per_night', 'nights', 'discount_percent', 'discount_amount', 'subtotal', 'net_subtotal'); }
-    public function payment()    { return $this->hasOne(Payment::class)->latestOfMany(); }
-    public function payments()   { return $this->hasMany(Payment::class); }
-    public function invoice()    { return $this->hasOne(Invoice::class); }
-    public function statusLogs() { return $this->hasMany(BookingStatusLog::class); }
-    public function foodOrders() { return $this->hasMany(FoodOrder::class); }
+    public function user()       { 
+        return $this->belongsTo(User::class); 
+    }
+    public function resort()     { 
+        return $this->belongsTo(Resort::class); 
+    }
+    public function branch()     { 
+        return $this->belongsTo(Branch::class); 
+    }
+    public function coupon()     {
+         return $this->belongsTo(Coupon::class);
+         }
+    public function rooms()      { 
+        return $this->belongsToMany(Room::class, 'booking_rooms')
+        ->withPivot('price_per_night', 'nights', 'discount_percent', 'discount_amount', 'subtotal', 'net_subtotal');
+    }
+    public function payment()    { 
+        return $this->hasOne(Payment::class)->latestOfMany();
+     }
+    public function payments()   { 
+        return $this->hasMany(Payment::class);
+     }
+    public function invoice()    {
+         return $this->hasOne(Invoice::class); 
+        }
+    public function statusLogs() { 
+        return $this->hasMany(BookingStatusLog::class); 
+    }
+    public function foodOrders() {
+         return $this->hasMany(FoodOrder::class); 
+        }
 }

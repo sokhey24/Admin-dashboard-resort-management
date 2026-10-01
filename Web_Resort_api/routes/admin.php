@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\User\UserController;
 use App\Http\Controllers\Api\User\RoleController;
 use App\Http\Controllers\Api\User\PermissionController;
 use App\Http\Controllers\Api\User\UserPermissionController;
+use App\Http\Controllers\Api\Resort\ResortProfileController;
 use App\Http\Controllers\Api\Resort\ResortController;
 use App\Http\Controllers\Api\Resort\BranchController;
 use App\Http\Controllers\Api\Resort\FacilityController;
@@ -79,23 +80,40 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
     // User-Role assignment — admin.users.update
     Route::post('users/{user}/roles',        [UserController::class, 'assignRole'])   ->middleware('permission:admin.users.update');
+    Route::put('users/{user}/branches',      [UserController::class, 'syncBranches'])->middleware('permission:admin.users.update');
+    Route::patch('users/{user}/branches',    [UserController::class, 'syncBranches'])->middleware('permission:admin.users.update');
 
     // User Permission management — view/update per-user overrides
     Route::get('users/{user}/permissions',   [UserPermissionController::class, 'show'])       ->middleware('permission:admin.permissions.view');
     Route::put('users/{user}/permissions',   [UserPermissionController::class, 'update'])     ->middleware('permission:admin.permissions.update');
     Route::put('users/{user}/role',          [UserPermissionController::class, 'updateRole']) ->middleware('permission:admin.roles.update');
 
-    // Resorts — admin.resorts.*
+    // Single brand settings (Corporate Brand Configuration)
+    Route::get('resort-settings', [ResortProfileController::class, 'show'])
+        ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.branches.view');
+    Route::put('resort-settings', [ResortProfileController::class, 'update'])
+        ->middleware('permission:admin.resorts.update');
+    Route::patch('resort-settings', [ResortProfileController::class, 'update'])
+        ->middleware('permission:admin.resorts.update');
+
+    // Backward-compatible alias for existing frontend calls to resort-profile
+    Route::get('resort-profile', [ResortProfileController::class, 'show'])
+        ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.branches.view');
+    Route::put('resort-profile', [ResortProfileController::class, 'update'])
+        ->middleware('permission:admin.resorts.update');
+    Route::patch('resort-profile', [ResortProfileController::class, 'update'])
+        ->middleware('permission:admin.resorts.update');
+
+    // Brand overview & catalog listing
     Route::get('resorts',            [ResortController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.rooms.view,resort.branches.view');
-    Route::post('resorts',           [ResortController::class, 'store'])  ->middleware('permission:admin.resorts.create');
     Route::get('resorts/{resort}',   [ResortController::class, 'show'])   ->middleware('permission:admin.resorts.view');
-    Route::put('resorts/{resort}',   [ResortController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::patch('resorts/{resort}', [ResortController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::delete('resorts/{resort}',[ResortController::class, 'destroy'])->middleware('permission:admin.resorts.delete');
+
 
     // Branches, Facilities, Gallery — admin.resorts.*
     Route::get('branches',           [BranchController::class,   'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.rooms.view,resort.branches.view');
     Route::post('branches',          [BranchController::class,   'store'])  ->middleware('permission:admin.resorts.create');
+    Route::get('branches/{branch}/rooms', [BranchController::class, 'rooms'])
+        ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.rooms.view,resort.branches.view');
     Route::get('branches/{branch}',  [BranchController::class,   'show'])   ->middleware('permission:admin.resorts.view');
     Route::put('branches/{branch}',  [BranchController::class,   'update']) ->middleware('permission:admin.resorts.update');
     Route::patch('branches/{branch}',[BranchController::class,   'update']) ->middleware('permission:admin.resorts.update');

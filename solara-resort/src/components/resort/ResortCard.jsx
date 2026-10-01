@@ -11,6 +11,8 @@ export const ResortCard = ({ resort, featured = false }) => {
   const { currency, t, localize } = useApp();
   const item = localize ? localize(resort) : resort;
 
+  const detailPath = item.detailPath || `/branch/${item.id}`;
+
   return (
     <div
       className={`group bg-surface border border-border hover:border-gold/50 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col ${
@@ -63,7 +65,7 @@ export const ResortCard = ({ resort, featured = false }) => {
           </div>
 
           <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2">
-            <Link to={`/resort/${item.id}`}>{item.name}</Link>
+            <Link to={detailPath}>{item.name}</Link>
           </h3>
 
           <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4">
@@ -104,7 +106,7 @@ export const ResortCard = ({ resort, featured = false }) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/resort/${item.id}`)}
+              onClick={() => navigate(detailPath)}
               rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
             >
               {t('common.explore', 'Explore')}

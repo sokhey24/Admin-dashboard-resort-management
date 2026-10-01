@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../services/api/errors.js';
 import { catalogKeys } from '../features/catalog/queryKeys.js';
 import {
+  queryBranchDetailBundle,
+  queryBranchesPage,
   queryResortDetailBundle,
   queryResortsPage,
   queryRoomDetail,
@@ -31,6 +33,46 @@ export function useResorts(params, { enabled = true } = {}) {
     loading: query.isLoading,
     isFetching: query.isFetching,
     error: query.isError ? getApiErrorMessage(query.error) : null,
+    reload: () => query.refetch(),
+  };
+}
+
+export function useBranches(params, { enabled = true } = {}) {
+  const normalized = stableParams(params);
+  const query = useQuery({
+    queryKey: catalogKeys.branches(normalized),
+    queryFn: () => queryBranchesPage(normalized),
+    enabled,
+  });
+
+  return {
+    branches: query.data?.rows ?? [],
+    meta: query.data?.meta ?? null,
+    loading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.isError ? getApiErrorMessage(query.error) : null,
+    reload: () => query.refetch(),
+  };
+}
+
+export function useBranchDetail(branchId, stayParams = {}) {
+  const id = branchId ? String(branchId) : '';
+  const normalizedStay = stableParams(stayParams);
+  const query = useQuery({
+    queryKey: [...catalogKeys.branch(id), normalizedStay],
+    queryFn: () => queryBranchDetailBundle(id, normalizedStay),
+    enabled: Boolean(id),
+  });
+
+  return {
+    resort: query.data?.resort ?? null,
+    rooms: query.data?.rooms ?? [],
+    loading: query.isLoading,
+    error: query.isError
+      ? getApiErrorMessage(query.error)
+      : !id
+        ? 'Branch not found.'
+        : null,
     reload: () => query.refetch(),
   };
 }

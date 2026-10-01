@@ -24,6 +24,7 @@ export const Navbar = () => {
     theme,
     toggleTheme,
     currency,
+    setCurrency,
     toggleCurrency,
     language,
     setLanguage,
@@ -79,7 +80,7 @@ export const Navbar = () => {
   }, []);
 
   const navLinks = [
-    { label: t('nav.resorts', 'Resorts'), path: '/resorts' },
+    { label: t('nav.branches', 'Our Locations'), path: '/branches' },
     { label: t('nav.rooms', 'Rooms'), path: '/rooms' },
     { label: t('nav.activities', 'Activities'), path: '/activities' },
     { label: t('nav.services', 'Services'), path: '/services' },
@@ -91,6 +92,15 @@ export const Navbar = () => {
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
+    if (path === '/branches') {
+      return (
+        location.pathname.startsWith('/branches') ||
+        location.pathname.startsWith('/branch') ||
+        location.pathname.startsWith('/locations') ||
+        location.pathname.startsWith('/resorts') ||
+        location.pathname.startsWith('/resort')
+      );
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -135,27 +145,63 @@ export const Navbar = () => {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={toggleCurrency}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-button)] text-xs font-medium text-slate-200 hover:text-gold hover:bg-surface/50 border border-transparent hover:border-border transition-colors cursor-pointer"
-              title="Switch currency between USD and KHR"
-              aria-label={`Currency: ${currency}. Click to switch.`}
-            >
-              <span className="font-semibold text-gold">{currency === 'USD' ? '$' : '៛'}</span>
-              <span>{currency}</span>
-            </button>
+            {/* Dual Currency Switcher [ USD ($) | KHR (៛) ] */}
+            <div className="inline-flex items-center rounded-lg bg-black/40 p-0.5 border border-white/10 text-xs backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setCurrency('USD')}
+                className={`px-2 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                  currency === 'USD'
+                    ? 'bg-gold text-slate-950 shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="US Dollar"
+              >
+                USD ($)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrency('KHR')}
+                className={`px-2 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                  currency === 'KHR'
+                    ? 'bg-gold text-slate-950 shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="Khmer Riel"
+              >
+                KHR (៛)
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setLanguage(language === 'en' ? 'km' : 'en')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-button)] text-xs font-medium text-slate-200 hover:text-gold hover:bg-surface/50 border border-transparent hover:border-border transition-colors cursor-pointer"
-              title="Language"
-              aria-label={`Language: ${language === 'km' ? 'ភាសាខ្មែរ' : 'English'}`}
-            >
-              <Globe className="w-3.5 h-3.5 text-gold shrink-0" />
-              <span className="font-semibold text-xs">{language === 'km' ? 'ខ្មែរ' : 'EN'}</span>
-            </button>
+            {/* Language Switcher [ 🇰🇭 ខ្មែរ | 🇬🇧 EN ] */}
+            <div className="inline-flex items-center rounded-lg bg-black/40 p-0.5 border border-white/10 text-xs backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setLanguage('km')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                  language === 'km'
+                    ? 'bg-gold text-slate-950 font-bold shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="ភាសាខ្មែរ"
+              >
+                <span>🇰🇭</span>
+                <span>ខ្មែរ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                  language === 'en'
+                    ? 'bg-gold text-slate-950 font-bold shadow-sm'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="English"
+              >
+                <span>🇬🇧</span>
+                <span>EN</span>
+              </button>
+            </div>
 
             <button
               type="button"
@@ -299,21 +345,46 @@ export const Navbar = () => {
             })}
 
             <div className="pt-4 mt-2 border-t border-border flex flex-col gap-3">
-              <div className="flex items-center justify-between text-xs text-muted px-3">
-                <span>Currency / Language:</span>
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between text-xs text-muted px-2">
+                <span>{t('common.currency', 'Currency')}:</span>
+                <div className="inline-flex rounded-lg bg-surface p-0.5 border border-border">
                   <button
-                    onClick={toggleCurrency}
-                    className="font-bold text-gold cursor-pointer"
+                    onClick={() => setCurrency('USD')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold cursor-pointer ${
+                      currency === 'USD' ? 'bg-gold text-slate-950' : 'text-slate-300'
+                    }`}
                   >
-                    {currency}
+                    USD ($)
                   </button>
-                  <span>·</span>
                   <button
-                    onClick={() => setLanguage(language === 'en' ? 'km' : 'en')}
-                    className="font-semibold text-text cursor-pointer"
+                    onClick={() => setCurrency('KHR')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold cursor-pointer ${
+                      currency === 'KHR' ? 'bg-gold text-slate-950' : 'text-slate-300'
+                    }`}
                   >
-                    {language.toUpperCase()}
+                    KHR (៛)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-muted px-2">
+                <span>{t('common.language', 'Language')}:</span>
+                <div className="inline-flex rounded-lg bg-surface p-0.5 border border-border">
+                  <button
+                    onClick={() => setLanguage('km')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold cursor-pointer ${
+                      language === 'km' ? 'bg-gold text-slate-950' : 'text-slate-300'
+                    }`}
+                  >
+                    🇰🇭 ខ្មែរ
+                  </button>
+                  <button
+                    onClick={() => setLanguage('en')}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold cursor-pointer ${
+                      language === 'en' ? 'bg-gold text-slate-950' : 'text-slate-300'
+                    }`}
+                  >
+                    🇬🇧 English
                   </button>
                 </div>
               </div>

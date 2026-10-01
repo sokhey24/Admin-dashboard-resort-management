@@ -99,6 +99,7 @@ export const AppProvider = ({ children }) => {
     savePreferences(updates);
   };
 
+
   const setFavorites = useCallback((next) => {
     const normalized = saveFavorites(next);
     setFavoritesState(normalized);
@@ -401,7 +402,8 @@ export const AppProvider = ({ children }) => {
   const setRoomForBooking = (resort, room) => {
     const nextDraft = {
       ...bookingDraft,
-      resortId: resort.id,
+      resortId: resort.id ?? room.resortId,
+      branchId: resort.catalogKind === 'branch' ? resort.id : (room.branchId ?? bookingDraft.branchId),
       resortName: resort.name,
       roomId: room.id,
       roomName: room.name,

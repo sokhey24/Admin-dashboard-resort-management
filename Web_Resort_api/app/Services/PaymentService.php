@@ -32,6 +32,7 @@ class PaymentService
         protected PaymentReceiptService $receipts,
         protected BakongKhqrService $khqr,
         protected ResortAccessService $resortAccess,
+        protected BranchAccessService $branchAccess,
     ) {}
 
     public function paginateResort(array $filters, User $user): LengthAwarePaginator
@@ -49,7 +50,7 @@ class PaymentService
         if ($source === 'restaurant') {
             $query->where('source', 'restaurant')
                 ->with(['reference']);
-            $this->applyRestaurantScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyRestaurantScope($query, $user, $filters);
         } elseif ($source === 'all') {
             $query->with([
                 'booking.resort',
@@ -57,7 +58,7 @@ class PaymentService
                 'booking.rooms.branch',
                 'reference',
             ]);
-            $this->applyCombinedScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyCombinedScope($query, $user, $filters);
         } else {
             $query->with(['booking.resort', 'booking.rooms.roomType', 'booking.rooms.branch'])
                 ->where(function ($q) {
@@ -66,7 +67,7 @@ class PaymentService
                             $legacy->whereNull('source')->whereNotNull('booking_id');
                         });
                 });
-            $this->applyResortScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyResortScope($query, $user, $filters);
         }
 
         $this->applyListFilters($query, $filters, $source);
@@ -83,9 +84,9 @@ class PaymentService
 
         if ($source === 'restaurant') {
             $query->where('source', 'restaurant');
-            $this->applyRestaurantScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyRestaurantScope($query, $user, $filters);
         } elseif ($source === 'all') {
-            $this->applyCombinedScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyCombinedScope($query, $user, $filters);
         } else {
             $query->where(function ($q) {
                 $q->where('source', 'resort')
@@ -93,7 +94,7 @@ class PaymentService
                         $legacy->whereNull('source')->whereNotNull('booking_id');
                     });
             });
-            $this->applyResortScope($query, $user, $filters['resort_id'] ?? null);
+            $this->applyResortScope($query, $user, $filters);
         }
 
         $this->applyListFilters($query, $filters, $source, false);
@@ -106,6 +107,7 @@ class PaymentService
         if ($source !== 'restaurant') {
             $bookingQ = Booking::query();
             $this->applyBookingResortScope($bookingQ, $user, $filters['resort_id'] ?? null);
+            $this->branchAccess->applyBookingBranchScope($bookingQ, $user, $filters['branch_id'] ?? null);
             $outstanding = round((float) $bookingQ->sum('balance_due'), 2);
         }
 
@@ -137,9 +139,25 @@ class PaymentService
         $assigned = $user->resorts()->pluck('resorts.id');
 
         if ($payment->source === 'restaurant') {
-            $payment->loadMissing('reference.restaurantTable');
-            $resortId = (int) ($payment->reference?->restaurantTable?->resort_id ?? 0);
-            if (! $assigned->contains($resortId)) {
+            $payment->loadMissing('reference.restaurantTable', 'reference.branch');
+            /** @var FoodOrder|null $order */
+            $order = $payment->reference;
+            if (! $order) {
+                abort(403, 'You cannot access payments for this restaurant.');
+            }
+
+            $branchId = (int) ($order->branch_id ?? $order->restaurantTable?->branch_id ?? 0);
+            if ($branchId && ! $this->branchAccess->bypassesBranchScope($user)) {
+                $assignedBranches = $this->branchAccess->assignedBranchIds($user);
+                if ($assignedBranches === [] || ! in_array($branchId, $assignedBranches, true)) {
+                    abort(403, 'You cannot access payments for this restaurant branch.');
+                }
+
+                return;
+            }
+
+            $resortId = (int) ($order->restaurantTable?->resort_id ?? 0);
+            if ($resortId && ! $assigned->contains($resortId)) {
                 abort(403, 'You cannot access payments for this restaurant.');
             }
 
@@ -549,7 +567,6 @@ class PaymentService
         if (! empty($filters['booking_id']) && $source !== 'restaurant') {
             $query->where('booking_id', $filters['booking_id']);
         }
-
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $like = '%'.$search.'%';
@@ -588,36 +605,46 @@ class PaymentService
         }
     }
 
-    protected function applyRestaurantScope($query, User $user, mixed $resortId): void
+    protected function applyRestaurantScope($query, User $user, array $filters): void
     {
-        $query->whereHasMorph('reference', [FoodOrder::class], function ($q) use ($user, $resortId) {
+        $resortId = $filters['resort_id'] ?? null;
+        $branchId = $filters['branch_id'] ?? null;
+
+        $query->whereHasMorph('reference', [FoodOrder::class], function ($q) use ($user, $resortId, $branchId) {
+            $this->branchAccess->applyFoodOrderBranchScope($q, $user, $branchId);
             $q->whereHas('restaurantTable', function ($t) use ($user, $resortId) {
                 $this->resortAccess->applyResortColumnScope($t, $user, 'resort_id', $resortId);
             });
         });
     }
 
-    protected function applyCombinedScope($query, User $user, mixed $resortId): void
+    protected function applyCombinedScope($query, User $user, array $filters): void
     {
-        $query->where(function ($outer) use ($user, $resortId) {
-            $outer->where(function ($resortQ) use ($user, $resortId) {
+        $query->where(function ($outer) use ($user, $filters) {
+            $outer->where(function ($resortQ) use ($user, $filters) {
                 $resortQ->where(function ($s) {
                     $s->where('source', 'resort')
                         ->orWhere(function ($legacy) {
                             $legacy->whereNull('source')->whereNotNull('booking_id');
                         });
                 });
-                $this->applyResortScope($resortQ, $user, $resortId);
-            })->orWhere(function ($restQ) use ($user, $resortId) {
+                $this->applyResortScope($resortQ, $user, $filters);
+            })->orWhere(function ($restQ) use ($user, $filters) {
                 $restQ->where('source', 'restaurant');
-                $this->applyRestaurantScope($restQ, $user, $resortId);
+                $this->applyRestaurantScope($restQ, $user, $filters);
             });
         });
     }
 
-    protected function applyResortScope($query, User $user, mixed $resortId): void
+    protected function applyResortScope($query, User $user, array $filters): void
     {
-        $this->applyBookingResortScope($query, $user, $resortId, 'booking');
+        $resortId = $filters['resort_id'] ?? null;
+        $branchId = $filters['branch_id'] ?? null;
+
+        $query->whereHas('booking', function ($b) use ($user, $resortId, $branchId) {
+            $this->resortAccess->applyResortColumnScope($b, $user, 'resort_id', $resortId);
+            $this->branchAccess->applyBookingBranchScope($b, $user, $branchId);
+        });
     }
 
     protected function applyBookingResortScope($query, User $user, mixed $resortId, ?string $relation = null): void

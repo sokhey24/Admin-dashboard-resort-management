@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global Khmer Typography & Anti-Clipping ── */
+html[lang="km"] {
+  font-family: "Kantumruy Pro", "Inter", sans-serif;
+}
+
+html[lang="km"] body,
+html[lang="km"] p,
+html[lang="km"] span,
+html[lang="km"] a,
+html[lang="km"] label,
+html[lang="km"] table,
+html[lang="km"] td,
+html[lang="km"] th,
+html[lang="km"] .ant-table,
+html[lang="km"] .ant-table-cell {
+  line-height: 1.75 !important;
+}
+
+html[lang="km"] input,
+html[lang="km"] select,
+html[lang="km"] textarea,
+html[lang="km"] .ant-input,
+html[lang="km"] .ant-select-selector {
+  min-height: 40px !important;
+  line-height: 1.7 !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+html[lang="km"] button,
+html[lang="km"] .ant-btn {
+  min-height: 38px !important;
+  line-height: 1.65 !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+html[lang="km"] .ant-tag {
+  line-height: 1.6 !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+/* ── Print: show portal receipt only, single page ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .invoice-print-root,
+  .invoice-print-root *,
+  .reports-print-root,
+  .reports-print-root * {
+    visibility: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .invoice-print-root,
+  .reports-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    z-index: 99999 !important;
+  }
+
+  .resort-invoice-receipt {
+    max-width: 420px !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .resort-invoice-receipt,
+  .receipt-header-print {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

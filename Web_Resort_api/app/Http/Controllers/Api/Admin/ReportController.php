@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -81,13 +82,20 @@ class ReportController extends Controller
         $filters = $this->validatedFilters($request);
         $rows = $this->reports->dailyBreakdown($filters, $request->user(), 1, 10000)['rows'] ?? [];
 
+        $branchName = 'All branches';
+        if (! empty($filters['branch_id'])) {
+            $branchName = Branch::query()->whereKey((int) $filters['branch_id'])->value('name')
+                ?? 'Branch #'.$filters['branch_id'];
+        }
+
         $filename = 'resort-report-'.($filters['date_from'] ?? 'all').'-to-'.($filters['date_to'] ?? 'all').'.csv';
 
-        return response()->streamDownload(function () use ($rows) {
+        return response()->streamDownload(function () use ($rows, $branchName) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Date', 'Bookings', 'Guests', 'Revenue', 'Paid', 'Pending', 'Active stays']);
+            fputcsv($out, ['Branch Name', 'Date', 'Bookings', 'Guests', 'Revenue', 'Paid', 'Pending', 'Active stays']);
             foreach ($rows as $row) {
                 fputcsv($out, [
+                    $branchName,
                     $row['date'],
                     $row['bookings'],
                     $row['guests'],

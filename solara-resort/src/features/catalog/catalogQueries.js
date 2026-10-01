@@ -1,4 +1,7 @@
 import {
+  fetchBranch,
+  fetchBranchRooms,
+  fetchBranches,
   fetchResort,
   fetchResortGallery,
   fetchResorts,
@@ -7,10 +10,30 @@ import {
   fetchRoomTypes,
 } from '../../services/api/catalogApi.js';
 import {
+  mapBranchDetailFromApi,
+  mapBranchFromApi,
   mapResortDetailFromApi,
   mapResortFromApi,
   mapRoomFromApi,
 } from '../../util/mapCatalog.js';
+
+export async function queryBranchesPage(params) {
+  const payload = await fetchBranches(params);
+  const rows = (payload?.data ?? []).map(mapBranchFromApi).filter(Boolean);
+  return { rows, meta: payload };
+}
+
+export async function queryBranchDetailBundle(branchId, stayParams = {}) {
+  const [branchRow, roomsPayload] = await Promise.all([
+    fetchBranch(branchId),
+    fetchBranchRooms(branchId, { per_page: 50, ...stayParams }),
+  ]);
+
+  const mappedBranch = mapBranchDetailFromApi(branchRow);
+  const mappedRooms = (roomsPayload?.data ?? []).map(mapRoomFromApi).filter(Boolean);
+
+  return { resort: mappedBranch, rooms: mappedRooms };
+}
 
 export async function queryResortsPage(params) {
   const payload = await fetchResorts(params);

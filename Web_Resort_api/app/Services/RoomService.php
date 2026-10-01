@@ -111,6 +111,12 @@ class RoomService
                 'resort_id',
                 $filters['resort_id'] ?? null
             );
+            app(BranchAccessService::class)->applyBranchColumnScope(
+                $query,
+                $user,
+                'branch_id',
+                $filters['branch_id'] ?? null
+            );
         } elseif (! empty($filters['resort_id'])) {
             $query->where('resort_id', $filters['resort_id']);
         }

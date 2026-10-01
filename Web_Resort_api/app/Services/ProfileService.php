@@ -385,6 +385,25 @@ class ProfileService
 
         $primary = collect($resorts)->firstWhere('is_primary', true) ?? ($resorts[0] ?? null);
 
+        $assignedBranches = [];
+        try {
+            if (Schema::hasTable('user_branch')) {
+                $assignedBranches = $user->branches()->get()->map(fn ($branch) => [
+                    'id' => $branch->id,
+                    'name' => $branch->name,
+                    'city' => $branch->city,
+                    'resort_id' => $branch->resort_id,
+                    'assignment_role' => $branch->pivot->role,
+                    'is_primary' => (bool) $branch->pivot->is_primary,
+                ])->values()->all();
+            }
+        } catch (Throwable) {
+            $assignedBranches = [];
+        }
+
+        $primaryBranch = collect($assignedBranches)->firstWhere('is_primary', true)
+            ?? ($assignedBranches[0] ?? ($primary['branch'] ?? null));
+
         return [
             'id' => $user->id,
             'account_id' => 'ACC-' . str_pad((string) $user->id, 6, '0', STR_PAD_LEFT),
@@ -399,8 +418,10 @@ class ProfileService
             'profile_image_url' => $this->imageUrl($user->profile_image),
             'roles' => $user->roles->pluck('name')->values(),
             'assigned_resorts' => $resorts,
+            'assigned_branches' => $assignedBranches,
             'assigned_resort' => $primary['name'] ?? null,
-            'assigned_branch' => $primary['branch']['name'] ?? null,
+            'assigned_branch' => is_array($primaryBranch) ? ($primaryBranch['name'] ?? null) : ($primaryBranch['name'] ?? $primary['branch']['name'] ?? null),
+            'primary_branch_id' => is_array($primaryBranch) ? ($primaryBranch['id'] ?? null) : ($primaryBranch['id'] ?? $primary['branch']['id'] ?? null),
             'two_factor_enabled' => $this->twoFactor->isEnabled($user),
             'last_login_at' => $user->last_login_at?->format('Y-m-d H:i:s'),
             'last_login_human' => $user->last_login_at?->diffForHumans(),

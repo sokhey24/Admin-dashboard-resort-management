@@ -51,6 +51,7 @@ export function mapQuoteToSummary(quote, currency = 'USD') {
       quote.total_khr != null ? Number(quote.total_khr) : Math.round(totalUsd * KHR_RATE),
     currency: quote.currency || currency,
     resortId: quote.resort_id,
+    branchId: quote.branch_id ?? null,
     raw: quote,
   };
 }
@@ -67,12 +68,21 @@ export function mapBookingFromApi(booking) {
   const balanceDue = Number(booking.balance_due ?? total);
 
   const guestInfo = parseGuestInfo(booking.special_requests);
+  const branchName = booking.branch?.name || booking.branch_name || '';
+  const branchLocation = booking.branch
+    ? [booking.branch.city, booking.branch.province].filter((v, i, a) => v && a.indexOf(v) === i).join(', ')
+    : '';
+  const brandName = booking.resort?.brand_name || booking.resort?.name || 'Solara Resort & Spa';
 
   return {
     id: booking.booking_code || String(booking.id),
     apiId: booking.id,
     resortId: booking.resort_id,
-    resortName: booking.resort?.name || '',
+    branchId: booking.branch_id || booking.branch?.id || null,
+    branchName,
+    branchLocation,
+    brandName,
+    resortName: branchName ? `${brandName} — ${branchName}` : brandName,
     roomId: room?.id,
     roomName: roomLabel(room),
     roomImage:
