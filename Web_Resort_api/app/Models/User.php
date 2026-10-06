@@ -141,6 +141,11 @@ class User extends Authenticatable
         return $this->hasMany(PasswordResetOtp::class, 'email', 'email');
     }
 
+    public function customerLoyalty()
+    {
+        return $this->hasOne(CustomerLoyalty::class);
+    }
+
     public function bookings()
     {
         return $this->hasMany(Booking::class);

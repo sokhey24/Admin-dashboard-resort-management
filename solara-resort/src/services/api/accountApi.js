@@ -10,6 +10,20 @@ export async function updateProfile(payload) {
   return data?.data ?? data;
 }
 
+/** POST /api/profile/avatar — multipart field `avatar` */
+export async function uploadProfileAvatar(file) {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const { data } = await axiosClient.post('profile/avatar', formData);
+  return data?.data ?? data;
+}
+
+/** DELETE /api/profile/avatar */
+export async function deleteProfileAvatar() {
+  const { data } = await axiosClient.delete('profile/avatar');
+  return data?.data ?? data;
+}
+
 /** POST /api/auth/change-password */
 export async function changePasswordAuth(payload) {
   const { data } = await axiosClient.post('auth/change-password', payload);

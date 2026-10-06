@@ -8,6 +8,7 @@ import ReviewFilters from "./reviews/ReviewFilters";
 import ReviewPagination from "./reviews/ReviewPagination";
 import ReviewDetailModal from "./reviews/ReviewDetailModal";
 import useCatalogData from "../../hooks/useCatalogData";
+import usePermission from "../../util/usePermission";
 
 const EMPTY_FILTERS = {
   rating: undefined,
@@ -31,6 +32,8 @@ export default function CustomerReviewRoom({ embedded = false }) {
   const { resorts, branches } = useCatalogData({ autoFetch: false });
   const [selected, setSelected] = useState(null);
   const requestSeq = useRef(0);
+  const { canAny } = usePermission();
+  const canModerate = canAny("admin.resorts.update");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -100,6 +103,21 @@ export default function CustomerReviewRoom({ embedded = false }) {
     setFilters(EMPTY_FILTERS);
     setPage(1);
   };
+
+  const updateReviewStatus = useCallback(
+    async (reviewId, status) => {
+      const res = await request(`admin/reviews/${reviewId}`, "put", { status });
+      if (res?.errors) {
+        message.error(res.errors.message ?? "Unable to update review.");
+        return false;
+      }
+      message.success(status === "approved" ? "Review approved." : "Review rejected.");
+      setSelected(null);
+      await load();
+      return true;
+    },
+    [load]
+  );
 
   const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
   const subText = dark ? "text-gray-400" : "text-[#829AB1]";
@@ -175,7 +193,13 @@ export default function CustomerReviewRoom({ embedded = false }) {
         </>
       )}
 
-      <ReviewDetailModal review={selected} open={Boolean(selected)} onClose={() => setSelected(null)} />
+      <ReviewDetailModal
+        review={selected}
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        canModerate={canModerate}
+        onStatusChange={updateReviewStatus}
+      />
     </div>
   );
 }

@@ -14,6 +14,8 @@ import { SearchStayNotice } from '../features/search/components/SearchStayNotice
 import { Pagination } from '../components/common/Pagination.jsx';
 import { usePaginationMeta } from '../hooks/useCatalog.js';
 import heroImage from '../assets/images/hero_solara_resort_1790692958491.jpg';
+import { StaggerItem } from '../components/motion/StaggerItem.jsx';
+import { RevealOnScroll } from '../components/motion/RevealOnScroll.jsx';
 
 // Signature primary locations for Solara Brand
 const SIGNATURE_LOCATIONS = [
@@ -334,11 +336,13 @@ export const BranchesPage = () => {
                   onAction={handleClearFilters}
                 />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {filteredBranches.map((branch) => (
-                    <BranchCard key={branch.id} branch={branch} />
+                <RevealOnScroll className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch auto-rows-fr">
+                  {filteredBranches.map((branch, index) => (
+                    <StaggerItem key={branch.id} index={index}>
+                      <BranchCard branch={branch} />
+                    </StaggerItem>
                   ))}
-                </div>
+                </RevealOnScroll>
               )}
 
               {status === 'results' && lastPage > 1 && (

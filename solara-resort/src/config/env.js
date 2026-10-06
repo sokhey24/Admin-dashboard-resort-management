@@ -1,14 +1,13 @@
-const trimTrailingSlash = (url) => String(url || '').replace(/\/+$/, '');
+import {
+  resolveApiBaseUrl,
+  resolveStorageBaseUrl,
+} from './resolveBackendUrl.js';
 
-const apiRoot = trimTrailingSlash(
-  import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api'
-);
+const apiRoot = resolveApiBaseUrl(import.meta.env.VITE_API_URL);
 
 export const config = {
   apiUrl: `${apiRoot}/`,
-  imageUrl: trimTrailingSlash(
-    import.meta.env.VITE_IMAGE_URL ?? 'http://localhost:8000/storage'
-  ),
+  imageUrl: resolveStorageBaseUrl(import.meta.env.VITE_IMAGE_URL),
 };
 
 export default config;

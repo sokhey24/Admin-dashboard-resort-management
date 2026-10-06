@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { easeLuxury } from '../../motion/presets.js';
 import { Link } from 'react-router-dom';
 import { GoogleGenAI } from '@google/genai';
 
@@ -26,6 +27,7 @@ import { useApp } from '../../context/AppContext.jsx';
 
 export const GeminiAssistantWidget = () => {
   const { language } = useApp();
+  const reduced = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -180,8 +182,8 @@ export const GeminiAssistantWidget = () => {
         <motion.button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={reduced ? undefined : { scale: 1.05 }}
+          whileTap={reduced ? undefined : { scale: 0.95 }}
           className="relative flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-navy-900 to-navy-800 text-gold-light border border-gold/40 rounded-full shadow-2xl backdrop-blur-md group hover:border-gold transition-colors"
           aria-label="Open Solara AI Concierge"
         >
@@ -207,10 +209,10 @@ export const GeminiAssistantWidget = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            initial={{ opacity: 0, y: reduced ? 0 : 30, scale: reduced ? 1 : 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: reduced ? 0 : 30, scale: reduced ? 1 : 0.95 }}
+            transition={{ duration: 0.25, ease: easeLuxury }}
             className="fixed bottom-24 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 max-h-[580px] h-[80vh] bg-surface/95 border border-gold/30 rounded-2xl shadow-2xl backdrop-blur-xl z-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
@@ -284,8 +286,11 @@ export const GeminiAssistantWidget = () => {
             {/* Chat Body */}
             <div className="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs">
               {messages.map((m) => (
-                <div
+                <motion.div
                   key={m.id}
+                  initial={{ opacity: 0, y: reduced ? 0 : 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.22, ease: easeLuxury }}
                   className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
@@ -297,7 +302,7 @@ export const GeminiAssistantWidget = () => {
                   >
                     {m.text}
                   </div>
-                </div>
+                </motion.div>
               ))}
 
               {isTyping && (

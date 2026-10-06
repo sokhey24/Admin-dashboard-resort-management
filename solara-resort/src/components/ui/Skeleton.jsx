@@ -49,6 +49,25 @@ export const RoomCardSkeleton = () => {
   );
 };
 
+export const GuestReviewCardSkeleton = () => {
+  return (
+    <div className="rounded-[var(--radius-modal)] overflow-hidden border border-gold/30 bg-gradient-to-r from-slate-950 via-surface to-slate-950 flex flex-col lg:flex-row">
+      <div className="flex-1 p-8 sm:p-10 space-y-4">
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-4 w-4 rounded-sm" />
+          ))}
+        </div>
+        <Skeleton className="h-7 w-3/4" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+        <Skeleton className="h-3 w-40 mt-4" />
+      </div>
+      <Skeleton className="w-full lg:w-56 xl:w-64 min-h-[140px] lg:min-h-[180px]" />
+    </div>
+  );
+};
+
 export const PageSkeleton = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8 animate-pulse">

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useMotionPresets } from '../../motion/useMotionPresets.js';
 import {
   Sun,
   Moon,
@@ -36,6 +38,7 @@ export const Navbar = () => {
 
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const { reduced, scaleIn, fade, transition, duration } = useMotionPresets();
 
   const requestSignOut = () => {
     setSignOutConfirmOpen(true);
@@ -237,8 +240,13 @@ export const Navbar = () => {
                   <ChevronDown className="w-3.5 h-3.5 text-muted" />
                 </button>
 
+                <AnimatePresence>
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-surface border border-border rounded-[var(--radius-modal)] shadow-2xl p-2 z-50 text-text animate-in fade-in zoom-in-95 duration-150">
+                  <motion.div
+                    className="absolute right-0 mt-2 w-56 bg-surface border border-border rounded-[var(--radius-modal)] shadow-2xl p-2 z-50 text-text"
+                    {...scaleIn()}
+                    transition={transition(duration.button)}
+                  >
                     <div className="px-3 py-2 border-b border-border/80 mb-1">
                       <p className="text-xs font-semibold text-text truncate">{user.name}</p>
                       <p className="text-[11px] text-muted truncate">{user.email}</p>
@@ -288,8 +296,9 @@ export const Navbar = () => {
                       <LogOut className="w-3.5 h-3.5" />
                       <span>{t('nav.signOut', 'Sign Out')}</span>
                     </button>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -325,8 +334,23 @@ export const Navbar = () => {
         </div>
       </div>
 
+      <AnimatePresence>
       {mobileMenuOpen && (
-        <div className="xl:hidden fixed inset-x-0 top-[65px] bg-bg/95 backdrop-blur-xl border-b border-border shadow-2xl p-6 transition-all animate-in slide-in-from-top-4 duration-200 max-h-[85vh] overflow-y-auto">
+        <>
+        <motion.div
+          className="xl:hidden fixed inset-0 top-[65px] bg-slate-950/40 z-40"
+          {...fade()}
+          transition={transition(duration.button)}
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden
+        />
+        <motion.div
+          className="xl:hidden fixed inset-x-0 top-[65px] bg-bg/95 backdrop-blur-xl border-b border-border shadow-2xl p-6 z-50 max-h-[85vh] overflow-y-auto"
+          initial={{ opacity: 0, y: reduced ? 0 : -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: reduced ? 0 : -8 }}
+          transition={transition(duration.button)}
+        >
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => {
               const active = isActive(link.path);
@@ -429,8 +453,10 @@ export const Navbar = () => {
               )}
             </div>
           </nav>
-        </div>
+        </motion.div>
+        </>
       )}
+      </AnimatePresence>
 
       <SignOutConfirmDialog
         isOpen={signOutConfirmOpen}

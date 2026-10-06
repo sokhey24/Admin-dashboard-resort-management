@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api\Review;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Review\IndexReviewRequest;
+use App\Http\Requests\Review\StoreReviewRequest;
+use App\Http\Requests\Review\UpdateCustomerReviewRequest;
 use App\Http\Resources\ReviewResource;
 use App\Models\Review;
-use App\Models\Room;
 use App\Services\ReviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,26 @@ class ReviewController extends Controller
 
     public function index(IndexReviewRequest $request): AnonymousResourceCollection
     {
-        return ReviewResource::collection($this->reviews->paginate($request->validated(), $request->user()));
+        $user = $request->user();
+        $filters = $request->validated();
+        $paginator = $this->reviews->paginate($filters, $user);
+
+        $resource = ReviewResource::collection($paginator);
+
+        if ($this->reviews->isPublicReviewConsumer($user) && ($filters['scope'] ?? '') !== 'mine') {
+            $resource->additional([
+                'summary' => $this->reviews->approvedPublicSummary($user, $filters),
+            ]);
+        }
+
+        return $resource;
+    }
+
+    public function mine(IndexReviewRequest $request): AnonymousResourceCollection
+    {
+        $filters = array_merge($request->validated(), ['scope' => 'mine']);
+
+        return ReviewResource::collection($this->reviews->paginate($filters, $request->user()));
     }
 
     public function show(Review $review): ReviewResource
@@ -28,25 +48,12 @@ class ReviewController extends Controller
         return new ReviewResource($this->reviews->loadRelations($review));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreReviewRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'room_id' => 'required|exists:rooms,id',
-            'rating'  => 'required|numeric|min:1|max:5',
-            'title'   => 'nullable|string|max:180',
-            'comment' => 'nullable|string',
-        ]);
-
-        $room = Room::query()->findOrFail($data['room_id']);
-        $review = Review::create([
-            'user_id' => auth()->id(),
-            'room_id' => $room->id,
-            'resort_id' => $room->resort_id,
-            'rating' => $data['rating'],
-            'title' => $data['title'] ?? null,
-            'comment' => $data['comment'] ?? null,
-            'status' => 'pending',
-        ]);
+        $review = $this->reviews->createCustomerReview(
+            $request->user(),
+            $request->validated()
+        );
 
         return (new ReviewResource($this->reviews->loadRelations($review)))
             ->response()
@@ -55,6 +62,9 @@ class ReviewController extends Controller
 
     public function update(Request $request, Review $review): ReviewResource
     {
+        $user = $request->user();
+        $this->reviews->assertAccessible($review, $user);
+
         $data = $request->validate([
             'status'  => 'sometimes|in:pending,approved,rejected',
             'title'   => 'sometimes|nullable|string|max:180',
@@ -66,9 +76,28 @@ class ReviewController extends Controller
         return new ReviewResource($this->reviews->loadRelations($review->fresh()));
     }
 
-    public function destroy(Review $review): JsonResponse
+    public function updateCustomer(UpdateCustomerReviewRequest $request, Review $review): JsonResponse
     {
-        $review->delete();
+        $review = $this->reviews->updateCustomerReview(
+            $review,
+            $request->user(),
+            $request->validated()
+        );
+
+        return (new ReviewResource($this->reviews->loadRelations($review)))
+            ->response()
+            ->setStatusCode(200);
+    }
+
+    public function destroy(Request $request, Review $review): JsonResponse
+    {
+        $user = $request->user();
+        if ($user?->isGuestAccount()) {
+            $this->reviews->deleteCustomerReview($review, $user);
+        } else {
+            $this->reviews->assertAccessible($review, $user);
+            $review->delete();
+        }
 
         return response()->json(null, 204);
     }

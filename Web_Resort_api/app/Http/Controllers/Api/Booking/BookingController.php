@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Booking;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\BookingService;
+use App\Services\ReviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -15,7 +16,7 @@ class BookingController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Booking::with(['user', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice']);
+        $q = Booking::with(['user', 'branch', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice']);
         $this->service->applyResortScope($q, $request->user());
 
         if ($date = $request->query('date')) {
@@ -60,14 +61,20 @@ class BookingController extends Controller
             });
         }
 
-        return response()->json(['data' => $q->latest()->get()]);
+        $bookings = $q->latest()->get();
+        $this->attachReviewEligibility($bookings, $request->user());
+
+        return response()->json(['data' => $bookings]);
     }
 
     public function show(Request $request, Booking $booking): JsonResponse
     {
         $this->service->assertAccessible($booking, $request->user());
 
-        return response()->json($booking->load(['user', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice', 'statusLogs']));
+        $booking->load(['user', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice', 'statusLogs']);
+        $this->attachReviewEligibility(collect([$booking]), $request->user());
+
+        return response()->json($booking);
     }
 
     public function store(Request $request): JsonResponse
@@ -127,6 +134,23 @@ class BookingController extends Controller
             'room_ids.*' => 'exists:rooms,id',
         ]);
 
+        $user = $request->user();
+        if ($user?->isGuestAccount()) {
+            unset(
+                $data['user_id'],
+                $data['resort_id'],
+                $data['tax_amount'],
+                $data['service_charge_amount'],
+                $data['coupon_id'],
+                $data['coupon_code']
+            );
+            if (isset($data['status']) && $data['status'] !== 'cancelled') {
+                throw ValidationException::withMessages([
+                    'status' => ['Guests may only cancel their own reservations.'],
+                ]);
+            }
+        }
+
         if (isset($data['resort_id'])) {
             $this->assertResortAccess((int) $data['resort_id'], $request->user());
         }
@@ -142,6 +166,21 @@ class BookingController extends Controller
         $this->service->deleteBooking($booking);
 
         return response()->json(null, 204);
+    }
+
+    protected function attachReviewEligibility($bookings, $user): void
+    {
+        if (! $user?->isGuestAccount()) {
+            return;
+        }
+
+        $reviews = app(ReviewService::class);
+        foreach ($bookings as $booking) {
+            $booking->setAttribute(
+                'review_eligibility',
+                $reviews->bookingReviewEligibility($booking, $user)
+            );
+        }
     }
 
     protected function assertResortAccess(int $resortId, $user): void

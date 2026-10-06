@@ -363,6 +363,9 @@ class ProfileService
     public function formatUser(User $user): array
     {
         $user->loadMissing('roles');
+        if (Schema::hasTable('customer_loyalty')) {
+            $user->loadMissing('customerLoyalty');
+        }
 
         $resorts = [];
         try {
@@ -429,6 +432,35 @@ class ProfileService
             'created_at_human' => $user->created_at?->diffForHumans(),
             'updated_at' => $user->updated_at?->format('Y-m-d H:i:s'),
             'preferences' => $this->getPreferences($user),
+            'loyalty' => $this->formatLoyalty($user),
+        ];
+    }
+
+    /**
+     * @return array{points: int, tier: string|null, points_target: int|null}|null
+     */
+    public function formatLoyalty(User $user): ?array
+    {
+        if (!Schema::hasTable('customer_loyalty')) {
+            return null;
+        }
+
+        try {
+            $record = $user->relationLoaded('customerLoyalty')
+                ? $user->customerLoyalty
+                : $user->customerLoyalty()->first();
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (!$record) {
+            return null;
+        }
+
+        return [
+            'points' => (int) $record->points,
+            'tier' => $record->tier,
+            'points_target' => $record->points_target !== null ? (int) $record->points_target : null,
         ];
     }
 

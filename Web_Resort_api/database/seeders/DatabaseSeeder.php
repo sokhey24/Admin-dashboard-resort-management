@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
         // 3. Seed admin + staff accounts
         $this->call(AdminUserSeeder::class);
 
-        // 4. Seed sample payments
+        // 4. Seed sample payments (resort infrastructure + sample bookings)
         $this->call(PaymentSeeder::class);
 
         // 5. Seed sample customers
@@ -63,5 +63,8 @@ class DatabaseSeeder extends Seeder
                 $user->roles()->syncWithoutDetaching($customerRole);
             }
         }
+
+        $this->call(CustomerLoyaltySeeder::class);
+        $this->call(CustomerBookingSeeder::class);
     }
 }

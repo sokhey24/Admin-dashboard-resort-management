@@ -32,6 +32,10 @@ return [
     ],
     'allowed_origins_patterns' => [
         '#^https://[\w-]+\.vercel\.app$#',
+        // LAN / local network (other PCs, phones on same Wi‑Fi)
+        '#^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$#',
+        '#^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$#',
+        '#^http://172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$#',
     ],
     'allowed_headers'          => ['*'],
     'exposed_headers'          => [],

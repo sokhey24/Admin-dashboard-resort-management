@@ -19,3 +19,8 @@ export async function fetchMyBookings() {
   const { data } = await axiosClient.get('customer/bookings');
   return data?.data ?? data;
 }
+
+export async function updateBookingRequest(bookingId, payload) {
+  const { data } = await axiosClient.put(`customer/bookings/${bookingId}`, payload);
+  return data?.data ?? data;
+}

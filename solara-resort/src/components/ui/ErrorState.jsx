@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from './Button.jsx';
+import { FadeIn } from '../motion/FadeIn.jsx';
 
 export const ErrorState = ({
   title = 'Something went wrong',
@@ -9,7 +10,7 @@ export const ErrorState = ({
   retryText = 'Try Again',
 }) => {
   return (
-    <div className="w-full text-center py-16 px-4 bg-surface/50 border border-error/20 rounded-[var(--radius-card)] my-6">
+    <FadeIn y={8} className="w-full text-center py-16 px-4 bg-surface/50 border border-error/20 rounded-[var(--radius-card)] my-6">
       <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-error/10 flex items-center justify-center text-error">
         <AlertCircle className="w-7 h-7" />
       </div>
@@ -20,6 +21,6 @@ export const ErrorState = ({
           {retryText}
         </Button>
       )}
-    </div>
+    </FadeIn>
   );
 };

@@ -1,4 +1,11 @@
+import {
+  resolveApiBaseUrl,
+  resolveStorageBaseUrl,
+} from './resolveBackendUrl.js';
+
+const apiRoot = resolveApiBaseUrl(import.meta.env.VITE_API_URL);
+
 export default {
-  base_url: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/",
-  image_path: import.meta.env.VITE_IMAGE_URL ?? "http://localhost:8000/storage/",
-}
+  base_url: `${apiRoot}/`,
+  image_path: `${resolveStorageBaseUrl(import.meta.env.VITE_IMAGE_URL)}/`,
+};

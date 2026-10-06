@@ -29,8 +29,8 @@ export const RoomCard = ({ room }) => {
   };
 
   return (
-    <div className="group bg-surface border border-border hover:border-gold/40 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-900">
+    <div className="group bg-surface border border-border hover:border-gold/40 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full w-full">
+      <div className="relative aspect-[16/10] overflow-hidden bg-slate-900 shrink-0 w-full">
         {item.featuredImage ? (
           <img
             src={item.featuredImage}
@@ -58,14 +58,14 @@ export const RoomCard = ({ room }) => {
         </div>
       </div>
 
-      <div className="p-6 flex flex-col justify-between flex-1">
-        <div>
-          <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2">
+      <div className="p-6 flex flex-col flex-1 min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
+          <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2 min-h-[1.75rem]">
             <Link to={`/room/${item.id}`}>{item.name}</Link>
           </h3>
 
-          <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4">
-            {item.description}
+          <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">
+            {item.description || '\u00a0'}
           </p>
 
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 py-3 my-3 border-y border-border/60 text-xs text-text-secondary">
@@ -89,7 +89,7 @@ export const RoomCard = ({ room }) => {
             </div>
           </div>
 
-          <div className="space-y-1 my-3">
+          <div className="space-y-1 my-3 min-h-[2.75rem]">
             {(item.amenities || []).slice(0, 2).map((amenity) => (
               <div key={amenity} className="flex items-center gap-2 text-xs text-muted">
                 <CheckCircle2 className="w-3 h-3 text-gold/80 shrink-0" />
@@ -99,8 +99,8 @@ export const RoomCard = ({ room }) => {
           </div>
         </div>
 
-        <div className="pt-4 border-t border-border flex items-center justify-between gap-3 mt-4">
-          <div>
+        <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-end justify-between gap-3 mt-auto shrink-0">
+          <div className="min-h-[3.5rem] flex flex-col justify-end">
             <CatalogNightlyPrice
               salePrice={item.pricePerNight}
               listPrice={item.listPricePerNight}

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { loadMyBookingsMapped } from '../hooks/useBooking.js';
+import { updateBookingRequest } from '../services/api/bookingApi.js';
+import { syncBookingNotifications } from '../util/bookingNotifications.js';
 import { getTranslation } from '../i18n/index.js';
 import {
   loginRequest,
@@ -9,20 +11,20 @@ import {
   twoFactorChallengeRequest,
 } from '../services/api/authApi.js';
 import { getApiErrorMessage, getValidationFieldErrors } from '../services/api/errors.js';
-import { updateProfile, changePasswordAuth, updatePreferences } from '../services/api/accountApi.js';
+import {
+  updateProfile,
+  changePasswordAuth,
+  updatePreferences,
+  uploadProfileAvatar,
+  deleteProfileAvatar,
+} from '../services/api/accountApi.js';
 import { setAccessToken, clearAccessToken, getAccessToken } from '../store/authStore.js';
 import { mapCustomerUser, isCustomerRole } from '../util/mapCustomerUser.js';
 import { setUnauthorizedHandler } from '../services/api/axiosClient.js';
 import { localize } from '../util/localize.js';
 import { loadPreferences, savePreferences } from '../store/preferenceStore.js';
 import { loadBookingDraft, saveBookingDraft } from '../store/bookingStore.js';
-import {
-  loadFavorites,
-  saveFavorites,
-  mergeFavorites,
-  normalizeFavorites,
-  toggleFavoriteId,
-} from '../store/favoritesStore.js';
+import { normalizeFavorites, toggleFavoriteId } from '../store/favoritesStore.js';
 
 const AppContext = createContext(undefined);
 
@@ -49,13 +51,18 @@ export const AppProvider = ({ children }) => {
     getAccessToken() ? 'loading' : 'unauthenticated'
   );
   const bootstrapRan = useRef(false);
+  /** Bumped on logout and on each new login so stale API responses cannot apply to another guest. */
+  const sessionGenRef = useRef(0);
 
   // Booking Draft
   const [bookingDraft, setBookingDraft] = useState(() => loadBookingDraft());
 
   const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState(null);
 
-  const [favorites, setFavoritesState] = useState(() => loadFavorites());
+  const [favorites, setFavoritesState] = useState(() => normalizeFavorites({}));
+  const favoritesUserIdRef = useRef(null);
   const favoritesSyncRef = useRef(null);
 
   // Notifications
@@ -100,35 +107,34 @@ export const AppProvider = ({ children }) => {
   };
 
 
-  const setFavorites = useCallback((next) => {
-    const normalized = saveFavorites(next);
+  const applyFavoritesFromApi = useCallback((apiFavorites) => {
+    const normalized = normalizeFavorites(apiFavorites);
     setFavoritesState(normalized);
     return normalized;
   }, []);
 
-  const persistFavoritesToServer = useCallback(async (snapshot) => {
-    if (!getAccessToken()) return;
+  const persistFavoritesToServer = useCallback(async (snapshot, gen = sessionGenRef.current) => {
+    if (!getAccessToken() || gen !== sessionGenRef.current) return;
     try {
       await updatePreferences({ favorites: snapshot });
     } catch {
-      // keep local copy; user can retry on next toggle
+      // Optimistic UI already updated; user can retry by toggling again.
     }
   }, []);
 
+  /** Load favorites from `/auth/me` only — never merge or upload browser storage on login. */
   const syncFavoritesAfterLogin = useCallback(
     async (apiUser) => {
-      const server = normalizeFavorites(apiUser?.preferences?.favorites);
-      const local = loadFavorites();
-      const merged = mergeFavorites(server, local);
-      setFavorites(merged);
+      const gen = sessionGenRef.current;
+      const userId = apiUser?.id;
+      if (userId == null) return;
 
-      const serverKey = JSON.stringify(server);
-      const mergedKey = JSON.stringify(merged);
-      if (serverKey !== mergedKey) {
-        await persistFavoritesToServer(merged);
-      }
+      favoritesUserIdRef.current = userId;
+      const server = normalizeFavorites(apiUser?.preferences?.favorites);
+      if (gen !== sessionGenRef.current) return;
+      applyFavoritesFromApi(server);
     },
-    [persistFavoritesToServer, setFavorites]
+    [applyFavoritesFromApi]
   );
 
   const isFavoriteResort = useCallback(
@@ -181,30 +187,60 @@ export const AppProvider = ({ children }) => {
     [applySession, syncFavoritesAfterLogin]
   );
 
+  const resetCustomerState = useCallback(() => {
+    sessionGenRef.current += 1;
+    favoritesUserIdRef.current = null;
+    if (favoritesSyncRef.current) {
+      clearTimeout(favoritesSyncRef.current);
+      favoritesSyncRef.current = null;
+    }
+    setUser(null);
+    setFavoritesState(normalizeFavorites({}));
+    setBookings([]);
+    setBookingsLoading(false);
+    setBookingsError(null);
+    setNotifications([]);
+  }, []);
+
   const clearSession = useCallback(() => {
     clearAccessToken();
-    setUser(null);
     setAuthStatus('unauthenticated');
-    setFavorites(loadFavorites());
+    resetCustomerState();
     try {
       localStorage.removeItem('solara_user');
     } catch {
       // ignore
     }
-  }, [setFavorites]);
+  }, [resetCustomerState]);
 
   const refreshMyBookings = useCallback(async () => {
+    const gen = sessionGenRef.current;
     if (!getAccessToken()) {
       setBookings([]);
+      setBookingsLoading(false);
+      setBookingsError(null);
       return;
     }
+    setBookingsLoading(true);
+    setBookingsError(null);
     try {
       const mapped = await loadMyBookingsMapped();
+      if (gen !== sessionGenRef.current || !getAccessToken()) return;
       setBookings(mapped);
-    } catch {
-      setBookings([]);
+    } catch (error) {
+      if (gen === sessionGenRef.current) {
+        setBookings([]);
+        setBookingsError(getApiErrorMessage(error, 'Unable to load your reservations.'));
+      }
+    } finally {
+      if (gen === sessionGenRef.current) setBookingsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    setNotifications((prev) => syncBookingNotifications(prev, bookings, language));
+  }, [language, bookings]);
 
   const hydrateSession = useCallback(async () => {
     const token = getAccessToken();
@@ -214,19 +250,26 @@ export const AppProvider = ({ children }) => {
       return { ok: true, user: null };
     }
 
+    const gen = sessionGenRef.current;
     setAuthStatus('loading');
     try {
       const data = await meRequest();
+      if (gen !== sessionGenRef.current || !getAccessToken()) {
+        return { ok: false, error: 'Session changed.' };
+      }
       const roles = data.roles ?? data.user?.roles ?? [];
       if (!isCustomerRole(roles)) {
         clearSession();
         return { ok: false, error: STAFF_ONLY_MESSAGE };
       }
       const mapped = await applySessionWithFavorites(data.user, roles);
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed.' };
+      }
       await refreshMyBookings();
       return { ok: true, user: mapped };
     } catch (error) {
-      clearSession();
+      if (gen === sessionGenRef.current) clearSession();
       return { ok: false, error: getApiErrorMessage(error) };
     }
   }, [applySessionWithFavorites, clearSession, refreshMyBookings]);
@@ -234,10 +277,8 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       clearSession();
-      setBookings([]);
-      setNotifications([]);
     });
-    return () => setUnauthorizedHandler(() => {});
+    return () => setUnauthorizedHandler(() => { });
   }, [clearSession]);
 
   useEffect(() => {
@@ -252,24 +293,32 @@ export const AppProvider = ({ children }) => {
         return { ok: false, error: 'Sign-in did not return an access token.' };
       }
       setAccessToken(data.access_token);
+      resetCustomerState();
+      const gen = sessionGenRef.current;
 
       try {
         const me = await meRequest();
+        if (gen !== sessionGenRef.current || !getAccessToken()) {
+          return { ok: false, error: 'Session changed.' };
+        }
         const roles = me.roles ?? me.user?.roles ?? [];
         if (!isCustomerRole(roles)) {
           clearSession();
           return { ok: false, error: STAFF_ONLY_MESSAGE };
         }
         const mapped = await applySessionWithFavorites(me.user, roles);
+        if (gen !== sessionGenRef.current) {
+          return { ok: false, error: 'Session changed.' };
+        }
         await refreshMyBookings();
         addToast(`Welcome back, ${mapped.name}`, 'success');
         return { ok: true, user: mapped };
       } catch (error) {
-        clearSession();
+        if (gen === sessionGenRef.current) clearSession();
         return { ok: false, error: getApiErrorMessage(error) };
       }
     },
-    [applySessionWithFavorites, clearSession, refreshMyBookings]
+    [applySessionWithFavorites, clearSession, refreshMyBookings, resetCustomerState]
   );
 
   const loginWithPassword = async ({ email, password }) => {
@@ -336,8 +385,6 @@ export const AppProvider = ({ children }) => {
       // still clear local session
     }
     clearSession();
-    setBookings([]);
-    setNotifications([]);
     addToast('You have been signed out', 'info');
   };
 
@@ -346,10 +393,80 @@ export const AppProvider = ({ children }) => {
       return { ok: false, error: 'You must be signed in to update your profile.' };
     }
     try {
+      const gen = sessionGenRef.current;
+      const roles = user.roles;
       const updated = await updateProfile({ name, phone });
-      const mapped = mapCustomerUser(updated, user.roles);
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed. Please try again.' };
+      }
+      const mapped = mapCustomerUser(updated, roles);
       setUser(mapped);
       addToast('Profile updated successfully', 'success');
+      return { ok: true, user: mapped };
+    } catch (error) {
+      return {
+        ok: false,
+        error: getApiErrorMessage(error),
+        fieldErrors: getValidationFieldErrors(error),
+      };
+    }
+  };
+
+  const uploadCustomerAvatar = async (file) => {
+    if (!user) {
+      return { ok: false, error: 'You must be signed in to update your profile photo.' };
+    }
+    if (!file) {
+      return { ok: false, error: 'Please choose an image file.' };
+    }
+    try {
+      const gen = sessionGenRef.current;
+      const roles = user.roles;
+      await uploadProfileAvatar(file);
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed. Please try again.' };
+      }
+      const me = await meRequest();
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed. Please try again.' };
+      }
+      const mapped = mapCustomerUser(me.user, me.roles ?? roles);
+      setUser(mapped);
+      addToast(
+        getTranslation(language, 'account.profilePhotoUpdated', 'Profile photo updated'),
+        'success'
+      );
+      return { ok: true, user: mapped };
+    } catch (error) {
+      return {
+        ok: false,
+        error: getApiErrorMessage(error),
+        fieldErrors: getValidationFieldErrors(error),
+      };
+    }
+  };
+
+  const removeCustomerAvatar = async () => {
+    if (!user) {
+      return { ok: false, error: 'You must be signed in to update your profile photo.' };
+    }
+    try {
+      const gen = sessionGenRef.current;
+      const roles = user.roles;
+      await deleteProfileAvatar();
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed. Please try again.' };
+      }
+      const me = await meRequest();
+      if (gen !== sessionGenRef.current) {
+        return { ok: false, error: 'Session changed. Please try again.' };
+      }
+      const mapped = mapCustomerUser(me.user, me.roles ?? roles);
+      setUser(mapped);
+      addToast(
+        getTranslation(language, 'account.profilePhotoRemoved', 'Profile photo removed'),
+        'success'
+      );
       return { ok: true, user: mapped };
     } catch (error) {
       return {
@@ -415,30 +532,53 @@ export const AppProvider = ({ children }) => {
 
   const registerBooking = (booking) => {
     if (!booking) return;
-    setBookings((prev) => {
-      const exists = prev.some((b) => b.apiId === booking.apiId || b.id === booking.id);
-      if (exists) {
-        return prev.map((b) =>
-          b.apiId === booking.apiId || b.id === booking.id ? { ...b, ...booking } : b
-        );
-      }
-      return [booking, ...prev];
-    });
 
-    const newNotif = {
-      id: `notif-${Date.now()}`,
-      title: `Reservation created (#${booking.id})`,
-      message: `Your reservation at ${booking.resortName} for ${booking.roomName} has been saved.`,
+    const createdNotif = {
+      id: `notif-created-${booking.apiId}`,
+      title:
+        language === 'km'
+          ? `ការកក់ត្រូវបានរក្សាទុក (#${booking.id})`
+          : `Reservation saved (#${booking.id})`,
+      message:
+        language === 'km'
+          ? `${booking.roomName} · ${booking.resortName} (${booking.checkIn} – ${booking.checkOut})`
+          : `${booking.roomName} at ${booking.resortName} (${booking.checkIn} – ${booking.checkOut})`,
       date: 'Just now',
       read: false,
       type: 'booking',
+      bookingApiId: booking.apiId,
     };
-    setNotifications((prev) => [newNotif, ...prev]);
+
+    setBookings((prev) => {
+      const exists = prev.some((b) => b.apiId === booking.apiId || b.id === booking.id);
+      return exists
+        ? prev.map((b) =>
+            b.apiId === booking.apiId || b.id === booking.id ? { ...b, ...booking } : b
+          )
+        : [booking, ...prev];
+    });
+
+    setNotifications((nPrev) => [createdNotif, ...nPrev]);
   };
 
-  const cancelBooking = (id) => {
-    setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: 'cancelled' } : b)));
-    addToast(`Reservation #${id} has been cancelled`, 'info');
+  const cancelBooking = async (id) => {
+    if (!getAccessToken() || !user) {
+      addToast('You must be signed in to cancel a reservation.', 'error');
+      return { ok: false };
+    }
+    const gen = sessionGenRef.current;
+    const match = bookings.find((b) => b.id === id || b.apiId === id);
+    const apiId = match?.apiId ?? id;
+    try {
+      await updateBookingRequest(apiId, { status: 'cancelled' });
+      if (gen !== sessionGenRef.current) return { ok: false };
+      addToast(`Reservation #${match?.id ?? id} has been cancelled`, 'info');
+      await refreshMyBookings();
+      return { ok: true };
+    } catch (error) {
+      addToast(getApiErrorMessage(error, 'Unable to cancel this reservation.'), 'error');
+      return { ok: false, error: getApiErrorMessage(error) };
+    }
   };
 
   const markNotificationRead = (id) => {
@@ -461,13 +601,17 @@ export const AppProvider = ({ children }) => {
 
   const toggleFavoriteResort = useCallback(
     (resortId) => {
+      if (!getAccessToken() || favoritesUserIdRef.current == null) {
+        addToast(t('account.signInRequired', 'Sign in to save favorites'), 'info');
+        return;
+      }
+      const gen = sessionGenRef.current;
       const key = String(resortId);
       setFavoritesState((prev) => {
         const next = normalizeFavorites({
           ...prev,
           resorts: toggleFavoriteId(prev.resorts, key),
         });
-        saveFavorites(next);
         const added = next.resorts.includes(key);
         addToast(
           added
@@ -477,7 +621,7 @@ export const AppProvider = ({ children }) => {
         );
         if (favoritesSyncRef.current) clearTimeout(favoritesSyncRef.current);
         favoritesSyncRef.current = setTimeout(() => {
-          persistFavoritesToServer(next);
+          persistFavoritesToServer(next, gen);
         }, 400);
         return next;
       });
@@ -487,13 +631,17 @@ export const AppProvider = ({ children }) => {
 
   const toggleFavoriteRoom = useCallback(
     (roomId) => {
+      if (!getAccessToken() || favoritesUserIdRef.current == null) {
+        addToast(t('account.signInRequired', 'Sign in to save favorites'), 'info');
+        return;
+      }
+      const gen = sessionGenRef.current;
       const key = String(roomId);
       setFavoritesState((prev) => {
         const next = normalizeFavorites({
           ...prev,
           rooms: toggleFavoriteId(prev.rooms, key),
         });
-        saveFavorites(next);
         const added = next.rooms.includes(key);
         addToast(
           added
@@ -503,7 +651,7 @@ export const AppProvider = ({ children }) => {
         );
         if (favoritesSyncRef.current) clearTimeout(favoritesSyncRef.current);
         favoritesSyncRef.current = setTimeout(() => {
-          persistFavoritesToServer(next);
+          persistFavoritesToServer(next, gen);
         }, 400);
         return next;
       });
@@ -532,12 +680,16 @@ export const AppProvider = ({ children }) => {
         registerAccount,
         logout,
         saveCustomerProfile,
+        uploadCustomerAvatar,
+        removeCustomerAvatar,
         changeCustomerPassword,
         updateUser,
         bookingDraft,
         updateBookingDraft,
         setRoomForBooking,
         bookings,
+        bookingsLoading,
+        bookingsError,
         refreshMyBookings,
         registerBooking,
         cancelBooking,

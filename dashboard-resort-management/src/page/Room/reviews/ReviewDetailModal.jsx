@@ -1,4 +1,5 @@
-import { Modal } from "antd";
+import { useState } from "react";
+import { Modal, Button, Popconfirm } from "antd";
 import { useDarkMode } from "../../../util/DarkModeContext";
 import { imageUrl } from "../roomHelpers";
 import ReviewRating from "./ReviewRating";
@@ -26,9 +27,32 @@ function Row({ label, children, dark }) {
   );
 }
 
-export default function ReviewDetailModal({ review, open, onClose }) {
+export default function ReviewDetailModal({
+  review,
+  open,
+  onClose,
+  canModerate = false,
+  onStatusChange,
+}) {
   const dark = useDarkMode();
   const avatar = imageUrl(review?.user?.profile_image);
+  const [saving, setSaving] = useState(false);
+  const [action, setAction] = useState(null);
+
+  const setStatus = async (status) => {
+    if (!review?.id || saving) return;
+    setSaving(true);
+    setAction(status);
+    try {
+      const ok = await onStatusChange?.(review.id, status);
+      if (ok) onClose?.();
+    } finally {
+      setSaving(false);
+      setAction(null);
+    }
+  };
+
+  const isPending = String(review?.status || "").toLowerCase() === "pending";
 
   return (
     <Modal
@@ -66,6 +90,32 @@ export default function ReviewDetailModal({ review, open, onClose }) {
           <Row label="Review" dark={dark}>{review.comment?.trim() || "No written comment."}</Row>
           <Row label="Created" dark={dark}>{formatWhen(review.created_at)}</Row>
           <Row label="Updated" dark={dark}>{formatWhen(review.updated_at)}</Row>
+
+          {canModerate && isPending && (
+            <div className="flex flex-wrap justify-end gap-2 mt-6 pt-4 border-t border-dashed border-gray-600/30">
+              <Popconfirm
+                title="Reject this review?"
+                description="Guests will not see this review on the website."
+                okText="Reject"
+                okButtonProps={{ danger: true, loading: saving && action === "rejected" }}
+                cancelText="Cancel"
+                onConfirm={() => setStatus("rejected")}
+                disabled={saving}
+              >
+                <Button danger disabled={saving}>
+                  Reject
+                </Button>
+              </Popconfirm>
+              <Button
+                type="primary"
+                loading={saving && action === "approved"}
+                disabled={saving}
+                onClick={() => setStatus("approved")}
+              >
+                Approve
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Modal>

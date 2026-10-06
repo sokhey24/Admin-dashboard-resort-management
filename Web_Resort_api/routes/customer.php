@@ -64,6 +64,8 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     Route::apiResource('food-orders',         FoodOrderController::class);
 
     // Reviews
-    Route::post('/reviews',          [ReviewController::class, 'store']);
+    Route::get('/reviews/mine', [ReviewController::class, 'mine']);
+    Route::post('/reviews', [ReviewController::class, 'store']);
+    Route::patch('/reviews/{review}', [ReviewController::class, 'updateCustomer']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });

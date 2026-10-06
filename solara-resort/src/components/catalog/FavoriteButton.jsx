@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 
@@ -45,14 +46,18 @@ export const FavoriteButton = ({
     ? t('favorites.remove', 'Remove from favorites')
     : t('favorites.add', 'Save to favorites');
 
+  const reduced = useReducedMotion();
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={handleClick}
       aria-pressed={active}
       aria-label={label}
       title={label}
-      className={`inline-flex items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200 shrink-0 ${sizeClasses} ${
+      whileTap={reduced ? undefined : { scale: [1, 1.15, 1] }}
+      transition={{ duration: 0.2 }}
+      className={`inline-flex items-center justify-center rounded-full border backdrop-blur-md transition-colors duration-200 shrink-0 ${sizeClasses} ${
         active
           ? 'bg-gold/20 border-gold/60 text-gold shadow-sm'
           : 'bg-slate-950/75 border-white/15 text-white hover:border-gold/40 hover:text-gold-light'
@@ -62,6 +67,6 @@ export const FavoriteButton = ({
         className={`${iconSize} ${active ? 'fill-gold text-gold' : ''}`}
         strokeWidth={active ? 0 : 2}
       />
-    </button>
+    </motion.button>
   );
 };

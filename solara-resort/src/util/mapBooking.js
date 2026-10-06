@@ -17,10 +17,21 @@ function formatDate(value) {
   }
 }
 
-function roomLabel(room) {
+export function roomLabel(room) {
   if (!room) return '—';
   const typeName = room.room_type?.name || room.roomType?.name || 'Room';
-  return room.room_number ? `${typeName} · ${room.room_number}` : typeName;
+  const number = room.room_number || room.roomNumber;
+  return number ? `${typeName} · ${number}` : typeName;
+}
+
+function mapRoomsFromBooking(booking) {
+  const rooms = Array.isArray(booking?.rooms) ? booking.rooms : [];
+  return rooms.map((room) => ({
+    id: room.id,
+    label: roomLabel(room),
+    roomNumber: room.room_number || room.roomNumber || '',
+    image: resolveRoomFeaturedImage(room),
+  }));
 }
 
 export function mapQuoteToSummary(quote, currency = 'USD') {
@@ -59,7 +70,12 @@ export function mapQuoteToSummary(quote, currency = 'USD') {
 export function mapBookingFromApi(booking) {
   if (!booking) return null;
 
+  const roomList = mapRoomsFromBooking(booking);
   const room = booking.rooms?.[0];
+  const roomName =
+    roomList.length > 1
+      ? roomList.map((r) => r.label).join(', ')
+      : roomList[0]?.label || roomLabel(room);
   const total = Number(booking.total_amount ?? 0);
   const subtotal = Number(booking.subtotal ?? 0);
   const discount = Number(booking.discount ?? 0);
@@ -84,9 +100,14 @@ export function mapBookingFromApi(booking) {
     brandName,
     resortName: branchName ? `${brandName} — ${branchName}` : brandName,
     roomId: room?.id,
-    roomName: roomLabel(room),
+    roomNumber: roomList[0]?.roomNumber || room?.room_number || '',
+    roomName,
+    rooms: roomList,
     roomImage:
-      resolveRoomFeaturedImage(room) || resolveResortFeaturedImage(booking.resort) || null,
+      roomList[0]?.image ||
+      resolveRoomFeaturedImage(room) ||
+      resolveResortFeaturedImage(booking.resort) ||
+      null,
     checkIn: formatDate(booking.check_in),
     checkOut: formatDate(booking.check_out),
     nights: booking.nights,
@@ -111,8 +132,30 @@ export function mapBookingFromApi(booking) {
       totalUSD: total,
       totalKHR: Math.round(total * KHR_RATE),
     },
+    reviewEligibility: booking.review_eligibility ?? { can_review: false, rooms: [] },
     raw: booking,
   };
+}
+
+/** Matches Laravel `Booking::getPaymentStatusAttribute()` balance threshold. */
+export const BOOKING_BALANCE_EPSILON = 0.009;
+
+const NON_PAYABLE_BOOKING_STATUSES = new Set(['cancelled', 'completed']);
+
+/** True when the guest still owes a balance and may use the KHQR payment flow. */
+export function bookingNeedsPayment(booking) {
+  if (!booking || booking.apiId == null) return false;
+  if (NON_PAYABLE_BOOKING_STATUSES.has(booking.status)) return false;
+
+  const balanceRaw = booking.balanceDue;
+  if (balanceRaw == null || balanceRaw === '') return false;
+  const balance = Number(balanceRaw);
+  if (!Number.isFinite(balance) || balance <= BOOKING_BALANCE_EPSILON) return false;
+
+  const paymentStatus = String(booking.paymentStatus ?? '').toLowerCase();
+  if (paymentStatus === 'paid') return false;
+
+  return true;
 }
 
 function parseGuestInfo(specialRequests) {

@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useMotionPresets } from '../motion/useMotionPresets.js';
+import { StaggerItem } from '../components/motion/StaggerItem.jsx';
 import {
   User,
   Calendar,
@@ -11,6 +14,8 @@ import {
   LogOut,
   Heart,
   MapPin,
+  Camera,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
@@ -22,6 +27,15 @@ import { useFavoriteCatalog } from '../hooks/useFavoriteCatalog.js';
 import { MARKETING_IMAGES } from '../constants/marketingImages.js';
 import { formatCurrency } from '../util/currency.js';
 import { resolveStorageUrl } from '../util/media.js';
+import { bookingNeedsPayment } from '../util/mapBooking.js';
+import { pickUpcomingBooking } from '../util/bookingNotifications.js';
+import { paginateItems } from '../util/paginateList.js';
+import { ListPagination } from '../components/ui/ListPagination.jsx';
+import { ReviewFormModal } from '../components/reviews/ReviewFormModal.jsx';
+import { StarRatingDisplay } from '../components/reviews/StarRating.jsx';
+import { useMyGuestReviews } from '../hooks/useMyGuestReviews.js';
+import { deleteGuestReview } from '../services/api/reviewsApi.js';
+import { getApiErrorMessage } from '../services/api/errors.js';
 
 const BOOKING_ROOM_IMAGE_FALLBACK = MARKETING_IMAGES.villa;
 
@@ -34,6 +48,52 @@ function userAvatarSrc(avatar) {
   return resolveStorageUrl(avatar) || avatar;
 }
 
+function guestHasStoredProfilePhoto(user) {
+  return Boolean(user?.raw?.profile_image);
+}
+
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_ACCEPT = 'image/jpeg,image/jpg,image/png';
+
+function validateAvatarFile(file, t) {
+  if (!file) return null;
+  const type = (file.type || '').toLowerCase();
+  if (!['image/jpeg', 'image/jpg', 'image/png'].includes(type)) {
+    return t('account.profilePhotoInvalidType', 'Please choose a JPG or PNG image.');
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return t('account.profilePhotoTooLarge', 'Image must be 2 MB or smaller.');
+  }
+  return null;
+}
+
+function bookingStatusBadgeClass(status) {
+  switch (status) {
+    case 'confirmed':
+    case 'checked_in':
+      return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+    case 'completed':
+      return 'bg-surface-elevated text-text border border-border';
+    case 'cancelled':
+      return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
+    default:
+      return 'bg-surface-elevated text-muted border border-border';
+  }
+}
+
+function bookingStatusLabel(status, language) {
+  const labels = {
+    pending: language === 'km' ? 'កំពុងរង់ចាំ' : 'pending',
+    confirmed: language === 'km' ? 'បានបញ្ជាក់' : 'confirmed',
+    checked_in: language === 'km' ? 'កំពុងស្នាក់នៅ' : 'checked in',
+    completed: language === 'km' ? 'បានបញ្ចប់' : 'completed',
+    cancelled: language === 'km' ? 'បានបោះបង់' : 'cancelled',
+  };
+  return labels[status] || status;
+}
+
 export const AccountPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,6 +101,8 @@ export const AccountPage = () => {
     user,
     logout,
     bookings,
+    bookingsLoading,
+    bookingsError,
     cancelBooking,
     notifications,
     markNotificationRead,
@@ -53,6 +115,8 @@ export const AccountPage = () => {
     setLanguage,
     updateUser,
     saveCustomerProfile,
+    uploadCustomerAvatar,
+    removeCustomerAvatar,
     changeCustomerPassword,
     t,
     addToast,
@@ -60,6 +124,12 @@ export const AccountPage = () => {
     favorites,
     localize,
   } = useApp();
+
+  const { reduced, fadeUp, transition, duration } = useMotionPresets();
+  const tabPanelMotion = {
+    ...fadeUp(8),
+    transition: transition(duration.page),
+  };
 
   const path = location.pathname;
   let currentTab = 'dashboard';
@@ -80,7 +150,22 @@ export const AccountPage = () => {
 
   const memberSinceYear = user?.raw?.created_at
     ? new Date(user.raw.created_at).getFullYear()
-    : (user?.created_at ? new Date(user.created_at).getFullYear() : 2025);
+    : (user?.created_at ? new Date(user.created_at).getFullYear() : null);
+
+  const loyaltyTierLabel = user?.memberTier ?? null;
+  const loyaltyPoints = typeof user?.points === 'number' ? user.points : null;
+  const loyaltyTarget =
+    typeof user?.pointsTarget === 'number' && user.pointsTarget > 0 ? user.pointsTarget : null;
+  const loyaltyProgressPercent =
+    loyaltyPoints !== null && loyaltyTarget !== null
+      ? Math.min(100, Math.round((loyaltyPoints / loyaltyTarget) * 100))
+      : null;
+  const loyaltyPointsRemaining =
+    loyaltyPoints !== null && loyaltyTarget !== null && loyaltyTarget > loyaltyPoints
+      ? loyaltyTarget - loyaltyPoints
+      : null;
+  const hasLoyaltyData =
+    loyaltyTierLabel || loyaltyPoints !== null || loyaltyTarget !== null;
 
   const uniqueDestinations = new Set(
     (bookings || [])
@@ -89,27 +174,165 @@ export const AccountPage = () => {
   ).size;
 
   const [bookingFilter, setBookingFilter] = useState('all');
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [notificationsPage, setNotificationsPage] = useState(1);
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
+  const [bookingForReview, setBookingForReview] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
+  const {
+    reviews: myGuestReviews,
+    loading: myReviewsLoading,
+    reload: reloadMyGuestReviews,
+  } = useMyGuestReviews({ per_page: 20 }, { enabled: Boolean(user) });
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileFieldErrors, setProfileFieldErrors] = useState({});
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const avatarInputRef = useRef(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordFieldErrors, setPasswordFieldErrors] = useState({});
+  const [paymentNavigatingId, setPaymentNavigatingId] = useState(null);
 
   useEffect(() => {
     refreshMyBookings();
-  }, [refreshMyBookings]);
+  }, [refreshMyBookings, location.pathname]);
 
   useEffect(() => {
-    setName(user?.name || '');
-    setPhone(user?.phone || '');
-  }, [user?.name, user?.phone]);
+    setPaymentNavigatingId(null);
+  }, [location.pathname]);
+
+  const filteredBookings = useMemo(
+    () =>
+      bookingFilter === 'all'
+        ? bookings
+        : bookingFilter === 'unpaid'
+          ? bookings.filter((b) => bookingNeedsPayment(b))
+          : bookings.filter((b) => b.status === bookingFilter),
+    [bookings, bookingFilter]
+  );
+
+  const paginatedBookings = useMemo(
+    () => paginateItems(filteredBookings, bookingsPage),
+    [filteredBookings, bookingsPage]
+  );
+
+  const paginatedNotifications = useMemo(
+    () => paginateItems(notifications, notificationsPage),
+    [notifications, notificationsPage]
+  );
+
+  useEffect(() => {
+    setBookingsPage(1);
+  }, [bookingFilter]);
+
+  useEffect(() => {
+    if (bookingsPage > paginatedBookings.totalPages) {
+      setBookingsPage(paginatedBookings.totalPages);
+    }
+  }, [bookingsPage, paginatedBookings.totalPages]);
+
+  useEffect(() => {
+    if (notificationsPage > paginatedNotifications.totalPages) {
+      setNotificationsPage(paginatedNotifications.totalPages);
+    }
+  }, [notificationsPage, paginatedNotifications.totalPages]);
+
+  useEffect(() => {
+    setNotificationsPage(1);
+  }, [currentTab]);
+
+  const goToCompletePayment = (booking) => {
+    const apiId = booking?.apiId;
+    if (!apiId || paymentNavigatingId != null || !bookingNeedsPayment(booking)) return;
+    setPaymentNavigatingId(apiId);
+    navigate(`/payment?bookingId=${apiId}`);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    };
+  }, [avatarPreview]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setName(user.name || '');
+    setPhone(user.phone || '');
+    setSelectedBookingForDetail(null);
+    setBookingFilter('all');
+    setProfileFieldErrors({});
+    setPasswordFieldErrors({});
+    setPasswordError('');
+    setCurrentPassword('');
+    setNewPassword('');
+    setNewPasswordConfirm('');
+  }, [user?.id, user?.name, user?.phone]);
+
+  const displayAvatarUrl = avatarPreview || userAvatarSrc(user?.avatar);
+
+  const handleAvatarImgError = (e) => {
+    e.currentTarget.onerror = null;
+    const label = encodeURIComponent(user?.name || 'Guest');
+    e.currentTarget.src = `https://ui-avatars.com/api/?name=${label}&background=d4af37&color=1a1a1a&size=128`;
+  };
+
+  const openAvatarPicker = () => {
+    if (!avatarUploading) avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const validationError = validateAvatarFile(file, t);
+    if (validationError) {
+      addToast(validationError, 'error');
+      return;
+    }
+
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+    setAvatarUploading(true);
+
+    const result = await uploadCustomerAvatar(file);
+    setAvatarUploading(false);
+
+    if (!result.ok) {
+      URL.revokeObjectURL(previewUrl);
+      setAvatarPreview(null);
+      if (result.error) addToast(result.error, 'error');
+      return;
+    }
+
+    URL.revokeObjectURL(previewUrl);
+    setAvatarPreview(null);
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    if (!guestHasStoredProfilePhoto(user) || avatarUploading) return;
+    setAvatarUploading(true);
+    const result = await removeCustomerAvatar();
+    setAvatarUploading(false);
+    if (!result.ok) {
+      if (result.error) addToast(result.error, 'error');
+      return;
+    }
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
+    }
+  };
+
+  const hasStoredProfilePhoto = guestHasStoredProfilePhoto(user);
 
   if (!user) {
     return (
@@ -129,9 +352,8 @@ export const AccountPage = () => {
     );
   }
 
-  const filteredBookings = bookingFilter === 'all'
-    ? bookings
-    : bookings.filter((b) => b.status === bookingFilter);
+  const unpaidBookingsCount = bookings.filter((b) => bookingNeedsPayment(b)).length;
+  const upcomingBooking = pickUpcomingBooking(bookings);
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -184,16 +406,24 @@ export const AccountPage = () => {
         {/* User Card */}
         <div className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] shadow-lg mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <img
-              src={userAvatarSrc(user.avatar)}
-              alt={user.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-gold shadow-md"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                const label = encodeURIComponent(user.name || 'Guest');
-                e.currentTarget.src = `https://ui-avatars.com/api/?name=${label}&background=d4af37&color=1a1a1a&size=128`;
-              }}
-            />
+            <button
+              type="button"
+              onClick={() => navigate('/account/settings')}
+              className="relative shrink-0 rounded-full group cursor-pointer"
+              aria-label={t('account.changePhoto', 'Change photo')}
+            >
+              <img
+                src={displayAvatarUrl}
+                alt={user.name}
+                className="w-16 h-16 rounded-full object-cover border-2 border-gold shadow-md"
+                onError={handleAvatarImgError}
+              />
+              {avatarUploading && (
+                <span className="absolute inset-0 rounded-full bg-slate-950/55 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-gold animate-spin" aria-hidden />
+                </span>
+              )}
+            </button>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-serif font-bold text-text">{user.name}</h1>
@@ -216,11 +446,13 @@ export const AccountPage = () => {
                     <span>·</span>
                   </>
                 )}
-                <span>
-                  {language === 'km'
-                    ? `សមាជិកតាំងពីឆ្នាំ ${memberSinceYear}`
-                    : `Member since ${memberSinceYear}`}
-                </span>
+                {memberSinceYear && (
+                  <span>
+                    {language === 'km'
+                      ? `សមាជិកតាំងពីឆ្នាំ ${memberSinceYear}`
+                      : `Member since ${memberSinceYear}`}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -338,26 +570,56 @@ export const AccountPage = () => {
               <span className="text-[10px] uppercase tracking-wider text-muted font-bold block">
                 {t('account.loyaltyTier', 'Loyalty Tier Status')}
               </span>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-text">{t('account.goldConcierge', 'Gold Concierge')}</span>
-                <span className="text-gold font-bold">14,200 / 20,000 pts</span>
-              </div>
-              <div className="w-full bg-bg rounded-full h-1.5 overflow-hidden">
-                <div className="bg-gold h-full rounded-full" style={{ width: '71%' }} />
-              </div>
-              <p className="text-[11px] text-muted leading-relaxed font-light">
-                {language === 'km'
-                  ? 'សន្សំបាន ៥,៨០០ ពិន្ទុបន្ថែមទៀតដើម្បីឡើងដល់ឋានៈឯកអគ្គរដ្ឋទូតរាជវង្ស ជាមួយសេវាទូកកាណូតផ្ទាល់ខ្លួនដោយឥតគិតថ្លៃ។'
-                  : 'Earn 5,800 more points to reach Royal Ambassador status with private yacht complimentary transfers.'}
-              </p>
+              {hasLoyaltyData ? (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-text">
+                      {loyaltyTierLabel ||
+                        (language === 'km' ? 'កម្រិតសមាជិក' : 'Member tier')}
+                    </span>
+                    {loyaltyPoints !== null && loyaltyTarget !== null && (
+                      <span className="text-gold font-bold">
+                        {loyaltyPoints.toLocaleString()} / {loyaltyTarget.toLocaleString()} pts
+                      </span>
+                    )}
+                    {loyaltyPoints !== null && loyaltyTarget === null && (
+                      <span className="text-gold font-bold">
+                        {loyaltyPoints.toLocaleString()} pts
+                      </span>
+                    )}
+                  </div>
+                  {loyaltyProgressPercent !== null && (
+                    <div className="w-full bg-bg rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-gold h-full rounded-full"
+                        style={{ width: `${loyaltyProgressPercent}%` }}
+                      />
+                    </div>
+                  )}
+                  {loyaltyPointsRemaining !== null && loyaltyPointsRemaining > 0 && (
+                    <p className="text-[11px] text-muted leading-relaxed font-light">
+                      {language === 'km'
+                        ? `សន្សំបាន ${loyaltyPointsRemaining.toLocaleString()} ពិន្ទុបន្ថែមទៀតដើម្បីឈានដល់កម្រិតបន្ទាប់។`
+                        : `Earn ${loyaltyPointsRemaining.toLocaleString()} more points to reach the next tier.`}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[11px] text-muted leading-relaxed font-light">
+                  {language === 'km'
+                    ? 'ព័ត៌មានកម្មវិធីភាពស្មោះត្រង់មិនទាន់មានសម្រាប់គណនីនេះទេ។'
+                    : 'Loyalty program details are not available for this account yet.'}
+                </p>
+              )}
             </div>
           </aside>
 
           {/* Main Tab Area */}
           <main className="lg:col-span-3 space-y-8">
+            <AnimatePresence mode="wait">
             {currentTab === 'dashboard' && (
-              <div className="space-y-8">
-                {bookings.length > 0 && (
+              <motion.div key="account-dashboard" {...tabPanelMotion} className="space-y-8">
+                {upcomingBooking && (
                   <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-md space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-border">
                       <span className="text-xs uppercase tracking-wider text-gold font-semibold flex items-center gap-1.5">
@@ -365,14 +627,14 @@ export const AccountPage = () => {
                         <span>{language === 'km' ? 'ការស្នាក់នៅរមណីយដ្ឋានបន្ទាប់របស់អ្នក' : 'Upcoming Sanctuary Residency'}</span>
                       </span>
                       <span className="text-xs font-mono font-semibold text-text">
-                        #{bookings[0].id}
+                        #{upcomingBooking.id}
                       </span>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-6 items-start">
                       <img
-                        src={bookingRoomImageSrc(bookings[0].roomImage)}
-                        alt={bookings[0].roomName}
+                        src={bookingRoomImageSrc(upcomingBooking.roomImage)}
+                        alt={upcomingBooking.roomName}
                         className="w-full md:w-44 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
@@ -381,40 +643,61 @@ export const AccountPage = () => {
                       />
                       <div className="space-y-2 flex-1 text-left">
                         <h3 className="text-xl font-serif font-bold text-text">
-                          {bookings[0].roomName}
+                          {upcomingBooking.roomName}
                         </h3>
-                        <p className="text-xs text-gold-light">{bookings[0].resortName}</p>
+                        <p className="text-xs text-gold-light">{upcomingBooking.resortName}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted pt-1">
                           <div>
                             <span className="text-[10px] block uppercase">{t('search.checkIn', 'Check-In')}</span>
-                            <span className="font-medium text-text">{bookings[0].checkIn}</span>
+                            <span className="font-medium text-text">{upcomingBooking.checkIn}</span>
                           </div>
                           <div>
                             <span className="text-[10px] block uppercase">{t('search.checkOut', 'Check-Out')}</span>
-                            <span className="font-medium text-text">{bookings[0].checkOut}</span>
+                            <span className="font-medium text-text">{upcomingBooking.checkOut}</span>
                           </div>
                           <div>
                             <span className="text-[10px] block uppercase">{t('common.totalDue', 'Total Paid')}</span>
                             <span className="font-medium text-gold font-serif">
-                              {formatCurrency(bookings[0].pricing.totalUSD, currency)}
+                              {formatCurrency(upcomingBooking.pricing.totalUSD, currency)}
                             </span>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
-                      <span className="text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{t('confirm.verified', 'Confirmed & Guaranteed')}</span>
-                      </span>
-                      <Button
-                        variant="gold"
-                        size="sm"
-                        onClick={() => setSelectedBookingForDetail(bookings[0])}
-                      >
-                        {language === 'km' ? 'មើលវិញ្ញាបនបត្រកក់' : 'View Full Voucher'}
-                      </Button>
+                    <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs">
+                      {bookingNeedsPayment(upcomingBooking) ? (
+                        <span className="text-amber-400 font-medium flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>
+                            {language === 'km' ? 'ការបង់ប្រាក់មិនទាន់បញ្ចប់' : 'Payment outstanding'}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{t('confirm.verified', 'Confirmed & Guaranteed')}</span>
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {bookingNeedsPayment(upcomingBooking) && (
+                          <Button
+                            variant="gold"
+                            size="sm"
+                            disabled={paymentNavigatingId === upcomingBooking.apiId}
+                            onClick={() => goToCompletePayment(upcomingBooking)}
+                          >
+                            {t('account.completePayment', 'Complete Payment')}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedBookingForDetail(upcomingBooking)}
+                        >
+                          {language === 'km' ? 'មើលវិញ្ញាបនបត្រកក់' : 'View Full Voucher'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -521,27 +804,159 @@ export const AccountPage = () => {
                     </Link>
                   </div>
                   <div className="space-y-3">
-                    {notifications.slice(0, 3).map((n) => (
-                      <div
-                        key={n.id}
-                        className={`p-3.5 rounded-[var(--radius-button)] border text-xs flex items-start justify-between gap-3 ${
-                          n.read ? 'bg-surface border-border/50 text-muted' : 'bg-surface-elevated border-gold/30 text-text'
-                        }`}
-                      >
-                        <div className="space-y-0.5">
-                          <p className="font-semibold text-text">{n.title}</p>
-                          <p className="text-muted leading-relaxed font-light">{n.message}</p>
+                    {notifications.length === 0 ? (
+                      <p className="text-xs text-muted py-2">
+                        {t(
+                          'account.noAlertsYet',
+                          'No alerts yet. Reservation and payment updates will appear here.'
+                        )}
+                      </p>
+                    ) : (
+                      notifications.slice(0, 3).map((n) => (
+                        <div
+                          key={n.id}
+                          role={n.bookingApiId ? 'button' : undefined}
+                          tabIndex={n.bookingApiId ? 0 : undefined}
+                          onClick={() => n.bookingApiId && navigate('/account/bookings')}
+                          onKeyDown={(e) => {
+                            if (n.bookingApiId && (e.key === 'Enter' || e.key === ' ')) {
+                              e.preventDefault();
+                              navigate('/account/bookings');
+                            }
+                          }}
+                          className={`p-3.5 rounded-[var(--radius-button)] border text-xs flex items-start justify-between gap-3 ${
+                            n.read
+                              ? 'bg-surface border-border/50 text-muted'
+                              : 'bg-surface-elevated border-gold/30 text-text'
+                          } ${n.bookingApiId ? 'cursor-pointer hover:border-gold/50' : ''}`}
+                        >
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-text">{n.title}</p>
+                            <p className="text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
+                          </div>
+                          <span className="text-[10px] text-muted shrink-0">{n.date}</span>
                         </div>
-                        <span className="text-[10px] text-muted shrink-0">{n.date}</span>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {currentTab === 'bookings' && (
-              <div className="space-y-6">
+              <motion.div key="account-bookings" {...tabPanelMotion} className="space-y-6">
+                {bookingsError && (
+                  <div className="rounded-[var(--radius-card)] border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-text">
+                    <p className="font-medium text-rose-200/90">{bookingsError}</p>
+                    <button
+                      type="button"
+                      className="text-gold hover:underline mt-2 cursor-pointer"
+                      onClick={() => refreshMyBookings()}
+                    >
+                      {t('common.tryAgain', 'Try again')}
+                    </button>
+                  </div>
+                )}
+
+                {bookingsLoading && bookings.length === 0 && !bookingsError && (
+                  <p className="text-xs text-muted text-center py-8">
+                    {t('account.loadingReservations', 'Loading your reservations…')}
+                  </p>
+                )}
+
+                {unpaidBookingsCount > 0 && (
+                  <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-text">
+                    <p className="font-medium text-amber-200/90">
+                      {language === 'km'
+                        ? `ការកក់ ${unpaidBookingsCount} ដែលរង់ចាំការបង់ប្រាក់`
+                        : `${unpaidBookingsCount} reservation${unpaidBookingsCount > 1 ? 's' : ''} awaiting payment`}
+                    </p>
+                    <p className="text-muted mt-1">
+                      {t(
+                        'account.unpaidBookingsHint',
+                        'You have reservations waiting for payment. Use Complete Payment to continue with KHQR.'
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {(myReviewsLoading || myGuestReviews.length > 0) && (
+                  <div className="space-y-3 pb-6 border-b border-border">
+                    <h3 className="text-sm font-serif font-bold text-text">
+                      {t('account.myReviews', 'Your Reviews')}
+                    </h3>
+                    <p className="text-[11px] text-muted">
+                      {t(
+                        'account.reviewsHomeHint',
+                        'Published reviews appear on the Home page after staff approval.'
+                      )}
+                    </p>
+                    {myReviewsLoading && myGuestReviews.length === 0 && (
+                      <p className="text-xs text-muted">{t('account.loadingReviews', 'Loading your reviews…')}</p>
+                    )}
+                    <div className="space-y-3">
+                      {myGuestReviews.map((rev) => (
+                        <div
+                          key={rev.id}
+                          className="rounded-[var(--radius-card)] border border-border bg-surface/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1.5 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StarRatingDisplay value={rev.rating} />
+                              <span className="text-[10px] uppercase font-semibold text-muted">
+                                {rev.status === 'pending'
+                                  ? t('account.reviewStatusPending', 'Awaiting approval')
+                                  : rev.status === 'approved'
+                                    ? t('account.reviewStatusApproved', 'Published')
+                                    : t('account.reviewStatusRejected', 'Not published')}
+                              </span>
+                            </div>
+                            {rev.title && (
+                              <p className="text-sm font-semibold text-text truncate">{rev.title}</p>
+                            )}
+                            <p className="text-xs text-muted line-clamp-2">{rev.comment}</p>
+                            <p className="text-[10px] text-muted">
+                              {[rev.roomLabel, rev.locationLabel].filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                          {rev.status === 'pending' && (
+                            <div className="flex flex-wrap gap-2 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => setEditingReview(rev)}
+                              >
+                                {t('account.editReview', 'Edit')}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs text-rose-400 border-rose-500/30"
+                                onClick={async () => {
+                                  try {
+                                    await deleteGuestReview(re.id);
+                                    addToast(t('account.reviewDeleted', 'Review removed.'), 'info');
+                                    await reloadMyGuestReviews();
+                                    await refreshMyBookings();
+                                  } catch (err) {
+                                    addToast(
+                                      getApiErrorMessage(err, t('account.reviewDeleteFailed', 'Unable to delete review.')),
+                                      'error'
+                                    );
+                                  }
+                                }}
+                              >
+                                {t('account.deleteReview', 'Delete')}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between gap-4 pb-4 border-b border-border">
                   <div>
                     <h2 className="text-xl font-serif font-bold text-text">
@@ -557,6 +972,15 @@ export const AccountPage = () => {
                   <div className="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-[var(--radius-button)]">
                     {[
                       { key: 'all', label: language === 'km' ? 'ទាំងអស់' : 'All' },
+                      ...(unpaidBookingsCount > 0
+                        ? [
+                            {
+                              key: 'unpaid',
+                              label: language === 'km' ? 'រង់ចាំបង់' : 'Awaiting payment',
+                            },
+                          ]
+                        : []),
+                      { key: 'pending', label: language === 'km' ? 'កំពុងរង់ចាំ' : 'Pending' },
                       { key: 'confirmed', label: language === 'km' ? 'បានបញ្ជាក់' : 'Confirmed' },
                       { key: 'completed', label: language === 'km' ? 'បានបញ្ចប់' : 'Completed' },
                       { key: 'cancelled', label: language === 'km' ? 'បានបោះបង់' : 'Cancelled' },
@@ -586,9 +1010,9 @@ export const AccountPage = () => {
                       </p>
                     </div>
                   ) : (
-                    filteredBookings.map((b) => (
+                    paginatedBookings.items.map((b, index) => (
+                      <StaggerItem key={b.id} index={index}>
                       <div
-                        key={b.id}
                         className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-sm flex flex-col md:flex-row items-start justify-between gap-6"
                       >
                         <div className="flex flex-col sm:flex-row gap-5 items-start">
@@ -605,33 +1029,60 @@ export const AccountPage = () => {
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono font-semibold text-gold">#{b.id}</span>
                               <span
-                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                                  b.status === 'confirmed'
-                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                    : b.status === 'completed'
-                                    ? 'bg-surface-elevated text-text border border-border'
-                                    : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                                }`}
+                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${bookingStatusBadgeClass(
+                                  b.status
+                                )}`}
                               >
-                                {b.status === 'confirmed' ? (language === 'km' ? 'បានបញ្ជាក់' : 'confirmed') : b.status}
+                                {bookingStatusLabel(b.status, language)}
                               </span>
                             </div>
                             <h3 className="text-lg font-serif font-bold text-text">{b.roomName}</h3>
+                            {b.rooms?.length > 1 && (
+                              <p className="text-[11px] text-muted">
+                                {b.rooms.map((r) => r.label).join(' · ')}
+                              </p>
+                            )}
                             <p className="text-xs text-muted">{b.resortName}</p>
                             <p className="text-xs text-text-secondary pt-1">
                               {b.checkIn} — {b.checkOut} ({b.nights} {b.nights === 1 ? t('common.night', 'night') : t('common.nights', 'nights')})
                             </p>
+                            {bookingNeedsPayment(b) && (
+                              <p className="text-[10px] font-semibold uppercase text-amber-400/90 pt-0.5">
+                                {t('account.paymentUnpaid', 'Payment required')}
+                                {b.paymentStatus && b.paymentStatus !== 'unpaid'
+                                  ? ` · ${b.paymentStatus}`
+                                  : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
 
                         <div className="w-full md:w-auto flex md:flex-col items-center md:items-end justify-between gap-3 border-t md:border-t-0 pt-4 md:pt-0 border-border">
                           <div className="text-left md:text-right">
-                            <span className="text-[10px] uppercase text-muted block">{t('common.totalDue', 'Total Paid')}</span>
+                            <span className="text-[10px] uppercase text-muted block">
+                              {bookingNeedsPayment(b)
+                                ? t('account.balanceDue', 'Balance due')
+                                : t('common.totalDue', 'Total Paid')}
+                            </span>
                             <span className="text-lg font-bold font-serif text-gold">
-                              {formatCurrency(b.pricing.totalUSD, currency)}
+                              {formatCurrency(
+                                bookingNeedsPayment(b) ? b.balanceDue : b.pricing.totalUSD,
+                                currency
+                              )}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {bookingNeedsPayment(b) && (
+                              <Button
+                                variant="gold"
+                                size="sm"
+                                className="text-xs"
+                                disabled={paymentNavigatingId === b.apiId}
+                                onClick={() => goToCompletePayment(b)}
+                              >
+                                {t('account.completePayment', 'Complete Payment')}
+                              </Button>
+                            )}
                             {b.status === 'confirmed' && (
                               <Button
                                 variant="outline"
@@ -642,8 +1093,18 @@ export const AccountPage = () => {
                                 {language === 'km' ? 'បោះបង់' : 'Cancel'}
                               </Button>
                             )}
+                            {b.reviewEligibility?.can_review && (
+                              <Button
+                                variant="gold"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => setBookingForReview(b)}
+                              >
+                                {t('home.writeReview', 'Write a Review')}
+                              </Button>
+                            )}
                             <Button
-                              variant="gold"
+                              variant="outline"
                               size="sm"
                               className="text-xs"
                               onClick={() => setSelectedBookingForDetail(b)}
@@ -653,14 +1114,27 @@ export const AccountPage = () => {
                           </div>
                         </div>
                       </div>
+                      </StaggerItem>
                     ))
                   )}
                 </div>
-              </div>
+
+                {paginatedBookings.showPagination && (
+                  <ListPagination
+                    page={paginatedBookings.page}
+                    totalPages={paginatedBookings.totalPages}
+                    total={paginatedBookings.total}
+                    startIndex={paginatedBookings.startIndex}
+                    endIndex={paginatedBookings.endIndex}
+                    onPageChange={setBookingsPage}
+                    language={language}
+                  />
+                )}
+              </motion.div>
             )}
 
             {currentTab === 'notifications' && (
-              <div className="space-y-6">
+              <motion.div key="account-notifications" {...tabPanelMotion} className="space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div>
                     <h2 className="text-xl font-serif font-bold text-text">
@@ -675,11 +1149,29 @@ export const AccountPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {notifications.map((n) => (
-                    <div
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)]">
+                      <p className="text-xs text-muted max-w-sm mx-auto">
+                        {t(
+                          'account.noAlertsYet',
+                          'No alerts yet. Reservation and payment updates will appear here.'
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                  paginatedNotifications.items.map((n, index) => (
+                    <motion.div
                       key={n.id}
-                      onClick={() => markNotificationRead(n.id)}
-                      className={`p-5 rounded-[var(--radius-card)] border transition-all cursor-pointer flex items-start justify-between gap-4 ${
+                      layout
+                      initial={{ opacity: 0, x: reduced ? 0 : 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ ...transition(duration.card), delay: reduced ? 0 : Math.min(index, 4) * 0.05 }}
+                      onClick={() => {
+                        markNotificationRead(n.id);
+                        if (n.bookingApiId) navigate('/account/bookings');
+                      }}
+                      className={`p-5 rounded-[var(--radius-card)] border transition-colors cursor-pointer flex items-start justify-between gap-4 ${
                         n.read
                           ? 'bg-surface border-border text-muted'
                           : 'bg-surface-elevated border-gold/40 shadow-sm text-text'
@@ -692,17 +1184,30 @@ export const AccountPage = () => {
                             <span className="w-2 h-2 rounded-full bg-gold shrink-0" />
                           )}
                         </div>
-                        <p className="text-xs text-muted leading-relaxed font-light">{n.message}</p>
+                        <p className="text-xs text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
                       </div>
                       <span className="text-[11px] text-muted shrink-0">{n.date}</span>
-                    </div>
-                  ))}
+                    </motion.div>
+                  ))
+                  )}
                 </div>
-              </div>
+
+                {paginatedNotifications.showPagination && (
+                  <ListPagination
+                    page={paginatedNotifications.page}
+                    totalPages={paginatedNotifications.totalPages}
+                    total={paginatedNotifications.total}
+                    startIndex={paginatedNotifications.startIndex}
+                    endIndex={paginatedNotifications.endIndex}
+                    onPageChange={setNotificationsPage}
+                    language={language}
+                  />
+                )}
+              </motion.div>
             )}
 
             {currentTab === 'favorites' && (
-              <div className="space-y-8">
+              <motion.div key="account-favorites" {...tabPanelMotion} className="space-y-8">
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-border">
                   <div>
                     <h2 className="text-xl font-serif font-bold text-text">
@@ -864,11 +1369,11 @@ export const AccountPage = () => {
                     )}
                   </>
                 )}
-              </div>
+              </motion.div>
             )}
 
             {currentTab === 'settings' && (
-              <div className="space-y-8">
+              <motion.div key="account-settings" {...tabPanelMotion} className="space-y-8">
                 <div>
                   <h2 className="text-xl font-serif font-bold text-text">
                     {t('account.settings', 'Preferences & Profile')}
@@ -878,6 +1383,72 @@ export const AccountPage = () => {
                       ? 'គ្រប់គ្រងព័ត៌មានផ្ទាល់ខ្លួន និងការកំណត់ការបង្ហាញកម្មវិធី'
                       : 'Manage your personal information and application preferences'}
                   </p>
+                </div>
+
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept={AVATAR_ACCEPT}
+                  className="hidden"
+                  onChange={handleAvatarFileChange}
+                  aria-hidden
+                  tabIndex={-1}
+                />
+
+                <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
+                    {t('account.profilePhoto', 'Profile photo')}
+                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                    <div className="relative shrink-0 mx-auto sm:mx-0">
+                      <img
+                        src={displayAvatarUrl}
+                        alt={user.name}
+                        className="w-24 h-24 rounded-full object-cover border-2 border-gold/60 shadow-md"
+                        onError={handleAvatarImgError}
+                      />
+                      {avatarUploading && (
+                        <span className="absolute inset-0 rounded-full bg-slate-950/55 flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-gold animate-spin" aria-hidden />
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-3 text-center sm:text-left">
+                      <p className="text-xs text-muted leading-relaxed">
+                        {t(
+                          'account.profilePhotoHint',
+                          'JPG or PNG, up to 2 MB. Minimum 100×100 pixels.'
+                        )}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <Button
+                          type="button"
+                          variant="gold"
+                          size="sm"
+                          disabled={avatarUploading}
+                          onClick={openAvatarPicker}
+                          leftIcon={<Camera className="w-4 h-4" />}
+                        >
+                          {avatarUploading
+                            ? t('account.profilePhotoUploading', 'Uploading photo…')
+                            : hasStoredProfilePhoto
+                              ? t('account.changePhoto', 'Change photo')
+                              : t('account.uploadPhoto', 'Upload photo')}
+                        </Button>
+                        {hasStoredProfilePhoto && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={avatarUploading}
+                            onClick={handleRemoveProfilePhoto}
+                          >
+                            {t('account.removePhoto', 'Remove photo')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <form onSubmit={handleSaveSettings} className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
@@ -1033,8 +1604,9 @@ export const AccountPage = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </main>
         </div>
       </div>
@@ -1090,7 +1662,17 @@ export const AccountPage = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-wrap justify-end gap-3 pt-2">
+              {bookingNeedsPayment(selectedBookingForDetail) && (
+                <Button
+                  variant="gold"
+                  size="sm"
+                  disabled={paymentNavigatingId === selectedBookingForDetail.apiId}
+                  onClick={() => goToCompletePayment(selectedBookingForDetail)}
+                >
+                  {t('account.completePayment', 'Complete Payment')}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1101,7 +1683,7 @@ export const AccountPage = () => {
                 {language === 'km' ? 'បោះពុម្ពវិញ្ញាបនបត្រ' : 'Print Voucher'}
               </Button>
               <Button
-                variant="gold"
+                variant="outline"
                 size="sm"
                 onClick={() => setSelectedBookingForDetail(null)}
               >
@@ -1111,6 +1693,31 @@ export const AccountPage = () => {
           </div>
         </Modal>
       )}
+
+      <ReviewFormModal
+        isOpen={Boolean(bookingForReview)}
+        booking={bookingForReview}
+        onClose={() => setBookingForReview(null)}
+        t={t}
+        language={language}
+        onSubmitted={async () => {
+          addToast(t('home.reviewSubmitted', 'Thank you for your review. It has been submitted and is awaiting approval.'), 'success');
+          await refreshMyBookings();
+          await reloadMyGuestReviews();
+        }}
+      />
+
+      <ReviewFormModal
+        isOpen={Boolean(editingReview)}
+        editingReview={editingReview}
+        onClose={() => setEditingReview(null)}
+        t={t}
+        language={language}
+        onSubmitted={async () => {
+          addToast(t('account.reviewUpdated', 'Review updated.'), 'success');
+          await reloadMyGuestReviews();
+        }}
+      />
     </div>
   );
 };

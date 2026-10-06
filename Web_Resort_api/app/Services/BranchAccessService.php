@@ -80,6 +80,15 @@ class BranchAccessService
     ): void {
         $filterId = $filterBranchId ? (int) $filterBranchId : null;
 
+        // Website guests are scoped by user_id on bookings; branch staff assignments do not apply.
+        if ($user?->isGuestAccount()) {
+            if ($filterId) {
+                $query->where($column, $filterId);
+            }
+
+            return;
+        }
+
         if ($this->bypassesBranchScope($user)) {
             if ($filterId) {
                 $query->where($column, $filterId);
@@ -139,6 +148,10 @@ class BranchAccessService
      */
     public function applyBookingBranchScope(Builder $query, ?User $user, mixed $filterBranchId = null): void
     {
+        if ($user?->isGuestAccount()) {
+            return;
+        }
+
         $filterId = $filterBranchId ? (int) $filterBranchId : null;
         $table = $query->getModel()->getTable();
 

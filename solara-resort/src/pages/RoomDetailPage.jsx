@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useMotionPresets } from '../motion/useMotionPresets.js';
 import {
   Users,
   BedDouble,
@@ -20,6 +22,7 @@ import { FavoriteButton } from '../components/catalog/FavoriteButton.jsx';
 export const RoomDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { reduced, transition, duration } = useMotionPresets();
   const {
     currency,
     setRoomForBooking,
@@ -149,12 +152,19 @@ export const RoomDetailPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         <div className="space-y-4">
-          <div className="w-full aspect-[16/9] max-h-[500px] rounded-[var(--radius-card)] overflow-hidden bg-slate-950 border border-border shadow-lg">
-            <img
-              src={heroPhoto}
-              alt={room.name}
-              className="w-full h-full object-cover transition-opacity duration-300"
-            />
+          <div className="w-full aspect-[16/9] max-h-[500px] rounded-[var(--radius-card)] overflow-hidden bg-slate-950 border border-border shadow-lg relative">
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={heroPhoto}
+                src={heroPhoto}
+                alt={room.name}
+                className="w-full h-full object-cover absolute inset-0"
+                initial={{ opacity: 0, scale: reduced ? 1 : 1.01 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={transition(duration.button)}
+              />
+            </AnimatePresence>
           </div>
 
           {gallery.length > 1 && (

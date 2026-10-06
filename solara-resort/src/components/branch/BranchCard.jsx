@@ -15,13 +15,13 @@ export const BranchCard = ({ branch, featured = false }) => {
 
   return (
     <div
-      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col ${
+      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full w-full ${
         featured ? 'lg:col-span-2 md:flex-row' : ''
       }`}
     >
       <div
-        className={`relative overflow-hidden bg-slate-900 ${
-          featured ? 'md:w-1/2 aspect-[16/10] md:aspect-auto' : 'aspect-[16/10]'
+        className={`relative overflow-hidden bg-slate-900 shrink-0 ${
+          featured ? 'md:w-1/2 aspect-[16/10] md:aspect-auto' : 'aspect-[16/10] w-full'
         }`}
       >
         {item.featuredImage ? (
@@ -63,23 +63,23 @@ export const BranchCard = ({ branch, featured = false }) => {
         </div>
       </div>
 
-      <div className={`p-6 flex flex-col justify-between flex-1 ${featured ? 'md:w-1/2' : ''}`}>
-        <div>
-          <div className="flex items-center gap-1.5 text-xs text-muted mb-2">
+      <div className={`p-6 flex flex-col flex-1 min-h-0 ${featured ? 'md:w-1/2' : ''}`}>
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-1.5 text-xs text-muted mb-2 min-h-[1.125rem]">
             <MapPin className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span className="truncate">{item.location || item.address}</span>
+            <span className="truncate">{item.location || item.address || '\u00a0'}</span>
           </div>
 
-          <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2">
+          <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2 min-h-[1.75rem]">
             <Link to={detailPath}>{item.name}</Link>
           </h3>
 
-          <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4">
-            {item.description}
+          <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">
+            {item.description || '\u00a0'}
           </p>
 
-          {/* Key Amenities */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] text-text-secondary mb-4">
+          {/* Key Amenities — fixed block height so cards align in the grid */}
+          <div className="flex flex-wrap items-start content-start gap-x-2 gap-y-1.5 text-[11px] text-text-secondary mb-4 min-h-[3.75rem]">
             {(item.amenities || []).slice(0, 4).map((amenity) => (
               <span
                 key={amenity}
@@ -91,19 +91,24 @@ export const BranchCard = ({ branch, featured = false }) => {
             ))}
           </div>
 
-          {/* Room count / inventory */}
-          {(item.roomsCount ?? 0) > 0 && (
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-4">
-              <BedDouble className="w-3.5 h-3.5 text-gold shrink-0" />
-              <span>
-                {item.roomsCount} {language === 'km' ? 'បន្ទប់ស្នាក់នៅ' : 'villas & quarters at this branch'}
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-4 min-h-[1.25rem]">
+            {(item.roomsCount ?? 0) > 0 ? (
+              <>
+                <BedDouble className="w-3.5 h-3.5 text-gold shrink-0" />
+                <span>
+                  {item.roomsCount} {language === 'km' ? 'បន្ទប់ស្នាក់នៅ' : 'villas & quarters at this branch'}
+                </span>
+              </>
+            ) : (
+              <span className="invisible select-none" aria-hidden>
+                —
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-auto">
-          <div>
+        <div className="pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-4 items-end mt-auto shrink-0">
+          <div className="min-h-[4.75rem] flex flex-col justify-end">
             {item.startingPrice > 0 ? (
               <div>
                 <span className="block text-[10px] uppercase tracking-wider text-muted font-medium mb-0.5">
@@ -126,8 +131,8 @@ export const BranchCard = ({ branch, featured = false }) => {
             variant="gold"
             size="sm"
             onClick={() => navigate(detailPath)}
-            rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-            className="w-full sm:w-auto font-medium text-xs shadow-sm hover:shadow-md"
+            rightIcon={<ArrowRight className="w-3.5 h-3.5 shrink-0" />}
+            className="w-full sm:w-auto sm:max-w-[11.5rem] font-medium text-xs shadow-sm hover:shadow-md whitespace-normal sm:whitespace-nowrap text-center"
           >
             {t('branches.exploreRoomsAtBranch', 'Explore Rooms at this Branch')}
           </Button>

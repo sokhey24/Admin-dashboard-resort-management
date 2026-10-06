@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useMotionPresets } from '../motion/useMotionPresets.js';
 import {
   Check,
   CreditCard,
@@ -13,6 +15,7 @@ import {
 import { Button } from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
+import { RoomUnavailablePanel } from '../components/booking/RoomUnavailablePanel.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { useApp } from '../context/AppContext.jsx';
 import { formatCurrency } from '../util/currency.js';
@@ -42,6 +45,12 @@ export const BookingPage = () => {
   } = useApp();
 
   const [step, setStep] = useState(1);
+  const { reduced, transition, duration } = useMotionPresets();
+  const stepMotion = {
+    initial: { opacity: 0, x: reduced ? 0 : 12 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: reduced ? 0 : -12 },
+  };
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -77,7 +86,13 @@ export const BookingPage = () => {
 
   const activeBranchId = bookingDraft.branchId || currentRoom?.branchId;
 
-  const { quote, loading: quoteLoading, error: quoteError, refetch: refetchQuote } = useBookingQuote({
+  const {
+    quote,
+    loading: quoteLoading,
+    error: quoteError,
+    roomAvailability,
+    refetch: refetchQuote,
+  } = useBookingQuote({
     roomId: bookingDraft.roomId,
     branchId: activeBranchId,
     checkIn: bookingDraft.checkIn,
@@ -272,8 +287,13 @@ export const BookingPage = () => {
               const isCurrent = step === s.num;
               return (
                 <div key={s.num} className="relative z-10 flex flex-col items-center">
-                  <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                  <motion.div
+                    layout
+                    animate={{
+                      scale: isCurrent && !reduced ? 1.05 : 1,
+                    }}
+                    transition={transition(duration.micro)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                       isCompleted
                         ? 'bg-gold text-slate-950 font-bold'
                         : isCurrent
@@ -282,7 +302,7 @@ export const BookingPage = () => {
                     }`}
                   >
                     {isCompleted ? <Check className="w-4 h-4" /> : s.num}
-                  </div>
+                  </motion.div>
                   <span
                     className={`text-[11px] mt-2 font-medium uppercase tracking-wider ${
                       isCurrent || isCompleted ? 'text-gold' : 'text-muted'
@@ -298,8 +318,14 @@ export const BookingPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+            <AnimatePresence mode="wait">
             {step === 1 && (
-              <div className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left">
+              <motion.div
+                key="booking-step-1"
+                {...stepMotion}
+                transition={transition(duration.page)}
+                className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left"
+              >
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div>
                     <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block">
@@ -405,7 +431,23 @@ export const BookingPage = () => {
                   </div>
                 </div>
 
-                {quoteError && <ErrorState message={quoteError} />}
+                {roomAvailability?.length > 0 ? (
+                  <RoomUnavailablePanel
+                    rooms={roomAvailability}
+                    language={language}
+                    t={t}
+                    requestedCheckIn={bookingDraft.checkIn}
+                    requestedCheckOut={bookingDraft.checkOut}
+                    onUseCheckInDate={(dates) => updateBookingDraft(dates)}
+                  />
+                ) : (
+                  quoteError && (
+                    <ErrorState
+                      title={t('booking.availabilityTitle', 'Room unavailable')}
+                      message={quoteError}
+                    />
+                  )
+                )}
 
                 <div className="flex justify-end pt-4 border-t border-border">
                   <Button
@@ -424,11 +466,16 @@ export const BookingPage = () => {
                     {t('booking.proceedGuest', 'Proceed to Guest Details')}
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {step === 2 && (
-              <div className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left">
+              <motion.div
+                key="booking-step-2"
+                {...stepMotion}
+                transition={transition(duration.page)}
+                className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left"
+              >
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div>
                     <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block">
@@ -522,11 +569,16 @@ export const BookingPage = () => {
                     {t('booking.continuePayment', 'Continue to Payment')}
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {step === 3 && (
-              <div className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left">
+              <motion.div
+                key="booking-step-3"
+                {...stepMotion}
+                transition={transition(duration.page)}
+                className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] space-y-6 text-left"
+              >
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div>
                     <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block">
@@ -626,8 +678,9 @@ export const BookingPage = () => {
                           : t('booking.authorizeConfirm', 'Confirm Reservation')}
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           <aside className="space-y-6">

@@ -12,6 +12,7 @@ import { useSearchCriteria } from '../hooks/useSearch.js';
 import { roomCatalogParamsFromCriteria } from '../util/searchParams.js';
 import { Pagination } from '../components/common/Pagination.jsx';
 import villaImage from '../assets/images/villa_ocean_luxury_1790692975563.jpg';
+import { StaggerItem } from '../components/motion/StaggerItem.jsx';
 
 export const RoomsPage = () => {
   const [searchParams] = useSearchParams();
@@ -157,9 +158,11 @@ export const RoomsPage = () => {
                 }}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredRooms.map((room) => (
-                  <RoomCard key={room.id} room={room} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch auto-rows-fr">
+                {filteredRooms.map((room, index) => (
+                  <StaggerItem key={room.id} index={index}>
+                    <RoomCard room={room} />
+                  </StaggerItem>
                 ))}
               </div>
             )}

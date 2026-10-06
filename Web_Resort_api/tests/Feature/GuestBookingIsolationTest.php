@@ -98,8 +98,58 @@ class GuestBookingIsolationTest extends TestCase
         $list = $this->getJson('/api/customer/bookings')->assertOk()->json('data');
         $this->assertCount(1, $list);
         $this->assertSame($bob->id, (int) $list[0]['user_id']);
+        $this->assertNotEmpty($list[0]['rooms']);
+        $this->assertSame('G-101', $list[0]['rooms'][0]['room_number']);
+        $this->assertNotEmpty($list[0]['rooms'][0]['room_type']['name'] ?? null);
 
         $this->getJson("/api/customer/bookings/{$aliceBooking}")->assertForbidden();
+    }
+
+    public function test_guest_cannot_cancel_another_customers_booking(): void
+    {
+        $resort = Resort::create(['name' => 'C', 'slug' => 'c', 'address' => 'x', 'city' => 'y']);
+        $room = $this->makeRoom($resort);
+
+        $alice = $this->customer('alice-cancel@example.com');
+        $bob = $this->customer('bob-cancel@example.com');
+
+        Sanctum::actingAs($alice);
+        $aliceBooking = $this->postJson('/api/customer/bookings', [
+            'resort_id' => $resort->id,
+            'room_ids' => [$room->id],
+            'check_in' => '2027-08-01',
+            'check_out' => '2027-08-03',
+            'adults' => 2,
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($bob);
+        $this->putJson("/api/customer/bookings/{$aliceBooking}", [
+            'status' => 'cancelled',
+        ])->assertForbidden();
+    }
+
+    public function test_guest_can_cancel_own_confirmed_booking(): void
+    {
+        $resort = Resort::create(['name' => 'D', 'slug' => 'd', 'address' => 'x', 'city' => 'y']);
+        $room = $this->makeRoom($resort);
+        $guest = $this->customer('self-cancel@example.com');
+
+        Sanctum::actingAs($guest);
+        $bookingId = $this->postJson('/api/customer/bookings', [
+            'resort_id' => $resort->id,
+            'room_ids' => [$room->id],
+            'check_in' => '2027-09-01',
+            'check_out' => '2027-09-03',
+            'adults' => 2,
+        ])->assertCreated()->json('data.id');
+
+        Booking::findOrFail($bookingId)->update(['status' => 'confirmed']);
+
+        $this->putJson("/api/customer/bookings/{$bookingId}", [
+            'status' => 'cancelled',
+        ])->assertOk();
+
+        $this->assertSame('cancelled', Booking::findOrFail($bookingId)->status);
     }
 
     public function test_website_booking_sets_source(): void

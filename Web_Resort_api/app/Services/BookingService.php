@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\RoomUnavailableException;
 use App\Models\Booking;
 use App\Models\BookingStatusLog;
 use App\Models\Coupon;
@@ -116,10 +117,131 @@ class BookingService
         $busy = $this->overlappingRoomIds($roomIds, $checkIn, $checkOut, $ignoreBookingId);
         if ($busy !== []) {
             $numbers = Room::whereIn('id', $busy)->pluck('room_number')->implode(', ');
-            throw ValidationException::withMessages([
-                'room_ids' => ["Room(s) {$numbers} are not available for the selected dates."],
-            ]);
+            $message = "Room(s) {$numbers} are not available for the selected dates.";
+            throw new RoomUnavailableException(
+                $message,
+                $this->buildUnavailableRoomsPayload($busy, $checkIn, $checkOut, $ignoreBookingId)
+            );
         }
+    }
+
+    /**
+     * Blocking reservation windows for a room (dates only — safe for guest-facing APIs).
+     *
+     * @return array<int, array{check_in: string, check_out: string}>
+     */
+    public function blockingStayWindowsForRoom(int $roomId, ?int $ignoreBookingId = null): array
+    {
+        $q = Booking::query()
+            ->whereIn('status', Booking::BLOCKING_STATUSES)
+            ->whereNotNull('check_in')
+            ->whereNotNull('check_out')
+            ->whereHas('rooms', function ($query) use ($roomId) {
+                $query->where('rooms.id', $roomId);
+            })
+            ->orderBy('check_in');
+
+        if ($ignoreBookingId) {
+            $q->where('id', '!=', $ignoreBookingId);
+        }
+
+        $windows = [];
+        foreach ($q->get(['check_in', 'check_out']) as $booking) {
+            $windows[] = [
+                'check_in' => Carbon::parse($booking->check_in)->toDateString(),
+                'check_out' => Carbon::parse($booking->check_out)->toDateString(),
+            ];
+        }
+
+        return $windows;
+    }
+
+    /**
+     * @param  array<int, array{check_in: string, check_out: string}>  $windows
+     * @return array<int, array{check_in: string, check_out: string}>
+     */
+    public function overlappingStayWindows(array $windows, Carbon $requestedIn, Carbon $requestedOut): array
+    {
+        $conflicts = [];
+        foreach ($windows as $window) {
+            if ($this->datesOverlap($window['check_in'], $window['check_out'], $requestedIn, $requestedOut)) {
+                $conflicts[] = $window;
+            }
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * First check-in date (on or after $requestedCheckIn) where a stay of $stayNights fits.
+     *
+     * @param  array<int, array{check_in: string, check_out: string}>  $blockingWindows
+     */
+    public function nextAvailableCheckInForStayLength(
+        array $blockingWindows,
+        Carbon $requestedCheckIn,
+        int $stayNights,
+        int $maxIterations = 366,
+    ): ?string {
+        $stayNights = max(1, $stayNights);
+        $candidate = $requestedCheckIn->copy()->startOfDay();
+
+        for ($i = 0; $i < $maxIterations; $i++) {
+            $candidateOut = $candidate->copy()->addDays($stayNights);
+            $overlapping = $this->overlappingStayWindows($blockingWindows, $candidate, $candidateOut);
+            if ($overlapping === []) {
+                return $candidate->toDateString();
+            }
+
+            $latestCheckout = null;
+            foreach ($overlapping as $window) {
+                $checkOut = Carbon::parse($window['check_out'])->startOfDay();
+                if ($latestCheckout === null || $checkOut->gt($latestCheckout)) {
+                    $latestCheckout = $checkOut;
+                }
+            }
+
+            if ($latestCheckout === null) {
+                break;
+            }
+
+            if ($latestCheckout->lte($candidate)) {
+                $latestCheckout = $latestCheckout->copy()->addDay();
+            }
+            $candidate = $latestCheckout->copy()->startOfDay();
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function buildUnavailableRoomsPayload(
+        array $roomIds,
+        Carbon $checkIn,
+        Carbon $checkOut,
+        ?int $ignoreBookingId = null,
+    ): array {
+        $stayNights = max(1, (int) $checkIn->copy()->startOfDay()->diffInDays($checkOut->copy()->startOfDay()));
+        $rooms = Room::whereIn('id', $roomIds)->get(['id', 'room_number']);
+        $payload = [];
+
+        foreach ($rooms as $room) {
+            $windows = $this->blockingStayWindowsForRoom((int) $room->id, $ignoreBookingId);
+            $conflicts = $this->overlappingStayWindows($windows, $checkIn, $checkOut);
+            $payload[] = [
+                'room_id' => (int) $room->id,
+                'room_number' => $room->room_number,
+                'requested_check_in' => $checkIn->toDateString(),
+                'requested_check_out' => $checkOut->toDateString(),
+                'requested_nights' => $stayNights,
+                'conflicts' => $conflicts,
+                'next_available_from' => $this->nextAvailableCheckInForStayLength($windows, $checkIn, $stayNights),
+            ];
+        }
+
+        return $payload;
     }
 
     public function createBooking(array $data, ?User $actor = null): Booking

@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useMotionPresets } from '../motion/useMotionPresets.js';
 import {
   CheckCircle2,
   FileText,
@@ -19,6 +21,7 @@ export const ConfirmationPage = () => {
   const navigate = useNavigate();
   const bookingId = searchParams.get('bookingId');
   const { currency, t } = useApp();
+  const { staggerContainer, staggerItem } = useMotionPresets();
 
   const { booking, loading, error, reload } = useBookingDetail(bookingId);
 
@@ -48,12 +51,20 @@ export const ConfirmationPage = () => {
   return (
     <div className="w-full min-h-screen pt-28 pb-24 bg-bg flex items-center justify-center">
       <div className="max-w-2xl w-full mx-auto px-4 sm:px-6">
-        <div className="bg-surface border border-border rounded-[var(--radius-modal)] p-8 sm:p-12 shadow-2xl text-center space-y-8">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto shadow-inner">
+        <motion.div
+          className="bg-surface border border-border rounded-[var(--radius-modal)] p-8 sm:p-12 shadow-2xl text-center space-y-8"
+          variants={staggerContainer(0.12)}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div
+            variants={staggerItem(8)}
+            className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto shadow-inner"
+          >
             <CheckCircle2 className="w-8 h-8" />
-          </div>
+          </motion.div>
 
-          <div className="space-y-2">
+          <motion.div variants={staggerItem(10)} className="space-y-2">
             <span className="text-xs uppercase tracking-[0.25em] text-gold font-bold block">
               {t('confirm.guaranteed', 'Reservation Saved')}
             </span>
@@ -66,9 +77,9 @@ export const ConfirmationPage = () => {
                 'Your reservation is recorded with Solara. Payment status reflects what the resort has received.'
               )}
             </p>
-          </div>
+          </motion.div>
 
-          <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border/80 flex items-center justify-between">
+          <motion.div variants={staggerItem(10)} className="p-4 rounded-[var(--radius-button)] bg-bg border border-border/80 flex items-center justify-between">
             <div className="text-left">
               <span className="text-[10px] uppercase text-muted block">{t('confirm.code', 'Confirmation Code')}</span>
               <span className="text-xl font-mono font-bold text-gold">#{booking.id}</span>
@@ -79,9 +90,9 @@ export const ConfirmationPage = () => {
                 {booking.status} · {booking.paymentStatus}
               </span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="p-6 rounded-[var(--radius-card)] bg-surface-elevated border border-border/60 text-xs text-left space-y-4">
+          <motion.div variants={staggerItem(12)} className="p-6 rounded-[var(--radius-card)] bg-surface-elevated border border-border/60 text-xs text-left space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-border/60">
               <div>
                 <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold block mb-0.5">
@@ -134,9 +145,9 @@ export const ConfirmationPage = () => {
                 <span>{guest.specialRequests}</span>
               </div>
             )}
-          </div>
+          </motion.div>
 
-          <div className="p-4 rounded-[var(--radius-button)] bg-gold/10 border border-gold/30 text-xs text-left flex items-start gap-3">
+          <motion.div variants={staggerItem(10)} className="p-4 rounded-[var(--radius-button)] bg-gold/10 border border-gold/30 text-xs text-left flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-gold shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-semibold text-text">{t('confirm.preArrival', 'Pre-Arrival Concierge Coordination')}</span>
@@ -147,9 +158,9 @@ export const ConfirmationPage = () => {
                 )}
               </p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <motion.div variants={staggerItem(8)} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Button
               variant="gold"
               size="md"
@@ -177,8 +188,8 @@ export const ConfirmationPage = () => {
             >
               {t('confirm.printReceipt', 'Print Receipt')}
             </Button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );

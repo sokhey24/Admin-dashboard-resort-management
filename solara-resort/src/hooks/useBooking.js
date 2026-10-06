@@ -7,6 +7,7 @@ import {
   fetchMyBookings,
 } from '../services/api/bookingApi.js';
 import { mapBookingFromApi, mapQuoteToSummary } from '../util/mapBooking.js';
+import { parseRoomAvailabilityFromError } from '../util/bookingAvailability.js';
 import { isBookingAvailabilityError, validateBookingStay } from '../util/bookingSelection.js';
 
 function buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode }) {
@@ -26,6 +27,7 @@ export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, c
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [roomAvailability, setRoomAvailability] = useState(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const refetch = useCallback(() => {
@@ -37,6 +39,7 @@ export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, c
     if (!validation.valid) {
       setQuote(null);
       setError(validation.message || null);
+      setRoomAvailability(null);
       setLoading(false);
       return;
     }
@@ -45,17 +48,20 @@ export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, c
     const timer = setTimeout(async () => {
       setLoading(true);
       setError(null);
+      setRoomAvailability(null);
       try {
         const data = await fetchBookingQuote(
           buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode })
         );
         if (!cancelled) {
           setQuote(mapQuoteToSummary(data));
+          setRoomAvailability(null);
         }
       } catch (err) {
         if (!cancelled) {
           setQuote(null);
           setError(getApiErrorMessage(err, 'Unable to price this stay. Please adjust dates or room.'));
+          setRoomAvailability(parseRoomAvailabilityFromError(err));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -68,7 +74,7 @@ export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, c
     };
   }, [roomId, branchId, checkIn, checkOut, adults, children, couponCode, refreshNonce]);
 
-  return { quote, loading, error, refetch };
+  return { quote, loading, error, roomAvailability, refetch };
 }
 
 export function useBookingDetail(bookingId, { enabled = true } = {}) {
@@ -132,6 +138,7 @@ export function useCreateBooking() {
         ok: false,
         error: message,
         availabilityChanged: isBookingAvailabilityError(message),
+        roomAvailability: parseRoomAvailabilityFromError(err),
       };
     } finally {
       inFlight.current = false;

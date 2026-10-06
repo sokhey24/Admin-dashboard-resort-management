@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import { motion } from 'motion/react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useMotionPresets } from '../motion/useMotionPresets.js';
 import {
   Clock,
   CheckCircle2,
@@ -20,6 +22,7 @@ export const PaymentPage = () => {
   const navigate = useNavigate();
   const bookingId = searchParams.get('bookingId');
   const { currency, t, refreshMyBookings, addToast } = useApp();
+  const { reduced, scaleIn, transition, duration } = useMotionPresets();
 
   const { booking, loading, error, reload } = useBookingDetail(bookingId);
   const [gateway, setGateway] = useState('aba-khqr');
@@ -132,8 +135,18 @@ export const PaymentPage = () => {
           )}
 
           {showPaid ? (
-            <div className="p-6 rounded-[var(--radius-card)] bg-emerald-500/10 border border-emerald-500/30 space-y-3">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+            <motion.div
+              className="p-6 rounded-[var(--radius-card)] bg-emerald-500/10 border border-emerald-500/30 space-y-3"
+              {...scaleIn()}
+              transition={transition(duration.button)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: reduced ? 1 : 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={transition(duration.button)}
+              >
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+              </motion.div>
               <p className="text-sm text-text">{t('payment.approved', 'Payment Approved')}</p>
               <Button
                 variant="gold"
@@ -141,7 +154,7 @@ export const PaymentPage = () => {
               >
                 {t('payment.viewConfirmation', 'View confirmation')}
               </Button>
-            </div>
+            </motion.div>
           ) : khqr.phase === 'loading' ? (
             <div className="py-12 flex flex-col items-center gap-3 text-muted">
               <Loader2 className="w-8 h-8 animate-spin text-gold" />

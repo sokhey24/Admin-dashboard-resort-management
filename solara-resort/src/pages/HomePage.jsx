@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -22,11 +22,16 @@ import { useWebsiteContent } from '../hooks/useWebsiteContent.js';
 import { MARKETING_IMAGES } from '../constants/marketingImages.js';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { ResortCardSkeleton, RoomCardSkeleton } from '../components/ui/Skeleton.jsx';
+import { useGuestReviews } from '../hooks/useGuestReviews.js';
+import { HomeReviewsCarousel } from '../components/reviews/HomeReviewsCarousel.jsx';
+import { StarRatingDisplay } from '../components/reviews/StarRating.jsx';
 import heroImage from '../assets/images/hero_solara_resort_1790692958491.jpg';
+import { RevealOnScroll } from '../components/motion/RevealOnScroll.jsx';
+import { StaggerItem } from '../components/motion/StaggerItem.jsx';
 
 export const HomePage = () => {
   const navigate = useNavigate();
-  const { currency, t, localize } = useApp();
+  const { currency, t, localize, language } = useApp();
 
   const {
     branches: catalogBranches,
@@ -54,7 +59,64 @@ export const HomePage = () => {
   const activities = cmsActivities.map((a) => (localize ? localize(a) : a));
   const services = cmsServices.map((s) => (localize ? localize(s) : s));
   const diningVenues = cmsDining.map((dv) => (localize ? localize(dv) : dv));
-  const reviews = cmsReviews.map((rev) => (localize ? localize(rev) : rev));
+  const cmsReviewsLocalized = cmsReviews.map((rev) => (localize ? localize(rev) : rev));
+
+  const {
+    reviews: approvedGuestReviews,
+    loading: guestReviewsLoading,
+    error: guestReviewsError,
+    summary: guestReviewsSummary,
+  } = useGuestReviews({ status: 'approved', per_page: 30 });
+
+  const guestReviewsApiFailed = !guestReviewsLoading && Boolean(guestReviewsError);
+  const showGuestReviews = approvedGuestReviews.length > 0;
+  const showCmsReviews =
+    cmsReviewsLocalized.length > 0 &&
+    !showGuestReviews &&
+    (!guestReviewsLoading || guestReviewsApiFailed);
+
+  const showGuestReviewSkeletons =
+    guestReviewsLoading && !showGuestReviews && !showCmsReviews;
+  const showReviewsSection =
+    guestReviewsLoading || showGuestReviews || showCmsReviews;
+
+  const guestReviewSummary = useMemo(() => {
+    if (!showGuestReviews) return null;
+    if (guestReviewsSummary?.totalReviews > 0) {
+      return {
+        avg: guestReviewsSummary.averageRating.toFixed(2),
+        total: guestReviewsSummary.totalReviews,
+      };
+    }
+    return null;
+  }, [guestReviewsSummary, showGuestReviews]);
+
+  const homeReviewCarouselItems = useMemo(() => {
+    if (showGuestReviews) {
+      return approvedGuestReviews.map((review) => ({
+        key: `api-${review.id}`,
+        review,
+        verifiedLabel: t('home.verified', 'Verified'),
+      }));
+    }
+    if (showCmsReviews) {
+      return cmsReviewsLocalized.map((review) => ({
+        key: `cms-${review.id}`,
+        review: {
+          id: review.id,
+          guestName: review.author,
+          avatar: review.avatar,
+          rating: review.rating,
+          title: review.title,
+          comment: review.comment,
+          stayMeta: [review.country, review.date].filter(Boolean).join(' · '),
+          roomLabel: review.stayType || '',
+        },
+        verifiedLabel: undefined,
+      }));
+    }
+    return [];
+  }, [showGuestReviews, showCmsReviews, approvedGuestReviews, cmsReviewsLocalized, t]);
 
   return (
     <div className="w-full flex flex-col">
@@ -69,7 +131,7 @@ export const HomePage = () => {
       </HeroSection>
 
       {/* 2. VALUE PROPOSITION BAR / TRUST MARKERS */}
-      <section className="border-b border-border bg-surface/60 py-6">
+      <RevealOnScroll as="section" className="border-b border-border bg-surface/60 py-6" y={16}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div className="flex flex-col items-center gap-1.5">
@@ -102,10 +164,10 @@ export const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
 
       {/* 3. POPULAR DESTINATIONS */}
-      <section className="py-20 bg-bg">
+      <RevealOnScroll as="section" className="py-20 bg-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -147,11 +209,23 @@ export const HomePage = () => {
             )}
             {!branchesError &&
               !branchesLoading &&
-              destinations.map((dest) => (
-              <div
+              destinations.map((dest, index) => (
+              <StaggerItem
                 key={dest.name}
-                onClick={() => navigate(`/branches?destination=${encodeURIComponent(dest.name)}`)}
+                index={index}
                 className="group relative h-96 rounded-[var(--radius-card)] overflow-hidden cursor-pointer border border-border/80 shadow-md hover:shadow-2xl transition-all duration-300"
+              >
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/branches?destination=${encodeURIComponent(dest.name)}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/branches?destination=${encodeURIComponent(dest.name)}`);
+                  }
+                }}
+                className="group relative h-full min-h-96 rounded-[var(--radius-card)] overflow-hidden cursor-pointer"
               >
                 <img
                   src={dest.image}
@@ -172,13 +246,14 @@ export const HomePage = () => {
                   </p>
                 </div>
               </div>
+              </StaggerItem>
               ))}
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
 
       {/* 4. POPULAR BRANCHES */}
-      <section className="py-20 bg-surface/30 border-y border-border">
+      <RevealOnScroll as="section" className="py-20 bg-surface/30 border-y border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -202,9 +277,11 @@ export const HomePage = () => {
               <ResortCardSkeleton />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch auto-rows-fr">
               {featuredBranches.map((branch, idx) => (
-                <BranchCard key={branch.id} branch={branch} featured={false} />
+                <StaggerItem key={branch.id} index={idx}>
+                  <BranchCard branch={branch} featured={false} />
+                </StaggerItem>
               ))}
             </div>
           )}
@@ -220,10 +297,10 @@ export const HomePage = () => {
             </Button>
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
 
       {/* 5. FEATURED ROOMS & VILLAS */}
-      <section className="py-20 bg-bg">
+      <RevealOnScroll as="section" className="py-20 bg-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -253,18 +330,20 @@ export const HomePage = () => {
               <RoomCardSkeleton />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {catalogRooms.slice(0, 3).map((room) => (
-                <RoomCard key={room.id} room={room} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch auto-rows-fr">
+              {catalogRooms.slice(0, 3).map((room, index) => (
+                <StaggerItem key={room.id} index={index}>
+                  <RoomCard room={room} />
+                </StaggerItem>
               ))}
             </div>
           )}
         </div>
-      </section>
+      </RevealOnScroll>
 
       {/* 6. ACTIVITIES PREVIEW */}
       {activities.length > 0 && (
-      <section className="py-20 bg-surface/40 border-t border-border">
+      <RevealOnScroll as="section" className="py-20 bg-surface/40 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -331,12 +410,12 @@ export const HomePage = () => {
             ))}
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
       )}
 
       {/* 7. SERVICES & WELLNESS SECTION */}
       {services.length > 0 && (
-      <section className="py-20 bg-bg">
+      <RevealOnScroll as="section" className="py-20 bg-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
@@ -382,12 +461,12 @@ export const HomePage = () => {
             ))}
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
       )}
 
       {/* 8. DINING HIGHLIGHT */}
       {diningVenues.length > 0 && (
-      <section className="py-20 bg-surface/50 border-t border-border">
+      <RevealOnScroll as="section" className="py-20 bg-surface/50 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -442,11 +521,11 @@ export const HomePage = () => {
             ))}
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
       )}
 
       {/* 9. PROMOTION / SPECIAL OFFER BANNER */}
-      <section className="py-16 bg-bg">
+      <RevealOnScroll as="section" className="py-16 bg-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative rounded-[var(--radius-modal)] overflow-hidden border border-gold/40 p-8 sm:p-12 bg-gradient-to-r from-slate-950 via-surface to-slate-950 text-white shadow-2xl">
             <div className="relative z-10 max-w-2xl space-y-4 text-left">
@@ -481,70 +560,64 @@ export const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
 
       {/* 10. REVIEWS / TESTIMONIALS */}
-      {reviews.length > 0 && (
-      <section className="py-20 bg-surface/30 border-t border-border">
+      {showReviewsSection && (
+      <RevealOnScroll as="section" className="py-20 bg-surface/30 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
-              {t('home.reviewsTag', 'Guest Impressions')}
+              {showGuestReviews
+                ? t('home.guestReviewsTag', 'Real Guest Reviews')
+                : t('home.reviewsTag', 'Guest Impressions')}
             </span>
             <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight mb-4">
-              {t('home.reviewsTitle', 'Words from Our Residents')}
+              {showGuestReviews
+                ? t('home.guestReviewsTitle', 'Words from Our Guests')
+                : t('home.reviewsTitle', 'Words from Our Residents')}
             </h2>
-            <div className="flex items-center justify-center gap-1.5 text-gold">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-gold" />
-              ))}
-              <span className="ml-2 text-xs font-semibold text-text">
-                {t('home.reviewsSummary', '4.94 Overall Rating across 1,040+ Verified Reviews')}
-              </span>
-            </div>
+            {showGuestReviews && guestReviewSummary ? (
+              <div className="flex flex-col items-center justify-center gap-2 text-gold">
+                <StarRatingDisplay value={Math.round(Number(guestReviewSummary.avg))} size="lg" />
+                <span className="text-xs font-semibold text-text">
+                  {guestReviewSummary.avg} · {guestReviewSummary.total}{' '}
+                  {guestReviewSummary.total === 1
+                    ? t('home.verifiedReview', 'verified review')
+                    : t('home.verifiedReviews', 'verified reviews')}
+                </span>
+              </div>
+            ) : showGuestReviews ? null : (
+              <div className="flex items-center justify-center gap-1.5 text-gold">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-gold" />
+                ))}
+                <span className="ml-2 text-xs font-semibold text-text">
+                  {t('home.reviewsSummary', '4.94 Overall Rating across 1,040+ Verified Reviews')}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {reviews.map((review) => (
-              <div
-                key={review.id}
-                className="bg-surface border border-border p-8 rounded-[var(--radius-card)] flex flex-col justify-between shadow-sm hover:border-gold/30 transition-colors"
-              >
-                <div>
-                  <div className="flex items-center gap-1 text-gold mb-3">
-                    {[...Array(review.rating)].map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-gold" />
-                    ))}
-                  </div>
-                  <h4 className="text-sm font-semibold font-serif text-text mb-2">
-                    "{review.title}"
-                  </h4>
-                  <p className="text-xs text-muted leading-relaxed mb-6 font-light">
-                    "{review.comment}"
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-border flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={review.avatar}
-                      alt={review.author}
-                      className="w-9 h-9 rounded-full object-cover border border-gold/30"
-                    />
-                    <div>
-                      <p className="text-xs font-semibold text-text">{review.author}</p>
-                      <p className="text-[10px] text-muted">{review.country} · {review.date}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gold font-medium bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
-                    {t('home.verified', 'Verified')}
-                  </span>
-                </div>
+          <div className="max-w-7xl mx-auto">
+            {showGuestReviewSkeletons && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <RoomCardSkeleton />
+                <RoomCardSkeleton />
+                <RoomCardSkeleton />
               </div>
-            ))}
+            )}
+
+            {!showGuestReviewSkeletons && homeReviewCarouselItems.length > 0 && (
+              <HomeReviewsCarousel
+                items={homeReviewCarouselItems}
+                language={language}
+                t={t}
+              />
+            )}
           </div>
         </div>
-      </section>
+      </RevealOnScroll>
       )}
     </div>
   );
