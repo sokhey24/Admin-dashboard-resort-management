@@ -9,6 +9,13 @@ import { ProfileStore } from "../../store/ProfileStore";
 
 const PAGE_SIZE = 8;
 
+/** Website-registered guests (customer role) belong in Customer Management only. */
+function isCustomerUser(user) {
+  const roles = user?.roles ?? [];
+  if (!roles.length) return false;
+  return roles.every((r) => r.name === "customer");
+}
+
 const STATUS_STYLE = {
   active:   { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
   inactive: { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200", dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
@@ -175,7 +182,14 @@ export default function UserManagement() {
     ]).then(([usersRes, rolesRes]) => {
       const data  = Array.isArray(usersRes) ? usersRes : usersRes?.data ?? [];
       const roles = Array.isArray(rolesRes) ? rolesRes : rolesRes?.data ?? [];
-      setUsers(data.filter(u => u.id !== profile?.id && u.roles?.every(r => r.name !== "admin")));
+      setUsers(
+        data.filter(
+          (u) =>
+            u.id !== profile?.id &&
+            u.roles?.every((r) => r.name !== "admin") &&
+            !isCustomerUser(u)
+        )
+      );
       setAvailableRoles(roles.filter(r => r.name !== "customer"));
       setLoading(false);
     }).catch(() => setLoading(false));

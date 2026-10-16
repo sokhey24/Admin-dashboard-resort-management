@@ -2,7 +2,22 @@ import { Button } from "antd";
 import { MdDelete, MdEdit, MdVisibility } from "react-icons/md";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
 import { PriceWithDiscount } from "./RoomPrice.jsx";
-import { effectiveDiscountPercent, formatPercent, primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
+import {
+  effectiveDiscountPercent,
+  formatPercent,
+  primaryRoomImage,
+  roomActionClass,
+  roomImageSrc,
+  roomPageTitleClass,
+  roomCellTextClass,
+  roomCellMutedClass,
+  roomTableHeadClass,
+  roomTableHeaderTextClass,
+  roomTableBodyClass,
+  roomRowHoverClass,
+  roomMutedSurfaceClass,
+  roomPriceAccentClass,
+} from "./roomHelpers";
 
 export default function RoomList({
   rooms,
@@ -14,14 +29,14 @@ export default function RoomList({
   onEdit,
   onDelete,
 }) {
-  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
-  const cellText = dark ? "text-gray-300" : "text-[#486581]";
-  const cellMuted = dark ? "text-[#829AB1]" : "text-[#829AB1]";
-  const thead = dark ? "bg-gray-700/60" : "bg-[#F5F8FC]";
-  const thText = dark ? "text-gray-400" : "text-[#829AB1]";
-  const tbody = dark ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-100";
-  const divider = dark ? "divide-gray-700" : "divide-gray-200";
-  const rowHover = dark ? "hover:bg-gray-700/50" : "hover:bg-[#F5F8FC]";
+  const titleCls = roomPageTitleClass(dark);
+  const cellText = roomCellTextClass(dark);
+  const cellMuted = roomCellMutedClass();
+  const thead = roomTableHeadClass(dark);
+  const thText = roomTableHeaderTextClass(dark);
+  const tbody = roomTableBodyClass(dark);
+  const divider = dark ? "divide-brand-border-dark" : "divide-gray-200";
+  const rowHover = roomRowHoverClass(dark);
 
   const columns = [
     "No.",
@@ -71,7 +86,7 @@ export default function RoomList({
                       className="w-14 h-10 rounded-md object-cover"
                     />
                   ) : (
-                    <div className={`w-14 h-10 rounded-md flex items-center justify-center text-[10px] ${dark ? "bg-gray-700 text-gray-400" : "bg-[#F5F8FC] text-[#829AB1]"}`}>
+                    <div className={`w-14 h-10 rounded-md flex items-center justify-center text-[10px] ${roomMutedSurfaceClass(dark)}`}>
                       None
                     </div>
                   )}
@@ -83,7 +98,7 @@ export default function RoomList({
                 <td className={`px-4 py-4 text-sm max-w-[140px] truncate ${cellText}`} title={room.view || ""}>
                   {room.view || "—"}
                 </td>
-                <td className="px-4 py-4 text-sm whitespace-nowrap font-semibold text-[#FF6B00]">
+                <td className={`px-4 py-4 text-sm whitespace-nowrap ${roomPriceAccentClass()}`}>
                   <PriceWithDiscount
                     price={room.price_per_night}
                     percent={room.effective_discount_percent ?? effectiveDiscountPercent(room)}

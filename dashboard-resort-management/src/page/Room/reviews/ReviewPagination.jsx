@@ -1,3 +1,10 @@
+import {
+  roomPageSubTextClass,
+  roomPaginationNavClass,
+  roomPaginationPageClass,
+  roomCellTextClass,
+} from "../roomHelpers";
+
 export default function ReviewPagination({
   dark,
   page,
@@ -10,20 +17,18 @@ export default function ReviewPagination({
   onPerPageChange,
   itemLabel = "items",
 }) {
-  const pageBtn = dark
-    ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
+  const pageBtn = roomPaginationNavClass(dark);
 
   const pages = visiblePages(page, lastPage);
 
   return (
-    <div className={`px-1 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
+    <div className={`px-1 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm ${roomPageSubTextClass(dark)}`}>
       <span>Showing {total === 0 ? 0 : from}–{to} of {total} {itemLabel}</span>
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={perPage}
           onChange={(e) => onPerPageChange(Number(e.target.value))}
-          className={`h-8 rounded-lg border text-xs px-2 ${dark ? "bg-gray-800 border-gray-600 text-gray-200" : "bg-white border-[#D9E2EC] text-[#486581]"}`}
+          className={`h-8 rounded-lg border text-xs px-2 ${dark ? "bg-brand-card-dark border-brand-border-dark text-gray-200" : "bg-brand-card-light border-brand-border-light"} ${roomCellTextClass(dark)}`}
           aria-label="Items per page"
         >
           {[10, 20, 50].map((n) => (
@@ -39,7 +44,7 @@ export default function ReviewPagination({
               type="button"
               key={item}
               onClick={() => onPageChange(item)}
-              className={`w-8 h-8 rounded-lg text-xs font-medium ${page === item ? "bg-[#FF6B00] text-white" : dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`}
+              className={`w-8 h-8 rounded-lg text-xs font-medium ${roomPaginationPageClass(dark, page === item)}`}
             >
               {item}
             </button>

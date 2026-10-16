@@ -1,22 +1,150 @@
 import config from "../../util/config";
 import { asList as asListUtil } from "../../util/asList";
+import { BRAND, STATUS_COLORS } from "../../theme/brandTokens";
 
 export const ROOM_STATUSES = ["available", "occupied", "reserved", "maintenance"];
 
 export const STATUS_STYLE = {
-  available:   { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
-  occupied:    { dot: "bg-red-500",    light: "bg-red-50 text-red-700 ring-red-200",            dark: "bg-red-900/40 text-red-400 ring-red-700"         },
-  reserved:    { dot: "bg-blue-500",   light: "bg-blue-50 text-blue-700 ring-blue-200",          dark: "bg-blue-900/40 text-blue-400 ring-blue-700"       },
-  maintenance: { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200",  dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
+  available: {
+    dot: "bg-status-available",
+    light: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    dark: "bg-emerald-900/40 text-emerald-400 ring-emerald-700",
+  },
+  occupied: {
+    dot: "bg-status-occupied",
+    light: "bg-red-50 text-red-700 ring-red-200",
+    dark: "bg-red-900/40 text-red-400 ring-red-700",
+  },
+  reserved: {
+    dot: "bg-status-reserved",
+    light: "bg-blue-50 text-blue-700 ring-blue-200",
+    dark: "bg-blue-900/40 text-blue-400 ring-blue-700",
+  },
+  maintenance: {
+    dot: "bg-status-maintenance",
+    light: "bg-amber-50 text-amber-700 ring-amber-200",
+    dark: "bg-amber-900/40 text-amber-400 ring-amber-700",
+  },
 };
+
+/** For charts / inline styles */
+export { STATUS_COLORS, BRAND };
 
 export const TYPE_STATUSES = ["active", "inactive"];
 export const TYPE_STATUS_STYLE = {
-  active:   { dot: "bg-green-500", light: "bg-green-50 text-green-700 ring-green-200", dark: "bg-green-900/40 text-green-400 ring-green-700" },
-  inactive: { dot: "bg-gray-400",  light: "bg-gray-100 text-gray-600 ring-gray-200",   dark: "bg-gray-700 text-gray-300 ring-gray-600" },
+  active: { dot: "bg-status-available", light: "bg-emerald-50 text-emerald-700 ring-emerald-200", dark: "bg-emerald-900/40 text-emerald-400 ring-emerald-700" },
+  inactive: { dot: "bg-gray-400", light: "bg-gray-100 text-gray-600 ring-gray-200", dark: "bg-gray-700 text-gray-300 ring-gray-600" },
 };
 
 export const MAX_DISCOUNT_PERCENT = 100;
+
+// ── Page shell (Room module) ─────────────────────────────────────────────
+
+export function roomPageTitleClass(dark) {
+  return dark ? "text-gray-100" : "text-brand-navy";
+}
+
+export function roomPageSubTextClass(dark) {
+  return dark ? "text-gray-400" : "text-slate-500";
+}
+
+export function roomCardClass(dark) {
+  return dark
+    ? "bg-brand-card-dark border-brand-border-dark"
+    : "bg-brand-card-light border-brand-border-light";
+}
+
+export function roomCardHoverClass(dark) {
+  return `${roomCardClass(dark)} ${dark ? "hover:bg-gray-700/40" : "hover:bg-brand-surface-light"}`;
+}
+
+export function roomCardHeaderBorderClass(dark) {
+  return dark ? "border-brand-border-dark" : "border-brand-border-light";
+}
+
+export function roomTableHeaderTextClass(dark) {
+  return dark ? "text-gray-400" : "text-slate-500";
+}
+
+export function roomCellMutedClass() {
+  return "text-slate-500";
+}
+
+export function roomMutedSurfaceClass(dark) {
+  return dark ? "bg-gray-700 text-gray-400" : "bg-brand-surface-light text-slate-500";
+}
+
+export function roomStickyBarClass(dark) {
+  return dark
+    ? "bg-gray-900/95 border-brand-border-dark backdrop-blur-sm"
+    : "bg-brand-surface-light/95 border-brand-border-light backdrop-blur-sm";
+}
+
+export function roomDividerClass(dark) {
+  return dark ? "border-brand-border-dark" : "border-brand-border-light";
+}
+
+export function roomCountBadgeClass(dark) {
+  return dark
+    ? "bg-blue-900/40 text-blue-400 ring-1 ring-blue-700"
+    : "bg-blue-50 text-brand-navy ring-1 ring-blue-200";
+}
+
+export function roomPageShellClass(dark) {
+  return `min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-brand-surface-dark" : "bg-brand-surface-light"}`;
+}
+
+export function roomTableHeadClass(dark) {
+  return dark ? "bg-gray-700/60" : "bg-brand-surface-light";
+}
+
+export function roomTableBodyClass(dark) {
+  return dark ? "bg-brand-card-dark divide-brand-border-dark" : "bg-brand-card-light divide-gray-100";
+}
+
+export function roomRowHoverClass(dark) {
+  return dark ? "hover:bg-gray-700/50" : "hover:bg-brand-surface-light";
+}
+
+export function roomCellTextClass(dark) {
+  return dark ? "text-gray-300" : "text-slate-600";
+}
+
+export function roomStatusSearchClass(dark) {
+  const focus = "focus:outline-none focus:ring-2 focus:ring-brand-accent/30";
+  return dark
+    ? `pl-9 pr-3 py-1.5 text-sm border border-brand-border-dark bg-gray-700 text-gray-100 placeholder:text-slate-500 rounded-brand ${focus} w-48`
+    : `pl-9 pr-3 py-1.5 text-sm border border-brand-border-light rounded-brand ${focus} w-48`;
+}
+
+export function roomPaginationNavBtnClass(dark) {
+  return dark
+    ? "px-3 py-1.5 rounded-brand border border-brand-border-dark text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
+    : "px-3 py-1.5 rounded-brand border border-brand-border-light text-xs font-semibold hover:bg-brand-surface-light disabled:opacity-40 disabled:cursor-not-allowed";
+}
+
+export function roomPriceAccentClass() {
+  return "text-brand-accent font-semibold";
+}
+
+export function roomPrimaryChipClass() {
+  return "bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded";
+}
+
+export function roomDiscountChipClass() {
+  return "px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-brand-accent whitespace-nowrap";
+}
+
+export function roomPaginationPageClass(dark, active) {
+  if (active) return "bg-blue-600 text-white";
+  return dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-brand-surface-light text-slate-600";
+}
+
+export function roomPaginationNavClass(dark) {
+  return dark
+    ? "px-3 py-1.5 rounded-brand border border-brand-border-dark text-xs font-semibold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+    : "px-3 py-1.5 rounded-brand border border-brand-border-light text-xs font-semibold hover:bg-brand-surface-light disabled:opacity-40 disabled:cursor-not-allowed";
+}
 
 // Preview-only helpers. Laravel recalculates every figure on quote and on save,
 // so these exist purely so the form can show the effect while it is being typed.
@@ -53,13 +181,21 @@ export const ROOM_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp,imag
 
 export function imageUrl(path) {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${config.image_path}${String(path).replace(/^\/+/, "")}`;
+  const str = String(path);
+  if (/^https?:\/\//i.test(str)) {
+    const storageTail = str.match(/\/storage\/(.+)$/i);
+    if (storageTail) {
+      const base = config.image_path.replace(/\/+$/, "");
+      return `${base}/${storageTail[1]}`;
+    }
+    return str;
+  }
+  return `${config.image_path}${str.replace(/^\/+/, "")}`;
 }
 
 export function roomImageSrc(image) {
   if (!image) return null;
-  return imageUrl(image.url || image.image_path || image.path);
+  return imageUrl(image.image_path || image.path || image.url);
 }
 
 export function primaryRoomImage(room) {
@@ -81,6 +217,29 @@ export function validateRoomImageFile(file) {
 
 export function asList(res) {
   return asListUtil(res);
+}
+
+/** Room type branch from API row (top-level or nested relation). */
+export function roomTypeBranchId(type) {
+  if (!type) return null;
+  const raw = type.branch_id ?? type.branch?.id;
+  if (raw == null || raw === "") return null;
+  return raw;
+}
+
+/** Room types available for a resort + branch (exact branch or resort-wide with no branch). */
+export function filterRoomTypesByBranch(types, resortId, branchId) {
+  const list = Array.isArray(types) ? types : [];
+  let scoped = list;
+  if (resortId) {
+    scoped = scoped.filter((t) => String(t.resort_id) === String(resortId));
+  }
+  if (!branchId) return scoped;
+  const bid = String(branchId);
+  return scoped.filter((t) => {
+    const tb = roomTypeBranchId(t);
+    return tb == null || String(tb) === bid;
+  });
 }
 
 export function paginationFrom(res) {
@@ -131,28 +290,29 @@ export function roomTypeAmenities(type, facilities = []) {
 
 export function roomActionClass(dark) {
   return `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors !border-0 !shadow-none h-auto px-4 py-2 ${
-    dark ? "!bg-blue-900/40 !text-blue-400 hover:!bg-blue-900/70" : "!bg-[#FFF3E8] !text-[#FF6B00] hover:!bg-orange-100"
+    dark ? "!bg-blue-900/40 !text-blue-400 hover:!bg-blue-900/70" : "!bg-blue-50 !text-brand-accent hover:!bg-blue-100"
   }`;
 }
 
 export function roomPrimaryBtnClass() {
-  return "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[8px] !bg-[#FF6B00] !border-[#FF6B00] !text-white hover:!bg-[#e05e00] hover:!border-[#e05e00] h-auto";
+  return "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-brand !bg-blue-600 !border-blue-600 !text-white hover:!bg-blue-700 hover:!border-blue-700 h-auto";
 }
 
 export function roomModalOkClass() {
-  return "!bg-[#FF6B00] !border-[#FF6B00] hover:!bg-[#e05e00] hover:!border-[#e05e00] rounded-[8px] font-medium";
+  return "!bg-blue-600 !border-blue-600 hover:!bg-blue-700 hover:!border-blue-700 rounded-brand font-medium";
 }
 
 export function roomModalCancelClass(dark) {
   return dark
-    ? "rounded-lg !border-gray-600 !text-gray-300 hover:!bg-gray-700"
-    : "rounded-lg !border-[#D9E2EC] !text-[#486581] hover:!bg-[#F5F8FC]";
+    ? "rounded-lg !border-brand-border-dark !text-gray-300 hover:!bg-gray-700"
+    : "rounded-lg !border-brand-border-light !text-slate-600 hover:!bg-brand-surface-light";
 }
 
 export function roomSearchClass(dark) {
+  const focus = "focus:outline-none focus:ring-2 focus:ring-brand-accent/30";
   return dark
-    ? "pl-9 pr-3 py-1.5 w-full min-w-[200px] text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30"
-    : "pl-9 pr-3 py-1.5 w-full min-w-[200px] text-sm border border-[#D9E2EC] bg-white text-[#102A43] placeholder-[#829AB1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30";
+    ? `pl-9 pr-3 py-1.5 w-full min-w-[200px] text-sm border border-brand-border-dark bg-gray-700 text-gray-100 placeholder:text-slate-500 rounded-brand ${focus}`
+    : `pl-9 pr-3 py-1.5 w-full min-w-[200px] text-sm border border-brand-border-light bg-brand-card-light text-brand-navy placeholder:text-slate-500 rounded-brand ${focus}`;
 }
 
 export function applyFormErrors(form, errors) {

@@ -9,9 +9,18 @@ use Illuminate\Http\Request;
 
 class MenuItemController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(MenuItem::with('category')->get());
+        $query = MenuItem::query()
+            ->with('category')
+            ->where('status', 'active')
+            ->where('is_available', true);
+
+        if ($request->filled('food_category_id')) {
+            $query->where('food_category_id', (int) $request->input('food_category_id'));
+        }
+
+        return response()->json($query->orderBy('name')->get());
     }
 
     public function show(MenuItem $menuItem): JsonResponse

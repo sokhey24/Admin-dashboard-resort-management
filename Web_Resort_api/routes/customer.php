@@ -18,8 +18,11 @@ use App\Http\Controllers\Api\Restaurant\MenuItemController;
 use App\Http\Controllers\Api\Restaurant\FoodCategoryController;
 use App\Http\Controllers\Api\Restaurant\RestaurantTableController;
 use App\Http\Controllers\Api\Restaurant\TableReservationController;
+use App\Http\Controllers\Api\Restaurant\GuestTableReservationController;
 use App\Http\Controllers\Api\Restaurant\FoodOrderController;
 use App\Http\Controllers\Api\Review\ReviewController;
+use App\Http\Controllers\Api\Activity\ActivityBookingController;
+use App\Http\Controllers\Api\Service\ServiceInquiryController;
 
 // Public browsing routes (no auth required)
 Route::prefix('customer')->group(function () {
@@ -41,6 +44,15 @@ Route::prefix('customer')->group(function () {
     // quotes before sign-in; throttled because it is an unauthenticated read.
     Route::post('/booking/quote', [BookingQuoteController::class, 'store'])
         ->middleware('throttle:60,1');
+
+    Route::post('/activity-bookings', [ActivityBookingController::class, 'store'])
+        ->middleware(['optional.sanctum', 'throttle:30,1']);
+
+    Route::post('/service-inquiries', [ServiceInquiryController::class, 'store'])
+        ->middleware(['optional.sanctum', 'throttle:30,1']);
+
+    Route::post('/table-reservation-requests', [GuestTableReservationController::class, 'store'])
+        ->middleware(['optional.sanctum', 'throttle:30,1']);
 });
 
 // Authenticated customer routes

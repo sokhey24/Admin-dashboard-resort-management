@@ -84,14 +84,17 @@ export function mapBookingFromApi(booking) {
   const balanceDue = Number(booking.balance_due ?? total);
 
   const guestInfo = parseGuestInfo(booking.special_requests);
-  const branchName = booking.branch?.name || booking.branch_name || '';
-  const branchLocation = booking.branch
-    ? [booking.branch.city, booking.branch.province].filter((v, i, a) => v && a.indexOf(v) === i).join(', ')
+  const branchEntity = booking.branch || room?.branch || null;
+  const branchName = branchEntity?.name || booking.branch_name || '';
+  const branchLocation = branchEntity
+    ? [branchEntity.city, branchEntity.province].filter((v, i, a) => v && a.indexOf(v) === i).join(', ')
     : '';
   const brandName = booking.resort?.brand_name || booking.resort?.name || 'Solara Resort & Spa';
+  const confirmationCode = booking.booking_code || `BK-${booking.id}`;
 
   return {
-    id: booking.booking_code || String(booking.id),
+    id: confirmationCode,
+    confirmationCode,
     apiId: booking.id,
     resortId: booking.resort_id,
     branchId: booking.branch_id || booking.branch?.id || null,

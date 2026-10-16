@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Users, BedDouble, Maximize2, Eye, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
@@ -6,6 +6,11 @@ import { useApp } from '../../context/AppContext.jsx';
 import { buildBookingPath } from '../../util/bookingSelection.js';
 import { CatalogNightlyPrice } from '../catalog/CatalogNightlyPrice.jsx';
 import { FavoriteButton } from '../catalog/FavoriteButton.jsx';
+import { Pagination } from '../common/Pagination.jsx';
+import { paginateItems } from '../../util/paginateList.js';
+
+/** Default page size for client-side room card grids (e.g. branch detail). */
+export const ROOM_CARD_GRID_PAGE_SIZE = 6;
 
 export const RoomCard = ({ room }) => {
   const navigate = useNavigate();
@@ -136,3 +141,57 @@ export const RoomCard = ({ room }) => {
     </div>
   );
 };
+
+/**
+ * Paginated grid of room cards (client-side). Use RoomsPage for API pagination.
+ */
+export function RoomCardGrid({
+  rooms = [],
+  pageSize = ROOM_CARD_GRID_PAGE_SIZE,
+  className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch auto-rows-fr',
+  paginationClassName = 'pt-10',
+  renderItem,
+}) {
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rooms, pageSize]);
+
+  const pagination = useMemo(
+    () => paginateItems(rooms, page, pageSize),
+    [rooms, page, pageSize]
+  );
+
+  useEffect(() => {
+    if (page > pagination.totalPages) {
+      setPage(pagination.totalPages);
+    }
+  }, [page, pagination.totalPages]);
+
+  if (!rooms.length) {
+    return null;
+  }
+
+  return (
+    <>
+      <div className={className}>
+        {pagination.items.map((room, index) =>
+          renderItem ? (
+            renderItem(room, index)
+          ) : (
+            <RoomCard key={room.id} room={room} />
+          )
+        )}
+      </div>
+      {pagination.showPagination && (
+        <Pagination
+          className={paginationClassName}
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={setPage}
+        />
+      )}
+    </>
+  );
+}

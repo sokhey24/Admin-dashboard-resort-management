@@ -67,7 +67,9 @@ export default function ResortDashboard() {
   return (
     <Spin spinning={loading}>
       <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
-        <h2 className={`text-[26px] font-bold mb-5 ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Resort Dashboard</h2>
+        <h2 className={`text-[26px] font-bold mb-4 ${dark ? "text-gray-100" : "text-[#102A43]"}`}>Resort Dashboard</h2>
+
+        <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
 
         {error && (
           <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>
@@ -79,9 +81,6 @@ export default function ResortDashboard() {
             <StatCard key={s.title} title={s.title} value={s.value} icon={s.icon} color={s.color} dark={dark} />
           ))}
         </div>
-
-        {/* Date filter */}
-        <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
 
         {/* Charts */}
         <div className={`rounded-xl border p-5 mb-4 ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>

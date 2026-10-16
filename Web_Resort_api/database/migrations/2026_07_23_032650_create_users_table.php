@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('date_of_birth')->nullable();
             $table->string('profile_image')->nullable();
             $table->json('preferences')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->enum('status', ['active', 'inactive', 'banned'])->default('active');
             $table->string('google_id')->nullable()->unique();
             $table->string('google_token')->nullable();
             $table->boolean('is_google_account')->default(false);

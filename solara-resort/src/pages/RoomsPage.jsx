@@ -10,9 +10,12 @@ import { useApp } from '../context/AppContext.jsx';
 import { usePaginationMeta, useRoomTypes, useRoomsList } from '../hooks/useCatalog.js';
 import { useSearchCriteria } from '../hooks/useSearch.js';
 import { roomCatalogParamsFromCriteria } from '../util/searchParams.js';
-import { Pagination } from '../components/common/Pagination.jsx';
+import { ListPagination } from '../components/ui/ListPagination.jsx';
 import villaImage from '../assets/images/villa_ocean_luxury_1790692975563.jpg';
 import { StaggerItem } from '../components/motion/StaggerItem.jsx';
+
+/** 3-column grid × 2 rows; keeps pagination visible for typical catalogs. */
+const ROOMS_PAGE_SIZE = 6;
 
 export const RoomsPage = () => {
   const [searchParams] = useSearchParams();
@@ -30,14 +33,14 @@ export const RoomsPage = () => {
     () =>
       roomCatalogParamsFromCriteria(criteria, {
         page,
-        per_page: 12,
+        per_page: ROOMS_PAGE_SIZE,
         ...(selectedTypeId ? { room_type_id: selectedTypeId } : {}),
       }),
     [page, selectedTypeId, criteria]
   );
 
   const { rooms, meta, loading, error, reload } = useRoomsList(roomParams);
-  const { page: currentPage, lastPage, total } = usePaginationMeta(meta);
+  const { page: currentPage, lastPage, total, perPage } = usePaginationMeta(meta);
 
   const roomTypeOptions = useMemo(() => {
     const all = { value: '', label: t('rooms.allQuarters', 'All Quarters') };
@@ -56,6 +59,20 @@ export const RoomsPage = () => {
     const peak = rooms.reduce((m, r) => Math.max(m, r.pricePerNight), 800);
     return Math.max(800, Math.ceil(peak / 50) * 50);
   }, [rooms]);
+
+  const listStartIndex =
+    filteredRooms.length === 0
+      ? 0
+      : meta?.from ?? (currentPage - 1) * perPage + 1;
+  const listEndIndex =
+    filteredRooms.length === 0
+      ? 0
+      : meta?.to ?? listStartIndex + filteredRooms.length - 1;
+
+  const handlePageChange = (nextPage) => {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="w-full pb-24">
@@ -101,7 +118,10 @@ export const RoomsPage = () => {
               max={maxPriceSlider}
               step="50"
               value={Math.min(maxPrice, maxPriceSlider)}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
+              onChange={(e) => {
+                setMaxPrice(Number(e.target.value));
+                setPage(1);
+              }}
               className="accent-gold cursor-pointer w-36"
             />
             <span className="font-serif font-bold text-gold shrink-0">
@@ -128,21 +148,20 @@ export const RoomsPage = () => {
 
         {!error && !loading && (
           <>
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-xs text-muted">
-                {language === 'km'
-                  ? `បង្ហាញបន្ទប់ និងវីឡាចំនួន ${filteredRooms.length}`
-                  : `Displaying ${filteredRooms.length} on this page · ${total || rooms.length} total`}
-              </p>
-              {selectedTypeId && (
+            {selectedTypeId && (
+              <div className="mb-6 flex justify-end">
                 <button
-                  onClick={() => setSelectedTypeId('')}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTypeId('');
+                    setPage(1);
+                  }}
                   className="text-xs text-gold hover:underline cursor-pointer"
                 >
                   {t('common.reset', 'Clear Type Filter')}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {filteredRooms.length === 0 ? (
               <EmptyState
@@ -167,12 +186,16 @@ export const RoomsPage = () => {
               </div>
             )}
 
-            {lastPage > 1 && (
-              <Pagination
-                className="pt-10"
+            {lastPage > 1 && filteredRooms.length > 0 && (
+              <ListPagination
+                className="mt-10"
                 page={currentPage}
                 totalPages={lastPage}
-                onPageChange={setPage}
+                total={total}
+                startIndex={listStartIndex}
+                endIndex={listEndIndex}
+                language={language}
+                onPageChange={handlePageChange}
               />
             )}
           </>

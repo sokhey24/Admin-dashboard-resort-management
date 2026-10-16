@@ -10,14 +10,12 @@ use App\Models\RoomType;
 use App\Models\User;
 use App\Models\Payment;
 use App\Services\BakongKhqrService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use Tests\TestCase;
 
 class GuestKhqrPaymentTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected function customer(): User
     {

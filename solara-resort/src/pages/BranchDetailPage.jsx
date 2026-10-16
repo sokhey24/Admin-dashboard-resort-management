@@ -12,7 +12,7 @@ import {
   BedDouble,
   Sparkles,
 } from 'lucide-react';
-import { RoomCard } from '../components/room/RoomCard.jsx';
+import { RoomCardGrid } from '../components/room/RoomCard.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
@@ -21,6 +21,7 @@ import { CatalogNightlyPrice } from '../components/catalog/CatalogNightlyPrice.j
 import { useApp } from '../context/AppContext.jsx';
 import { useBranchDetail } from '../hooks/useCatalog.js';
 import { FavoriteButton } from '../components/catalog/FavoriteButton.jsx';
+import { BranchRelated } from '../related/BranchRelated.jsx';
 
 export const BranchDetailPage = () => {
   const { id } = useParams();
@@ -208,7 +209,7 @@ export const BranchDetailPage = () => {
               <h2 className="text-2xl font-serif font-bold text-text">
                 {branch.tagline || `${branch.name} by Solara`}
               </h2>
-              <p className="text-sm text-muted leading-relaxed font-light">
+              <p className="text-sm text-muted leading-relaxed font-light whitespace-pre-line">
                 {branch.description ||
                   `Experience bespoke luxury hospitality at ${branch.name}. Every villa and suite has been crafted to harmonize with the surroundings, offering direct access to nature, fine gastronomy, and holistic wellness.`}
               </p>
@@ -267,11 +268,12 @@ export const BranchDetailPage = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {branchRooms.map((room) => (
-                    <RoomCard key={room.id} room={room} />
-                  ))}
-                </div>
+                <RoomCardGrid
+                  rooms={branchRooms}
+                  pageSize={4}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch auto-rows-fr"
+                  paginationClassName="pt-8"
+                />
               )}
             </div>
           </div>
@@ -349,6 +351,8 @@ export const BranchDetailPage = () => {
           </aside>
         </div>
       </div>
+
+      <BranchRelated branch={branch} />
 
       {/* Photo Modal */}
       <Modal

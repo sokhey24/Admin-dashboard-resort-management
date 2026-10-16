@@ -180,8 +180,7 @@ function ResortModal({ resort, onClose, onSaved, dark }) {
     if (coverFile) fd.append("cover_image", coverFile);
     let res;
     if (isEdit) {
-      fd.append("_method", "PUT");
-      res = await request("admin/resort-profile", "post", fd);
+      res = await request("admin/resort-profile", "put", fd);
     } else {
       res = await request("admin/resorts", "post", fd);
     }
@@ -547,6 +546,12 @@ export default function Manage_Resort() {
               <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search…" className={searchCls} />
             </div>
+            {!pageItems.length && !loading && (
+              <Button onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[10px] bg-[#FF6B00] text-white hover:bg-[#e05e00]">
+                <MdAdd size={14} /> Create brand profile
+              </Button>
+            )}
           </div>
         </div>
 

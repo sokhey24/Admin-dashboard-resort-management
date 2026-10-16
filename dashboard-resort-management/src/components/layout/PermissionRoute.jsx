@@ -2,7 +2,6 @@ import { Navigate, useLocation } from "react-router-dom";
 import { ProfileStore } from "../../store/ProfileStore";
 import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
-import { getHomeByRole } from "./ProtectedRoute";
 
 /**
  * Protects a route by permission name(s).
@@ -10,8 +9,8 @@ import { getHomeByRole } from "./ProtectedRoute";
  */
 export default function PermissionRoute({ children, requires }) {
   const { profile } = ProfileStore();
-  const { canAny } = usePermission();
-  const { role } = useRole();
+  const { canAny, isAdmin } = usePermission();
+  const { isAdmin: isAdminRole } = useRole();
   const location = useLocation();
 
   if (!profile) {
@@ -19,10 +18,10 @@ export default function PermissionRoute({ children, requires }) {
   }
 
   const required = Array.isArray(requires) ? requires : [requires];
-  const allowed  = canAny(...required);
+  const allowed  = isAdmin || isAdminRole || canAny(...required);
 
   if (!allowed) {
-    return <Navigate to={getHomeByRole(role)} replace />;
+    return <Navigate to="/403" state={{ from: location }} replace />;
   }
 
   return children;

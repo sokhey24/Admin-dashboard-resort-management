@@ -23,8 +23,9 @@ export function useSearchCriteria() {
   return useMemo(() => {
     const fromUrl = parseSearchCriteria(searchParams);
     return {
-      branchId: fromUrl.branchId || bookingDraft.branchId || '',
-      destination: fromUrl.destination,
+      // Location filters: URL only (draft must not keep a branch after "All Locations").
+      branchId: fromUrl.branchId || '',
+      destination: fromUrl.destination || '',
       checkIn: fromUrl.checkIn || bookingDraft.checkIn || '',
       checkOut: fromUrl.checkOut || bookingDraft.checkOut || '',
       adults: fromUrl.adults || bookingDraft.adults || 2,
@@ -87,7 +88,7 @@ export function useSearch() {
   const persistDraft = useCallback(
     (next) => {
       updateBookingDraft({
-        ...(next.branchId ? { branchId: Number(next.branchId) } : {}),
+        branchId: next.branchId ? Number(next.branchId) : null,
         checkIn: next.checkIn,
         checkOut: next.checkOut,
         adults: next.adults,
@@ -100,9 +101,19 @@ export function useSearch() {
 
   const submitSearch = useCallback(
     (partial) => {
+      const clearingBranch = partial.branchId === '' || partial.branchId === null;
       const nextCriteria = {
-        branchId: partial.branchId !== undefined ? partial.branchId : criteria.branchId,
-        destination: partial.destination ?? criteria.destination,
+        branchId:
+          partial.branchId !== undefined && partial.branchId !== ''
+            ? partial.branchId
+            : clearingBranch
+              ? ''
+              : criteria.branchId,
+        destination: clearingBranch
+          ? ''
+          : partial.destination !== undefined
+            ? partial.destination
+            : criteria.destination,
         checkIn: partial.checkIn ?? criteria.checkIn,
         checkOut: partial.checkOut ?? criteria.checkOut,
         adults: partial.adults ?? partial.guests ?? criteria.adults,
@@ -136,11 +147,15 @@ export function useSearch() {
   };
 }
 
+/** Branch listing page size (Our Resorts / BranchesPage). */
+export const BRANCHES_PAGE_SIZE = 6;
+
 /**
  * Resort / branch search results.
  */
 export function useResortSearchResults({
   page,
+  perPage = BRANCHES_PAGE_SIZE,
   sort,
   maxPrice,
   minRating,
@@ -150,7 +165,7 @@ export function useResortSearchResults({
   const apiParams = useMemo(
     () => ({
       page,
-      per_page: 12,
+      per_page: perPage,
       ...(criteria.branchId ? { branch_id: criteria.branchId } : {}),
       ...(criteria.destination
         ? { city: criteria.destination, destination: criteria.destination }

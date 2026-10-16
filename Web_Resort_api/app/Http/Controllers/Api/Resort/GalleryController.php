@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\GalleryPhoto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class GalleryController extends Controller
 {
@@ -25,9 +26,12 @@ class GalleryController extends Controller
         return response()->json($photo, 201);
     }
 
-    public function destroy(GalleryPhoto $galleryPhoto): JsonResponse
+    public function destroy(GalleryPhoto $gallery): JsonResponse
     {
-        $galleryPhoto->delete();
+        if ($gallery->path) {
+            Storage::disk('public')->delete($gallery->path);
+        }
+        $gallery->delete();
         return response()->json(null, 204);
     }
 }

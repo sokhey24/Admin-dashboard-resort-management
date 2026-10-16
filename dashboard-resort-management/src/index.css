@@ -103,3 +103,30 @@ html[lang="km"] .ant-tag {
     visibility: hidden !important;
   }
 }
+
+/* ── Luxury shell: sidebar menu active / hover ── */
+.rms-sider-menu.ant-menu-dark .ant-menu-item,
+.rms-sider-menu.ant-menu-dark .ant-menu-submenu-title {
+  margin-inline: 8px !important;
+  width: calc(100% - 16px) !important;
+  border-radius: 8px !important;
+}
+
+.rms-sider-menu.ant-menu-dark .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.22) 0%, rgba(15, 42, 74, 0.45) 100%) !important;
+  border-left: 3px solid #38bdf8;
+}
+
+.rms-sider-menu.ant-menu-dark .ant-menu-item:not(.ant-menu-item-selected):hover,
+.rms-sider-menu.ant-menu-dark .ant-menu-submenu-title:hover {
+  background: rgba(148, 163, 184, 0.12) !important;
+}
+
+.rms-notif-tabs .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.rms-notif-tabs .ant-tabs-tab {
+  padding: 8px 10px !important;
+  font-size: 12px !important;
+}

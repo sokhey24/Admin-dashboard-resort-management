@@ -4,6 +4,7 @@ import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button, Select } from "antd";
 import usePermission from "../../util/usePermission";
+import { imageUrl } from "../Room/roomHelpers";
 
 const STATUSES = ["all", "active", "inactive", "banned"];
 
@@ -46,8 +47,27 @@ function formatRooms(roomNumbers) {
   return roomNumbers.join(", ");
 }
 
+function guestAvatarSrc(user) {
+  return imageUrl(user?.profile_image_url ?? user?.profile_image);
+}
+
 function Avatar({ name, src }) {
-  if (src) return <img src={src} alt={name} className="w-9 h-9 rounded-full object-cover shrink-0" />;
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt={name ?? ""}
+        className="w-9 h-9 rounded-full object-cover shrink-0"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
   return (
     <div className="w-9 h-9 rounded-full bg-[#FF6B00] flex items-center justify-center text-white font-semibold text-sm shrink-0">
       {name?.charAt(0).toUpperCase() ?? <MdPerson />}
@@ -459,7 +479,7 @@ export default function ResortStaff() {
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar name={user.name} src={user.profile_image_url} />
+                      <Avatar name={user.name} src={guestAvatarSrc(user)} />
                       <div className="min-w-0">
                         <p className={`text-sm font-medium truncate ${title}`}>{user.name}</p>
                         <p className={`text-xs truncate lg:hidden ${subText}`}>{user.email}</p>

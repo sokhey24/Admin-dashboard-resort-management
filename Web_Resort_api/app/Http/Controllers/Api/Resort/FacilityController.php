@@ -17,15 +17,34 @@ class FacilityController extends Controller
         return response()->json($q->get());
     }
 
+    public function show(Facility $facility): JsonResponse
+    {
+        return response()->json($facility);
+    }
+
     public function store(Request $request): JsonResponse
     {
-        $facility = Facility::create($request->all());
+        $data = $request->validate([
+            'resort_id'   => 'required|exists:resorts,id',
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'icon'        => 'nullable|string|max:255',
+            'status'      => 'nullable|in:active,inactive',
+        ]);
+        $facility = Facility::create($data);
         return response()->json($facility, 201);
     }
 
     public function update(Request $request, Facility $facility): JsonResponse
     {
-        $facility->update($request->all());
+        $data = $request->validate([
+            'resort_id'   => 'sometimes|exists:resorts,id',
+            'name'        => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'icon'        => 'nullable|string|max:255',
+            'status'      => 'nullable|in:active,inactive',
+        ]);
+        $facility->update($data);
         return response()->json($facility);
     }
 

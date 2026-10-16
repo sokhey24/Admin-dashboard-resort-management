@@ -41,12 +41,16 @@ export async function fetchRoomTypes(params = {}) {
   return data;
 }
 
-export async function fetchResortGallery(resortId) {
+export async function fetchGalleryPhotos() {
   const { data } = await axiosClient.get('customer/gallery');
-  const rows = Array.isArray(data) ? data : data?.data ?? [];
+  return Array.isArray(data) ? data : data?.data ?? [];
+}
+
+export async function fetchResortGallery(resortId) {
+  const rows = await fetchGalleryPhotos();
   return rows.filter((photo) => Number(photo.resort_id) === Number(resortId));
 }
 
 export function galleryPhotoUrl(photo) {
-  return resolveStorageUrl(photo?.path);
+  return resolveStorageUrl(photo?.path) || resolveStorageUrl(photo?.url);
 }

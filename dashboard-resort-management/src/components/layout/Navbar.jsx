@@ -29,7 +29,7 @@ export const Navbar = ({
 }) => {
   const navigate = useNavigate();
   const { profile } = ProfileStore();
-  const { role, isAdmin } = useRole();
+  const { isAdmin } = useRole();
   const { can } = usePermission();
   const { t, language, setLanguage } = useTranslation();
 
@@ -43,7 +43,6 @@ export const Navbar = ({
 
   const canBypassAll = can("admin.dashboard.view") || can("admin.resorts.view") || isAdmin;
 
-  // Initialize branches and scope on mount or profile change
   useEffect(() => {
     if (branches.length === 0) {
       fetchBranches();
@@ -56,7 +55,6 @@ export const Navbar = ({
     }
   }, [profile, canBypassAll, initBranchScope]);
 
-  // Build options for Ant Design select
   const branchOptions = useMemo(() => {
     const active = (branches || []).filter(
       (b) => b.status === "active" || b.status === "maintenance" || !b.status
@@ -87,79 +85,85 @@ export const Navbar = ({
     { key: "logout", label: t("nav.logout", "Logout"), icon: <MdLogout size={14} />, danger: true },
   ];
 
+  const selectLight =
+    "w-64 [&_.ant-select-selector]:!bg-white [&_.ant-select-selector]:!border-slate-200 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selection-item]:!text-slate-800 [&_.ant-select-arrow]:!text-slate-500";
+  const selectDark =
+    "w-64 [&_.ant-select-selector]:!bg-slate-800/80 [&_.ant-select-selector]:!border-slate-700 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selection-item]:!text-slate-100 [&_.ant-select-arrow]:!text-slate-400";
+
   return (
-    <div
-      className="flex items-center justify-between px-5 h-16 shrink-0 sticky top-0 z-[99] shadow-md transition-colors"
-      style={{
-        background: darkMode
-          ? "#1f1f1f"
-          : "linear-gradient(135deg, #1a3c5e 0%, #2d6a9f 100%)",
-      }}
+    <header
+      className={`flex items-center justify-between px-5 h-16 shrink-0 sticky top-0 z-[99] border-b backdrop-blur-md transition-colors ${
+        darkMode
+          ? "bg-slate-900/90 border-slate-800 shadow-sm"
+          : "bg-white/90 border-slate-200/80 shadow-sm"
+      }`}
     >
-      {/* Left Brand Identity */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <img
           src={logoResort}
           alt="logo"
-          className="w-9 h-9 rounded-full object-cover border-2 border-white/30"
+          className={`w-9 h-9 rounded-full object-cover border-2 shrink-0 ${
+            darkMode ? "border-slate-600" : "border-slate-200"
+          }`}
         />
-        <div>
-          <div className="text-white font-bold text-base leading-tight font-sans">
+        <div className="min-w-0 hidden sm:block">
+          <div className="font-semibold text-base leading-tight truncate text-slate-900 dark:text-white">
             {t("brand.systemTitle", "Resort Management System")}
           </div>
-          <div className="text-blue-200 text-xs font-medium">
-            {roleLabel} Dashboard • {t("brand.name", "Solara Resort & Spa")}
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+            {roleLabel} · {t("brand.name", "Solara Resort & Spa")}
           </div>
         </div>
       </div>
 
-      {/* Right Controls: Branch Switcher, Language Toggle, Theme, Notifications, Profile */}
-      <div className="flex items-center gap-3">
-        {/* Global Branch Switcher */}
-        <div className="flex items-center">
-          <Tooltip
-            title={
-              branchScopeLocked
-                ? `${t("brand.assignedBranch")}: ${scopedBranchName || ""}`
-                : t("brand.selectBranch")
-            }
-          >
-            <div className="flex items-center gap-1.5">
-              <Select
-                size="middle"
-                className="w-64 [&_.ant-select-selector]:!bg-white/10 [&_.ant-select-selector]:!border-white/30 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selection-item]:!text-white [&_.ant-select-arrow]:!text-white font-medium text-xs hover:[&_.ant-select-selector]:!border-white/60 focus:[&_.ant-select-selector]:!border-white transition-all shadow-inner"
-                placeholder={`🏢 ${t("brand.selectBranch")}: ${t("brand.allBranches")}`}
-                value={selectedBranchId}
-                disabled={branchScopeLocked}
-                options={branchOptions}
-                onChange={(value) => setSelectedBranchId(value)}
-                popupMatchSelectWidth={300}
-                suffixIcon={
-                  branchScopeLocked ? (
-                    <MdLock className="text-amber-300 text-sm" />
-                  ) : (
-                    <MdKeyboardArrowDown className="text-white text-base" />
-                  )
-                }
-              />
-              {branchScopeLocked && (
-                <Tag color="gold" className="!mr-0 text-[11px] font-semibold flex items-center gap-1">
-                  <MdLock size={12} /> {t("brand.assignedBranch", "Assigned")}
-                </Tag>
-              )}
-            </div>
-          </Tooltip>
-        </div>
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+        <Tooltip
+          title={
+            branchScopeLocked
+              ? `${t("brand.assignedBranch")}: ${scopedBranchName || ""}`
+              : t("brand.selectBranch")
+          }
+        >
+          <div className="flex items-center gap-1.5">
+            <Select
+              size="middle"
+              className={darkMode ? selectDark : selectLight}
+              placeholder={`🏢 ${t("brand.selectBranch")}: ${t("brand.allBranches")}`}
+              value={selectedBranchId}
+              disabled={branchScopeLocked}
+              options={branchOptions}
+              onChange={(value) => setSelectedBranchId(value)}
+              popupMatchSelectWidth={300}
+              suffixIcon={
+                branchScopeLocked ? (
+                  <MdLock className="text-amber-500 text-sm" />
+                ) : (
+                  <MdKeyboardArrowDown className={darkMode ? "text-slate-400" : "text-slate-500"} />
+                )
+              }
+            />
+            {branchScopeLocked && (
+              <Tag color="gold" className="!mr-0 text-[11px] font-semibold flex items-center gap-1">
+                <MdLock size={12} /> {t("brand.assignedBranch", "Assigned")}
+              </Tag>
+            )}
+          </div>
+        </Tooltip>
 
-        {/* Global Language Toggle [ 🇰🇭 ខ្មែរ | 🇬🇧 English ] */}
-        <div className="flex items-center bg-white/10 rounded-lg p-0.5 border border-white/20">
+        <div
+          className={`flex items-center rounded-lg p-0.5 border ${
+            darkMode ? "bg-slate-800/60 border-slate-700" : "bg-slate-100 border-slate-200"
+          }`}
+        >
           <button
             type="button"
             onClick={() => setLanguage("km")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
               language === "km"
-                ? "bg-white text-navy-950 font-bold shadow-sm"
-                : "text-white/80 hover:text-white"
+                ? darkMode
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "bg-white text-slate-900 font-semibold shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
             title="ភាសាខ្មែរ (Khmer)"
           >
@@ -168,10 +172,12 @@ export const Navbar = ({
           <button
             type="button"
             onClick={() => setLanguage("en")}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
               language === "en"
-                ? "bg-white text-navy-950 font-bold shadow-sm"
-                : "text-white/80 hover:text-white"
+                ? darkMode
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "bg-white text-slate-900 font-semibold shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
             title="English"
           >
@@ -179,16 +185,15 @@ export const Navbar = ({
           </button>
         </div>
 
-        {/* Dark/Light mode toggle */}
-        <Tooltip title={darkMode ? "Light Mode" : "Dark Mode"}>
+        <Tooltip title={darkMode ? t("theme.lightMode", "Light Mode") : t("theme.darkMode", "Dark Mode")}>
           <Button
             type="text"
             shape="circle"
             icon={
               darkMode ? (
-                <MdLightMode className="text-yellow-300 text-xl" />
+                <MdLightMode className="text-amber-400 text-xl" />
               ) : (
-                <MdDarkMode className="text-white text-xl" />
+                <MdDarkMode className="text-slate-600 text-xl" />
               )
             }
             onClick={() =>
@@ -198,11 +203,14 @@ export const Navbar = ({
                 return next;
               })
             }
-            className="!bg-white/10 hover:!bg-white/20"
+            className={
+              darkMode
+                ? "!bg-slate-800 hover:!bg-slate-700"
+                : "!bg-slate-100 hover:!bg-slate-200"
+            }
           />
         </Tooltip>
 
-        {/* Notifications */}
         <Dropdown
           popupRender={() => notifPanel}
           trigger={["click"]}
@@ -211,17 +219,24 @@ export const Navbar = ({
             if (open && markAllRead) markAllRead();
           }}
         >
-          <Badge count={unreadCount} size="small">
+          <Badge count={unreadCount} size="small" offset={[-2, 2]}>
             <Button
               type="text"
               shape="circle"
-              icon={<MdNotifications className="text-white text-xl" />}
-              className="!bg-white/10 hover:!bg-white/20"
+              icon={
+                <MdNotifications
+                  className={`text-xl ${darkMode ? "text-slate-200" : "text-slate-700"}`}
+                />
+              }
+              className={
+                darkMode
+                  ? "!bg-slate-800 hover:!bg-slate-700"
+                  : "!bg-slate-100 hover:!bg-slate-200"
+              }
             />
           </Badge>
         </Dropdown>
 
-        {/* User Profile Menu */}
         <Dropdown
           menu={{
             items: userMenuItems,
@@ -238,17 +253,19 @@ export const Navbar = ({
             onClick={(e) => e.preventDefault()}
             className="flex items-center gap-2 cursor-pointer select-none"
           >
-            <div className="text-right hidden sm:block">
-              <div className="text-white font-semibold text-sm leading-tight">
+            <div className="text-right hidden md:block">
+              <div className="font-semibold text-sm leading-tight text-slate-900 dark:text-white">
                 {profile?.name}
               </div>
-              <div className="text-blue-200 text-xs">{roleLabel}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{roleLabel}</div>
             </div>
             {profile?.profile_image_url ? (
               <img
                 src={`${profile.profile_image_url}?v=${profile.updated_at || profile.id}`}
                 alt="avatar"
-                className="w-9 h-9 rounded-full object-cover border-2 border-white/40"
+                className={`w-9 h-9 rounded-full object-cover border-2 ${
+                  darkMode ? "border-slate-600" : "border-slate-200"
+                }`}
                 onError={(e) => {
                   e.target.style.display = "none";
                   if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
@@ -256,16 +273,20 @@ export const Navbar = ({
               />
             ) : null}
             <div
-              className="w-9 h-9 rounded-full bg-blue-700 border-2 border-white/40 items-center justify-center text-white font-bold text-sm"
+              className={`w-9 h-9 rounded-full items-center justify-center font-bold text-sm border-2 ${
+                darkMode
+                  ? "bg-sky-900 border-slate-600 text-sky-100"
+                  : "bg-sky-800 border-slate-200 text-white"
+              }`}
               style={{ display: profile?.profile_image_url ? "none" : "flex" }}
             >
               {profile?.name?.charAt(0).toUpperCase()}
             </div>
-            <MdKeyboardArrowDown className="text-white text-lg" />
+            <MdKeyboardArrowDown className="text-slate-500 dark:text-slate-400 text-lg" />
           </a>
         </Dropdown>
       </div>
-    </div>
+    </header>
   );
 };
 

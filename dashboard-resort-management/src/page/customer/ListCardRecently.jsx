@@ -25,17 +25,33 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function ListCardRecently() {
+export default function ListCardRecently({ bookings: bookingsProp = null }) {
   const dark = useDarkMode();
   const [bookings, setBookings] = useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
   const [page,     setPage]     = useState(1);
 
   useEffect(() => {
+    if (Array.isArray(bookingsProp)) {
+      setBookings(bookingsProp);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     request("admin/bookings", "get")
-      .then(res => { if (res?.data) setBookings(res.data); })
+      .then((res) => {
+        if (res?.data) setBookings(res.data);
+        else setBookings([]);
+      })
+      .catch(() => {
+        setBookings([]);
+        setError("Could not load recent reservations.");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [bookingsProp]);
 
   const totalPages = Math.max(1, Math.ceil(bookings.length / PAGE_SIZE));
   const paged      = bookings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -81,6 +97,8 @@ export default function ListCardRecently() {
       <div>
         {loading ? (
           <div className={`py-8 text-center text-[10px] ${subCls}`}>Loading…</div>
+        ) : error ? (
+          <div className={`py-8 text-center text-[10px] text-red-500`}>{error}</div>
         ) : paged.length === 0 ? (
           <div className={`py-8 text-center text-[10px] ${subCls}`}>No reservations found</div>
         ) : paged.map((b) => (

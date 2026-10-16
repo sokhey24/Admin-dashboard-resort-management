@@ -356,17 +356,14 @@ export const AppProvider = ({ children }) => {
 
   const registerAccount = async ({ name, email, phone, password, password_confirmation }) => {
     try {
-      const data = await registerRequest({
+      await registerRequest({
         name,
         email,
         phone: phone || undefined,
         password,
         password_confirmation,
       });
-      if (!data.access_token) {
-        return { ok: true, registered: true, message: data.message };
-      }
-      return await completeAuthResponse(data);
+      return { ok: true, registered: true, email };
     } catch (error) {
       return {
         ok: false,

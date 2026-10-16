@@ -103,10 +103,16 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
         ->middleware('permission:admin.resorts.update');
     Route::patch('resort-profile', [ResortProfileController::class, 'update'])
         ->middleware('permission:admin.resorts.update');
+    Route::post('resort-profile', [ResortProfileController::class, 'update'])
+        ->middleware('permission:admin.resorts.update');
 
     // Brand overview & catalog listing
     Route::get('resorts',            [ResortController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.rooms.view,resort.branches.view');
+    Route::post('resorts',           [ResortController::class, 'store'])  ->middleware('permission:admin.resorts.create');
     Route::get('resorts/{resort}',   [ResortController::class, 'show'])   ->middleware('permission:admin.resorts.view');
+    Route::put('resorts/{resort}',   [ResortController::class, 'update']) ->middleware('permission:admin.resorts.update');
+    Route::patch('resorts/{resort}', [ResortController::class, 'update']) ->middleware('permission:admin.resorts.update');
+    Route::delete('resorts/{resort}',[ResortController::class, 'destroy'])->middleware('permission:admin.resorts.delete');
 
 
     // Branches, Facilities, Gallery — admin.resorts.*
@@ -119,19 +125,16 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::patch('branches/{branch}',[BranchController::class,   'update']) ->middleware('permission:admin.resorts.update');
     Route::delete('branches/{branch}',[BranchController::class,  'destroy'])->middleware('permission:admin.resorts.delete');
 
-    Route::get('facilities',              [FacilityController::class, 'index'])  ->middleware('permission:admin.resorts.view');
-    Route::post('facilities',             [FacilityController::class, 'store'])  ->middleware('permission:admin.resorts.create');
-    Route::get('facilities/{facility}',   [FacilityController::class, 'show'])   ->middleware('permission:admin.resorts.view');
-    Route::put('facilities/{facility}',   [FacilityController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::patch('facilities/{facility}', [FacilityController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::delete('facilities/{facility}',[FacilityController::class, 'destroy'])->middleware('permission:admin.resorts.delete');
+    Route::get('facilities',              [FacilityController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.facilities.view');
+    Route::post('facilities',             [FacilityController::class, 'store'])  ->middleware('permission:admin.resorts.create,resort.facilities.manage');
+    Route::get('facilities/{facility}',   [FacilityController::class, 'show'])   ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.facilities.view');
+    Route::put('facilities/{facility}',   [FacilityController::class, 'update']) ->middleware('permission:admin.resorts.update,resort.facilities.manage');
+    Route::patch('facilities/{facility}', [FacilityController::class, 'update']) ->middleware('permission:admin.resorts.update,resort.facilities.manage');
+    Route::delete('facilities/{facility}',[FacilityController::class, 'destroy'])->middleware('permission:admin.resorts.delete,resort.facilities.manage');
 
-    Route::get('gallery',            [GalleryController::class, 'index'])  ->middleware('permission:admin.resorts.view');
-    Route::post('gallery',           [GalleryController::class, 'store'])  ->middleware('permission:admin.resorts.create');
-    Route::get('gallery/{gallery}',  [GalleryController::class, 'show'])   ->middleware('permission:admin.resorts.view');
-    Route::put('gallery/{gallery}',  [GalleryController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::patch('gallery/{gallery}',[GalleryController::class, 'update']) ->middleware('permission:admin.resorts.update');
-    Route::delete('gallery/{gallery}',[GalleryController::class,'destroy'])->middleware('permission:admin.resorts.delete');
+    Route::get('gallery',            [GalleryController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.facilities.view');
+    Route::post('gallery',           [GalleryController::class, 'store'])  ->middleware('permission:admin.resorts.create,resort.facilities.manage');
+    Route::delete('gallery/{gallery}',[GalleryController::class,'destroy'])->middleware('permission:admin.resorts.delete,resort.facilities.manage');
 
     // Rooms — admin.resorts.*
     Route::get('room-types',               [RoomTypeController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.rooms.view');

@@ -4,25 +4,8 @@ import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
 import { ProfileStore } from "../../store/ProfileStore";
+import { imageUrl } from "../Room/roomHelpers";
 
-
-const SAMPLE_USERS = [
-  { id: 1,  name: "Sophea Meas",     email: "sophea@example.com",    phone: "0961234501", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-01-05" },
-  { id: 2,  name: "Dara Chann",      email: "dara@example.com",      phone: "0961234502", gender: "male",   status: "active",   roles: [{ name: "customer" }], created_at: "2024-01-10" },
-  { id: 3,  name: "Bopha Keo",       email: "bopha@example.com",     phone: "0961234503", gender: "female", status: "inactive", roles: [{ name: "customer" }], created_at: "2024-02-03" },
-  { id: 4,  name: "Virak Sok",       email: "virak@example.com",     phone: "0961234504", gender: "male",   status: "active",   roles: [{ name: "customer" }], created_at: "2024-02-14" },
-  { id: 5,  name: "Sreymom Pich",    email: "sreymom@example.com",   phone: "0961234505", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-03-01" },
-  { id: 6,  name: "Kosal Heng",      email: "kosal@example.com",     phone: "0961234506", gender: "male",   status: "banned",   roles: [{ name: "customer" }], created_at: "2024-03-18" },
-  { id: 7,  name: "Chanthy Lim",     email: "chanthy@example.com",   phone: "0961234507", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-04-07" },
-  { id: 8,  name: "Piseth Noun",     email: "piseth@example.com",    phone: "0961234508", gender: "male",   status: "inactive", roles: [{ name: "customer" }], created_at: "2024-04-22" },
-  { id: 9,  name: "Ratana Chhun",    email: "ratana@example.com",    phone: "0961234509", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-05-09" },
-  { id: 10, name: "Makara Ung",      email: "makara@example.com",    phone: "0961234510", gender: "male",   status: "active",   roles: [{ name: "customer" }], created_at: "2024-05-30" },
-  { id: 11, name: "Leakhena Ros",    email: "leakhena@example.com",  phone: "0961234511", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-06-11" },
-  { id: 12, name: "Bunthoeun Yim",   email: "bunthoeun@example.com", phone: "0961234512", gender: "male",   status: "inactive", roles: [{ name: "customer" }], created_at: "2024-06-25" },
-  { id: 13, name: "Sokunthea Pen",   email: "sokunthea@example.com", phone: "0961234513", gender: "female", status: "active",   roles: [{ name: "customer" }], created_at: "2024-07-04" },
-  { id: 14, name: "Veasna Tep",      email: "veasna@example.com",    phone: "0961234514", gender: "male",   status: "active",   roles: [{ name: "customer" }], created_at: "2024-07-19" },
-  { id: 15, name: "Channary Seng",   email: "channary@example.com",  phone: "0961234515", gender: "female", status: "banned",   roles: [{ name: "customer" }], created_at: "2024-08-02" },
-];
 
 const STATUSES = ["all", "active", "inactive", "banned"];
 
@@ -34,8 +17,27 @@ const STATUS_STYLE = {
 
 const PAGE_SIZE = 10;
 
+function customerAvatarSrc(user) {
+  return imageUrl(user?.profile_image_url ?? user?.profile_image);
+}
+
 function Avatar({ name, src }) {
-  if (src) return <img src={src} alt={name} className="w-9 h-9 rounded-full object-cover shrink-0" />;
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt={name ?? ""}
+        className="w-9 h-9 rounded-full object-cover shrink-0"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
   return (
     <div className="w-9 h-9 rounded-full bg-[#FF6B00] flex items-center justify-center text-white font-semibold text-sm shrink-0">
       {name?.charAt(0).toUpperCase() ?? <MdPerson />}
@@ -187,6 +189,7 @@ export default function CustomerManagement() {
 
   const [users,    setUsers]    = useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [search,   setSearch]   = useState("");
   const [status,   setStatus]   = useState("all");
   const [sortCol,  setSortCol]  = useState("name");
@@ -199,15 +202,18 @@ export default function CustomerManagement() {
 
   const load = () => {
     setLoading(true);
-    request("admin/users", "get").then((res) => {
-      const data = Array.isArray(res) ? res : res?.data;
-      const list = data?.length ? data : SAMPLE_USERS;
-      setUsers(list.filter(u => u.id !== profile?.id && u.roles?.every(r => r.name !== "admin")));
-      setLoading(false);
-    }).catch(() => {
-      setUsers(SAMPLE_USERS);
-      setLoading(false);
-    });
+    setLoadError(null);
+    request("admin/guests", "get")
+      .then((res) => {
+        const data = Array.isArray(res) ? res : res?.data;
+        const list = Array.isArray(data) ? data : [];
+        setUsers(list.filter((u) => u.id !== profile?.id));
+      })
+      .catch((err) => {
+        setUsers([]);
+        setLoadError(err?.message ?? "Failed to load customers.");
+      })
+      .finally(() => setLoading(false));
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,6 +280,15 @@ export default function CustomerManagement() {
     <div style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       <h2 className={`text-[26px] font-bold mb-5 ${title}`}>Customer Management</h2>
 
+      {loadError && (
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${dark ? "border-red-800 bg-red-900/20 text-red-300" : "border-red-200 bg-red-50 text-red-700"}`}>
+          {loadError}
+          <button type="button" onClick={load} className="ml-3 font-semibold underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
 
         {/* ── Header ── */}
@@ -332,7 +347,7 @@ export default function CustomerManagement() {
                   {/* Name + Avatar */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar name={user.name} src={user.profile_image_url} />
+                      <Avatar name={user.name} src={customerAvatarSrc(user)} />
                       <div className="min-w-0">
                         <p className={`text-sm font-medium truncate ${title}`}>{user.name}</p>
                         <p className={`text-xs truncate ${subText}`}>{user.email}</p>

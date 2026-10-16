@@ -7,13 +7,11 @@ use App\Models\Resort;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Services\PricingService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class PricingServiceTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected PricingService $pricing;
 

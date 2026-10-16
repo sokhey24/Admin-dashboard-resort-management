@@ -19,7 +19,9 @@ import { MdEdit, MdDelete, MdSearch } from "react-icons/md";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { request } from "../../util/request";
 import ActionButtons from "../../components/ActionButtons";
-import ChartDataDashboard from "../Chart_Data/ChartDataDashboard";
+import AdminMonthlyRevenueChart from "../Chart_Data/AdminMonthlyRevenueChart";
+import RevenueStatCard from "../../components/dashboard/RevenueStatCard";
+import { useRevenuePeriodComparison } from "../../hooks/useRevenuePeriodComparison";
 import useRole from "../../util/useRole";
 import { buildQS, DateFilter, SearchBar } from "../FilterData/Filter_data";
 import PaymentTab from "../Payment/PaymentTab";
@@ -29,7 +31,6 @@ import { useBookingStore } from "../../store/BookingStore";
 import { useCatalogStore } from "../../store/CatalogStore";
 import { useBranchStore } from "../../store/useBranchStore";
 import LineChartPerformance from "../Chart_Data/LineChartPerformance";
-import AreaChartPerformance from "../Chart_Data/LineChartPerformance";
 import AreaChartAnalaysisPerformance from "../Chart_Data/AreaChartAnalaysisPerformance";
 import { BsShopWindow } from "react-icons/bs";
 import Chart_data_resort from "../Chart_Data/Chart_data_resort";
@@ -43,26 +44,65 @@ import NotificationCard from "../ManagerSystem/NotificationCard";
 const { Option } = Select;
 
 // ── Shared UI helpers ──────────────────────────────────────────
-function StatCard({ title, value, icon, color, dark, loading }) {
+function StatCard({ title, value, icon, color, dark, loading, trend, trendUp }) {
   return (
-    <div className={`rounded-xl border p-4 ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-semibold uppercase tracking-wide ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>{title}</span>
-        <span className="text-lg" style={{ color }}>{icon}</span>
+    <div
+      className={`rounded-xl border p-4 transition-shadow hover:shadow-md ${
+        dark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80 shadow-sm"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span
+          className={`text-xs font-semibold uppercase tracking-wide leading-relaxed ${
+            dark ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
+          {title}
+        </span>
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg ${
+            dark ? "bg-slate-800" : "bg-slate-50"
+          }`}
+          style={{ color }}
+        >
+          {icon}
+        </span>
       </div>
-      {loading
-        ? <div className={`h-8 w-20 rounded animate-pulse ${dark ? "bg-gray-700" : "bg-[#F5F8FC]"}`} />
-        : <div className="text-2xl font-bold" style={{ color }}>{value}</div>
-      }
+      {loading ? (
+        <div className={`h-8 w-24 rounded-lg animate-pulse ${dark ? "bg-slate-800" : "bg-slate-100"}`} />
+      ) : (
+        <div className="flex items-end justify-between gap-2">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{value}</div>
+          {trend != null && (
+            <span
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                trendUp
+                  ? dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+                  : dark ? "bg-red-900/40 text-red-400" : "bg-red-100 text-red-700"
+              }`}
+            >
+              {trendUp ? "▲" : "▼"} {trend}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 function Card({ title, children, dark, className = "" }) {
   return (
-    <div className={`rounded-xl border overflow-hidden ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"} ${className}`}>
+    <div
+      className={`rounded-xl border overflow-hidden ${
+        dark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80 shadow-sm"
+      } ${className}`}
+    >
       {title && (
-        <div className={`px-5 py-3 border-b text-sm font-semibold ${dark ? "border-gray-700 text-gray-200" : "border-[#D9E2EC] text-[#102A43]"}`}>
+        <div
+          className={`px-5 py-3 border-b text-sm font-semibold ${
+            dark ? "border-slate-800 text-slate-100" : "border-slate-100 text-slate-900"
+          }`}
+        >
           {title}
         </div>
       )}
@@ -236,94 +276,76 @@ function RecentActivityTable({ activities, dark }) {
     return { icon: "🔔", bg: dark ? "bg-gray-700" : "bg-[#F5F8FC]" };
   };
 
-  return (
+  const card = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
+  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
+  const subCls = dark ? "text-gray-400" : "text-[#486581]";
+  const borderCls = dark ? "border-gray-700" : "border-[#D9E2EC]";
 
-    <div>
-      
+  return (
+    <div className={`rounded-xl border shadow-sm overflow-hidden ${card}`}>
+      <div className={`px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${borderCls}`}>
+        <div>
+          <h3 className={`text-sm font-semibold ${titleCls}`}>Recent activity</h3>
+          <p className={`text-xs ${subCls}`}>From system audit log</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search…"
+            className={`text-xs px-3 py-1.5 rounded-lg border min-w-[140px] ${dark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-[#D9E2EC]"}`}
+          />
+          <select
+            value={actionFilter ?? ""}
+            onChange={(e) => setActionFilter(e.target.value || null)}
+            className={`text-xs px-2 py-1.5 rounded-lg border ${dark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-[#D9E2EC]"}`}
+          >
+            <option value="">All actions</option>
+            {actionOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <div className={`py-12 text-center text-sm ${subCls}`}>No activity records for this period.</div>
+      ) : (
+        <>
+          <ul className={`divide-y ${borderCls}`}>
+            {paged.map((a) => {
+              const mod = moduleIcon(a.model_type);
+              return (
+                <li key={a.id} className={`px-4 py-3 flex gap-3 ${dark ? "hover:bg-gray-700/40" : "hover:bg-[#F5F8FC]"}`}>
+                  <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${mod.bg}`}>{mod.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <span className={`text-sm font-medium ${titleCls}`}>{a.user ?? "System"}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${actionBadge(a.action)}`}>{a.action}</span>
+                    </div>
+                    <p className={`text-xs ${subCls} truncate`}>{a.description ?? a.model_type ?? "—"}</p>
+                  </div>
+                  <time className={`text-[10px] whitespace-nowrap ${subCls}`}>
+                    {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
+                  </time>
+                </li>
+              );
+            })}
+          </ul>
+          {filtered.length > PAGE_SIZE && (
+            <div className={`px-4 py-2 flex justify-between items-center text-xs ${subCls} border-t ${borderCls}`}>
+              <span>Page {page} of {Math.ceil(filtered.length / PAGE_SIZE)}</span>
+              <div className="flex gap-1">
+                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
+                <button type="button" disabled={page >= Math.ceil(filtered.length / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)} className="px-2 py-1 rounded border disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
-
-const sampleRecentBookings = [
-  {
-    id: 1,
-    booking_code: "BK-1001",
-    user: { name: "Sok Dara" },
-    check_in: "2026-08-28T14:00:00",
-    status: "confirmed",
-  },
-  {
-    id: 2,
-    booking_code: "BK-1002",
-    user: { name: "John Smith" },
-    check_in: "2026-08-29T12:00:00",
-    status: "pending",
-  },
-  {
-    id: 3,
-    booking_code: "BK-1003",
-    user: { name: "Dara Chan" },
-    check_in: "2026-08-30T15:00:00",
-    status: "checked_in",
-  },
-  {
-    id: 4,
-    booking_code: "BK-1004",
-    user: { name: "Emily Johnson" },
-    check_in: "2026-08-31T13:00:00",
-    status: "confirmed",
-  },
-  {
-    id: 5,
-    booking_code: "BK-1005",
-    user: { name: "Michael Brown" },
-    check_in: "2026-09-01T14:00:00",
-    status: "completed",
-  },
-];
-
-const sampleRecentActivities = [
-  {
-    id: 1,
-    user: "Admin",
-    action: "created",
-    module: "Booking",
-    description: "Created booking BK-1001",
-    created_at: "2026-08-28T09:30:00",
-  },
-  {
-    id: 2,
-    user: "Manager",
-    action: "updated",
-    module: "Room",
-    description: "Updated room Villa 102",
-    created_at: "2026-08-28T09:15:00",
-  },
-  {
-    id: 3,
-    user: "Staff",
-    action: "created",
-    module: "Restaurant Order",
-    description: "Created restaurant order #ORD-2031",
-    created_at: "2026-08-28T08:45:00",
-  },
-  {
-    id: 4,
-    user: "Admin",
-    action: "updated",
-    module: "User",
-    description: "Updated user permissions",
-    created_at: "2026-08-28T08:20:00",
-  },
-  {
-    id: 5,
-    user: "Manager",
-    action: "deleted",
-    module: "Menu",
-    description: "Deleted menu item Chicken Burger",
-    created_at: "2026-08-28T08:00:00",
-  },
-];
 
 // ── Overview Tab (real data) ───────────────────────────────────
 function OverviewTab({ dark }) {
@@ -356,9 +378,17 @@ function OverviewTab({ dark }) {
 
   const handleFilter = (f) => { setFilter(f); load(f); };
 
-  const axisColor = dark ? "#6b7280" : "#9ca3af";
-  const gridColor = dark ? "#374151" : "#e5e7eb";
   const stats     = data?.statistics ?? {};
+  const currentRevenue = stats.total_revenue ?? 0;
+  const {
+    comparison,
+    comparisonLoading,
+    comparisonError,
+    periodLabel,
+    canCompare,
+  } = useRevenuePeriodComparison(filter, selectedBranchId, currentRevenue);
+
+  const chartYear = filter.year || dayjs().year();
 
   if (error) return (
     <div className={`rounded-xl p-8 text-center ${dark ? "bg-gray-800 text-red-400" : "bg-white text-red-500"}`}>
@@ -379,7 +409,16 @@ function OverviewTab({ dark }) {
       </div>
       {/* Top stat cards row 2 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Revenue"    value={`$${Number(stats.total_revenue ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />}  color="#52c41a" dark={dark} loading={loading} />
+        <RevenueStatCard
+          revenue={currentRevenue}
+          dark={dark}
+          loading={loading}
+          comparison={comparison}
+          comparisonLoading={comparisonLoading}
+          comparisonError={comparisonError}
+          periodLabel={periodLabel}
+          canCompare={canCompare}
+        />
         <StatCard title="Food Orders"      value={stats.restaurant_orders} icon={<FaConciergeBell />}   color="#fa8c16" dark={dark} loading={loading} />
         <StatCard title="Occupancy"        value={`${Number(stats.occupancy_rate ?? 0)}%`} icon={<FaBed />} color="#1677ff" dark={dark} loading={loading} />
         <StatCard title="Current Stays"    value={stats.current_stays ?? 0} icon={<FaCalendarAlt />} color="#13c2c2" dark={dark} loading={loading} />
@@ -388,7 +427,11 @@ function OverviewTab({ dark }) {
 
       {/* ── Resort Management Section ── */}
       <div className={`rounded-xl border mb-4 overflow-hidden ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
-        <LineChartPerformance/>
+        <LineChartPerformance
+          monthlyPerformance={data?.monthly_performance ?? []}
+          loading={loading}
+          year={chartYear}
+        />
       </div>
 
       <div>
@@ -397,20 +440,11 @@ function OverviewTab({ dark }) {
 
       {/* ── Recent Bookings + Recent Activity ── */}
       {isAdmin && (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {/* <ListCardRecently/> */}
-
-    {/* Recent Activity */}
-    <RecentActivityTable
-      activities={
-        data?.recent_activities?.length
-          ? data.recent_activities
-          : sampleRecentActivities
-      }
-      dark={dark}
-    />
-  </div>
-)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <ListCardRecently bookings={data?.recent_bookings} />
+          <RecentActivityTable activities={data?.recent_activities ?? []} dark={dark} />
+        </div>
+      )}
       
     </Spin>
   );
@@ -776,8 +810,16 @@ function RevenueTab({ dark }) {
   const axisColor = dark ? "#6b7280" : "#9ca3af";
   const gridColor = dark ? "#374151" : "#e5e7eb";
   const monthly   = data?.monthly_revenue ?? [];
-  const totalRev  = monthly.reduce((s, r) => s + r.revenue, 0);
   const stats     = data?.statistics ?? {};
+  const chartYear = filter.year || dayjs().year();
+  const currentRevenue = stats.total_revenue ?? 0;
+  const {
+    comparison,
+    comparisonLoading,
+    comparisonError,
+    periodLabel,
+    canCompare,
+  } = useRevenuePeriodComparison(filter, selectedBranchId, currentRevenue);
 
   return (
     <Spin spinning={loading}>
@@ -786,11 +828,22 @@ function RevenueTab({ dark }) {
         <StatCard title="Total Users"      value={stats.total_users}    icon={<FaUsers />}         color="#fa8c16" dark={dark} loading={loading} />
         <StatCard title="Today Check-ins"  value={stats.today_checkins} icon={<FaCalendarAlt />}   color="#1677ff" dark={dark} loading={loading} />
         <StatCard title="Today Check-outs" value={stats.today_checkouts}icon={<FaCalendarAlt />}   color="#722ed1" dark={dark} loading={loading} />
-        <StatCard title="Total Revenue"    value={`$${Number(stats.total_revenue ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
+        <RevenueStatCard
+          revenue={currentRevenue}
+          dark={dark}
+          loading={loading}
+          comparison={comparison}
+          comparisonLoading={comparisonLoading}
+          comparisonError={comparisonError}
+          periodLabel={periodLabel}
+          canCompare={canCompare}
+        />
       </div>
 
-      <ChartDataDashboard/>
-      <AreaChartAnalaysisPerformance/>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 mb-4">
+        <AdminMonthlyRevenueChart monthlyRevenue={monthly} loading={loading} year={chartYear} />
+      </div>
+      <AreaChartAnalaysisPerformance monthlyRevenue={monthly} loading={loading} year={chartYear} />
     </Spin>
   );
 }

@@ -93,6 +93,8 @@ class BranchController extends Controller
             'slug'         => 'nullable|string|max:255',
             'city'         => 'nullable|string|max:255',
             'address'      => 'required|string|max:500',
+            'description'    => 'nullable|string|max:5000',
+            'description_km' => 'nullable|string|max:5000',
             'phone'        => 'nullable|string|max:20',
             'email'        => 'nullable|email|max:255',
             'cover_image'  => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
@@ -101,6 +103,8 @@ class BranchController extends Controller
             'stars'        => 'nullable|integer|min:1|max:5',
             'manager_name' => 'nullable|string|max:255',
             'status'       => 'required|in:active,inactive,maintenance',
+            'amenities'    => 'nullable|array',
+            'amenities.*'  => 'string|max:120',
         ]);
 
         if ($request->hasFile('cover_image')) {
@@ -122,6 +126,8 @@ class BranchController extends Controller
             'slug'         => 'nullable|string|max:255',
             'city'         => 'nullable|string|max:255',
             'address'      => 'sometimes|string|max:500',
+            'description'    => 'nullable|string|max:5000',
+            'description_km' => 'nullable|string|max:5000',
             'phone'        => 'nullable|string|max:20',
             'email'        => 'nullable|email|max:255',
             'cover_image'  => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
@@ -130,6 +136,8 @@ class BranchController extends Controller
             'stars'        => 'nullable|integer|min:1|max:5',
             'manager_name' => 'nullable|string|max:255',
             'status'       => 'sometimes|in:active,inactive,maintenance',
+            'amenities'    => 'nullable|array',
+            'amenities.*'  => 'string|max:120',
         ]);
 
         if ($request->hasFile('cover_image')) {

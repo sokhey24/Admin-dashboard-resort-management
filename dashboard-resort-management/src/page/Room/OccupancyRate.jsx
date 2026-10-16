@@ -60,11 +60,11 @@ export default function OccupancyRate() {
   const maintenance = Number(summary?.rooms_maintenance ?? 0);
   const rate = Number(summary?.occupancy_rate ?? 0);
 
-  const card     = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
+  const card = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
   const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
-  const subText  = dark ? "text-gray-400" : "text-[#829AB1]";
-  const axisClr  = dark ? "#6b7280" : "#9ca3af";
-  const gridClr  = dark ? "#374151" : "#e5e7eb";
+  const subText = dark ? "text-gray-400" : "text-[#829AB1]";
+  const axisClr = dark ? "#6b7280" : "#9ca3af";
+  const gridClr = dark ? "#374151" : "#e5e7eb";
 
   const stats = [
     { label: "Current Rate", value: `${rate}%`, color: "#52c41a" },

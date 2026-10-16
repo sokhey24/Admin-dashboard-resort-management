@@ -71,6 +71,11 @@ export const SearchBar = ({
     const foundBranch = (branchOptions.length > 0 ? branchOptions : []).find(
       (b) => String(b.value) === String(val) || String(b.branchId) === String(val)
     );
+    if (!val) {
+      setSelectedBranchId('');
+      setDestination('');
+      return;
+    }
     if (foundBranch && foundBranch.branchId) {
       setSelectedBranchId(String(foundBranch.branchId));
       setDestination(foundBranch.destination || '');
@@ -94,7 +99,7 @@ export const SearchBar = ({
     };
 
     updateBookingDraft({
-      ...(selectedBranchId ? { branchId: Number(selectedBranchId) } : {}),
+      branchId: selectedBranchId ? Number(selectedBranchId) : null,
       checkIn,
       checkOut,
       adults: guests,
@@ -225,7 +230,7 @@ export const SearchBar = ({
 
         <button
           type="submit"
-          className="inline-flex w-full lg:w-auto shrink-0 items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-gold via-[#d4a85a] to-gold-hover text-slate-950 font-semibold text-sm sm:text-base px-5 min-h-[56px] lg:min-h-0 lg:self-stretch lg:min-w-[11.5rem] xl:min-w-[15.5rem] shadow-lg hover:shadow-xl hover:brightness-105 active:scale-[0.99] transition-all"
+          className="inline-flex w-full lg:w-auto shrink-0 cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-gold via-[#d4a85a] to-gold-hover text-slate-950 font-semibold text-sm sm:text-base px-5 min-h-[56px] lg:min-h-0 lg:self-stretch lg:min-w-[11.5rem] xl:min-w-[15.5rem] shadow-lg hover:shadow-xl hover:brightness-105 active:scale-[0.99] transition-all"
         >
           <Search className="w-5 h-5 shrink-0" strokeWidth={2.25} aria-hidden />
           <span className="text-center leading-tight">{t('search.findSanctuaries', 'Find Sanctuaries')}</span>

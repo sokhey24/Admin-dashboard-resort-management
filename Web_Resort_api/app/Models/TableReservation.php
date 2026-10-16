@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class TableReservation extends Model
 {
-    protected $fillable = ['user_id', 'restaurant_table_id', 'reserved_at', 'party_size', 'status', 'note'];
+    protected $fillable = [
+        'user_id',
+        'restaurant_table_id',
+        'reserved_at',
+        'guests',
+        'guest_name',
+        'guest_email',
+        'guest_phone',
+        'status',
+        'note',
+    ];
 
     protected $casts = ['reserved_at' => 'datetime'];
 

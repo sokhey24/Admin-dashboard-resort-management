@@ -17,8 +17,8 @@ export function SignOutConfirmDialog({ isOpen, onClose, onConfirm, confirming = 
       )}
       maxWidth="sm"
     >
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
-        <Button variant="outline" size="sm" onClick={onClose} disabled={confirming}>
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2 border-t border-border/60 mt-1">
+        <Button variant="outline" size="sm" onClick={onClose} disabled={confirming} className="sm:min-w-[6.5rem]">
           {t('common.cancel', 'Cancel')}
         </Button>
         <Button
@@ -27,6 +27,7 @@ export function SignOutConfirmDialog({ isOpen, onClose, onConfirm, confirming = 
           onClick={onConfirm}
           isLoading={confirming}
           disabled={confirming}
+          className="sm:min-w-[6.5rem]"
         >
           {t('nav.signOut', 'Sign Out')}
         </Button>

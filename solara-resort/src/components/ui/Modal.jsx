@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { useMotionPresets } from '../../motion/useMotionPresets.js';
@@ -12,7 +13,12 @@ export const Modal = ({
   maxWidth = 'lg',
 }) => {
   const modalRef = useRef(null);
+  const [portalRoot, setPortalRoot] = useState(null);
   const { modalPanel, fade, transition, duration } = useMotionPresets();
+
+  useEffect(() => {
+    setPortalRoot(typeof document !== 'undefined' ? document.body : null);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -39,16 +45,17 @@ export const Modal = ({
     '4xl': 'max-w-4xl',
   };
 
-  return (
+  const dialog = (
     <AnimatePresence>
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 overflow-y-auto overscroll-contain"
           role="dialog"
           aria-modal="true"
+          aria-labelledby={title ? 'modal-dialog-title' : undefined}
         >
           <motion.div
-            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
             {...fade()}
             transition={transition(duration.button)}
             onClick={onClose}
@@ -57,25 +64,29 @@ export const Modal = ({
 
           <motion.div
             ref={modalRef}
-            className={`relative w-full ${maxWidthStyles[maxWidth] || maxWidthStyles.lg} bg-surface border border-border rounded-[var(--radius-modal)] shadow-2xl p-6 sm:p-8 z-10 my-8`}
+            className={`relative w-full ${maxWidthStyles[maxWidth] || maxWidthStyles.lg} bg-surface border border-border rounded-[var(--radius-modal)] shadow-2xl p-6 sm:p-8 z-[201] my-auto`}
             {...modalPanel()}
             transition={transition(duration.button)}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
                 {title && (
-                  <h3 className="text-xl font-semibold text-text tracking-tight font-serif">
+                  <h3
+                    id="modal-dialog-title"
+                    className="text-xl font-semibold text-text tracking-tight font-serif"
+                  >
                     {title}
                   </h3>
                 )}
                 {subtitle && (
-                  <p className="text-xs text-muted mt-1 leading-relaxed">{subtitle}</p>
+                  <p className="text-sm text-muted mt-2 leading-relaxed">{subtitle}</p>
                 )}
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer shrink-0"
                 aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
@@ -88,4 +99,10 @@ export const Modal = ({
       )}
     </AnimatePresence>
   );
+
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(dialog, portalRoot);
 };

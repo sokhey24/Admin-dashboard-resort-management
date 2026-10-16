@@ -13,6 +13,8 @@ class Branch extends Model
         'city',
         'province',
         'address',
+        'description',
+        'description_km',
         'phone',
         'email',
         'cover_image',
@@ -24,6 +26,7 @@ class Branch extends Model
         'checkin_time',
         'checkout_time',
         'is_active',
+        'amenities',
     ];
 
     protected $casts = [
@@ -31,6 +34,7 @@ class Branch extends Model
         'longitude' => 'float',
         'stars' => 'integer',
         'is_active' => 'boolean',
+        'amenities' => 'array',
     ];
 
     public function resort()

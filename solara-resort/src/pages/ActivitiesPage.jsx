@@ -1,221 +1,250 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HeroSection } from '../components/ui/HeroSection.jsx';
 import { Button } from '../components/ui/Button.jsx';
-import { Modal } from '../components/ui/Modal.jsx';
-import { formatCurrency } from '../util/currency.js';
 import { MARKETING_IMAGES } from '../constants/marketingImages.js';
 import { useApp } from '../context/AppContext.jsx';
-import { useWebsiteContent } from '../hooks/useWebsiteContent.js';
+import { ACTIVITIES_FIXTURE, ACTIVITY_CATEGORY_VALUES } from '../data/activitiesData.js';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
-import { Spinner } from '../components/common/Spinner.jsx';
-import { Calendar, Clock } from 'lucide-react';
+import { ActivityFilters } from '../components/activities/ActivityFilters.jsx';
+import { ActivityCard } from '../components/activities/ActivityCard.jsx';
+import { ActivityBookingModal } from '../components/activities/ActivityBookingModal.jsx';
+import { normalizeCategory } from '../components/activities/activityBookingUtils.js';
+import { paginateItems } from '../util/paginateList.js';
+import { ListPagination } from '../components/ui/ListPagination.jsx';
+import { Sparkles } from 'lucide-react';
+
+const ACTIVITIES_PAGE_SIZE = 6;
 
 export const ActivitiesPage = () => {
-  const { currency, addToast, t, localize, language } = useApp();
+  const { currency, t, localize, language, user } = useApp();
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [listPage, setListPage] = useState(1);
   const [selectedActivity, setSelectedActivity] = useState(null);
-  const [bookingDate, setBookingDate] = useState('2026-10-16');
-  const [guestCount, setGuestCount] = useState(2);
 
-  const categories = [
-    { value: 'All', label: t('activities.categoryAll', 'All') },
-    { value: 'Ocean & Water', label: t('activities.categoryWater', 'Ocean & Water') },
-    { value: 'Wellness & Spa', label: t('activities.categoryWellness', 'Wellness & Spa') },
-    { value: 'Culture & Culinary', label: t('activities.categoryCulture', 'Culture & Culinary') },
-    { value: 'Expedition', label: t('activities.categoryExpedition', 'Expedition') },
-  ];
+  const categories = useMemo(
+    () =>
+      ACTIVITY_CATEGORY_VALUES.map((value) => {
+        const keyMap = {
+          All: 'activities.categoryAll',
+          Adventure: 'activities.categoryAdventure',
+          Wellness: 'activities.categoryWellness',
+          Culture: 'activities.categoryCulture',
+          Nature: 'activities.categoryNature',
+        };
+        const defaults = {
+          All: 'All',
+          Adventure: 'Adventure',
+          Wellness: 'Wellness',
+          Culture: 'Culture',
+          Nature: 'Nature',
+        };
+        return {
+          value,
+          label: t(keyMap[value], defaults[value]),
+        };
+      }),
+    [t]
+  );
 
-  const { activities: cmsActivities, loading: contentLoading } = useWebsiteContent();
-  const localizedActivities = cmsActivities.map((a) => (localize ? localize(a) : a));
+  const introGalleryImages = useMemo(
+    () => [
+      { src: MARKETING_IMAGES.villa, alt: t('activities.categoryAdventure', 'Adventure') },
+      { src: MARKETING_IMAGES.spa, alt: t('activities.categoryWellness', 'Wellness') },
+      { src: MARKETING_IMAGES.dining, alt: t('activities.categoryCulture', 'Culture') },
+    ],
+    [t]
+  );
 
-  const filtered = selectedCategory === 'All'
-    ? localizedActivities
-    : localizedActivities.filter((a) => a.category === selectedCategory || (selectedCategory === 'Ocean & Water' && a.category_km === 'សមុទ្រ & ទឹក'));
+  const filteredActivities = useMemo(() => {
+    if (selectedCategory === 'All') return ACTIVITIES_FIXTURE;
+    const target = normalizeCategory(selectedCategory);
+    return ACTIVITIES_FIXTURE.filter((a) => normalizeCategory(a.category) === target);
+  }, [selectedCategory]);
 
-  const handleBookActivity = (e) => {
-    e.preventDefault();
-    if (!selectedActivity) return;
-    addToast(
-      t('activities.inquirySuccess', 'Activity inquiry submitted successfully. Our concierge will confirm within 2 hours.'),
-      'success'
-    );
+  useEffect(() => {
+    setListPage(1);
+  }, [selectedCategory]);
+
+  const activitiesPagination = useMemo(
+    () => paginateItems(filteredActivities, listPage, ACTIVITIES_PAGE_SIZE),
+    [filteredActivities, listPage]
+  );
+
+  useEffect(() => {
+    if (listPage > activitiesPagination.totalPages) {
+      setListPage(activitiesPagination.totalPages);
+    }
+  }, [listPage, activitiesPagination.totalPages]);
+
+  const pagedActivities = activitiesPagination.items;
+  const filterEmpty = filteredActivities.length === 0;
+
+  const openBookingModal = useCallback((rawActivity) => {
+    setSelectedActivity(rawActivity);
+  }, []);
+
+  const closeBookingModal = useCallback(() => {
     setSelectedActivity(null);
+  }, []);
+
+  const scrollToCatalog = () => {
+    document.getElementById('activities-catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const selectedDisplay = selectedActivity
+    ? (localize ? localize(selectedActivity) : selectedActivity)
+    : null;
+
   return (
-    <div className="w-full pb-24">
+    <div className="w-full pb-24 overflow-x-hidden">
       <HeroSection
-        image={MARKETING_IMAGES.hero}
-        badge={t('home.activitiesTag', 'Unforgettable Journeys')}
-        title={t('activities.pageTitle', 'Curated Adventures & Cultural Encounters')}
-        subtitle={t('activities.pageSubtitle', 'Sail private catamarans, meditate before ancient stone temples at dawn, or master the ancient art of royal Khmer gastronomy.')}
-        heightClass="min-h-[440px]"
-      />
+        image={MARKETING_IMAGES.villa}
+        badge={t('activities.heroEyebrow', 'Activities & Experiences')}
+        title={t('activities.heroTitle', 'Discover Unforgettable Experiences')}
+        subtitle={t(
+          'activities.heroSubtitle',
+          'Craft meaningful moments at Solara Resort—from dawn wellness rituals to coastal adventures and living Khmer heritage.'
+        )}
+        heightClass="min-h-[440px] sm:min-h-[480px] lg:min-h-[520px]"
+      >
+        <Button variant="gold" size="md" type="button" onClick={scrollToCatalog} className="shadow-lg">
+          {t('activities.exploreCta', 'Explore Experiences')}
+        </Button>
+      </HeroSection>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-12">
-          {categories.map((cat) => (
-            <button
-              key={cat.value}
-              type="button"
-              onClick={() => setSelectedCategory(cat.value)}
-              className={`px-4 py-2 rounded-[var(--radius-button)] text-xs font-medium transition-colors cursor-pointer ${
-                selectedCategory === cat.value
-                  ? 'bg-gold text-slate-950 font-semibold shadow-sm'
-                  : 'bg-surface border border-border text-text-secondary hover:text-text hover:bg-surface-hover'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {contentLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading', 'Loading')} />
-          </div>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title={t('activities.emptyTitle', 'Experiences coming soon')}
-            description={t(
-              'activities.emptyDesc',
-              'Our concierge team is preparing curated activities. Please check back shortly.'
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 sm:mt-12">
+        <section className="mb-10 sm:mb-14 text-center max-w-3xl mx-auto space-y-4">
+          <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block">
+            {t('activities.introEyebrow', 'Solara Resort')}
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-text tracking-tight">
+            {t('activities.introTitle', 'Discover More at Solara')}
+          </h2>
+          <p className="text-sm text-muted leading-relaxed font-light">
+            {t(
+              'activities.introDesc',
+              'Whether you seek adventure on the water, restorative wellness, immersive culture, tranquil nature, or family-friendly outings—our concierge curates experiences that match your pace.'
             )}
+          </p>
+          <ul className="flex flex-wrap justify-center gap-2 pt-2">
+            {[
+              t('activities.introThemeAdventure', 'Adventure'),
+              t('activities.introThemeWellness', 'Wellness'),
+              t('activities.introThemeCulture', 'Culture'),
+              t('activities.introThemeNature', 'Nature'),
+              t('activities.introThemeFamily', 'Family'),
+            ].map((label) => (
+              <li
+                key={label}
+                className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-secondary bg-surface border border-border px-3 py-1.5 rounded-full"
+              >
+                <Sparkles className="w-3 h-3 text-gold shrink-0" aria-hidden />
+                {label}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <header className="mb-8 sm:mb-10 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-center">
+          <div className="text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+            <h2 className="text-xl sm:text-2xl font-serif font-semibold text-text tracking-tight">
+              {t('activities.exploreTitle', 'Resort experiences & adventures')}
+            </h2>
+            <p className="mt-2 text-sm text-muted font-light leading-relaxed">
+              {t(
+                'activities.exploreSubtitle',
+                'Browse curated activities by category and reserve your preferred date with our concierge team.'
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-lg mx-auto lg:max-w-none lg:ml-auto w-full">
+            {introGalleryImages.map((item, index) => (
+              <div
+                key={`intro-gallery-${index}`}
+                className={`relative overflow-hidden rounded-[var(--radius-card)] border border-border bg-slate-900 aspect-[3/4] shadow-sm ${
+                  index === 1 ? 'sm:-translate-y-2' : ''
+                }`}
+              >
+                <img
+                  src={item.src}
+                  alt={item.alt}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-transparent pointer-events-none" />
+              </div>
+            ))}
+          </div>
+        </header>
+
+        <ActivityFilters
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelect={(value) => {
+            setSelectedCategory(value);
+            setListPage(1);
+          }}
+          ariaLabel={t('activities.exploreTitle', 'Resort experiences & adventures')}
+        />
+
+        {filterEmpty ? (
+          <EmptyState
+            title={t('activities.emptyFilterTitle', 'No experiences found')}
+            description={t('activities.emptyCategoryDesc', 'Try another category or view all experiences.')}
+            actionText={t('activities.viewAllExperiences', 'View All Experiences')}
+            onAction={() => {
+              setSelectedCategory('All');
+              setListPage(1);
+            }}
           />
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filtered.map((act) => (
-            <div
-              key={act.id}
-              className="group bg-surface border border-border hover:border-gold/40 rounded-[var(--radius-card)] overflow-hidden shadow-sm flex flex-col justify-between"
-            >
-              <div>
-                <div className="relative aspect-[16/10] overflow-hidden bg-slate-900">
-                  <img
-                    src={act.image}
-                    alt={act.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+          <div id="activities-catalog">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {pagedActivities.map((rawAct) => {
+                const act = localize ? localize(rawAct) : rawAct;
+                return (
+                  <ActivityCard
+                    key={rawAct.id}
+                    activity={rawAct}
+                    display={act}
+                    currency={currency}
+                    imageFallbackLabel={t('activities.imageFallback', 'Activity experience')}
+                    perPersonLabel={t('common.perPerson', '/ person')}
+                    reserveLabel={t('activities.reserveExp', 'Reserve Experience')}
+                    onReserve={openBookingModal}
                   />
-                  <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md text-[10px] uppercase tracking-wider text-gold-light px-2.5 py-1 rounded border border-gold/30">
-                    {act.category}
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-3">
-                  <div className="flex items-center justify-between text-xs text-muted">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-gold" />
-                      <span>{act.duration}</span>
-                    </span>
-                    <span className="font-bold font-serif text-gold text-sm">
-                      {formatCurrency(act.pricePerPerson, currency)} {t('common.perPerson', '/ person')}
-                    </span>
-                  </div>
-
-                  <h3 className="text-lg font-serif font-semibold text-text group-hover:text-gold transition-colors">
-                    {act.title}
-                  </h3>
-
-                  <p className="text-xs text-muted leading-relaxed font-light line-clamp-3">
-                    {act.description}
-                  </p>
-
-                  <div className="pt-2 text-xs text-text-secondary flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gold" />
-                    <span>{act.schedule}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 pt-0">
-                <Button
-                  variant="gold"
-                  size="sm"
-                  className="w-full shadow-sm"
-                  onClick={() => setSelectedActivity(act)}
-                >
-                  {t('activities.reserveExp', 'Reserve Experience')}
-                </Button>
-              </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+            {activitiesPagination.showPagination && (
+              <ListPagination
+                className="mt-10"
+                page={activitiesPagination.page}
+                totalPages={activitiesPagination.totalPages}
+                total={activitiesPagination.total}
+                startIndex={activitiesPagination.startIndex}
+                endIndex={activitiesPagination.endIndex}
+                language={language}
+                onPageChange={(nextPage) => {
+                  setListPage(nextPage);
+                  document.getElementById('activities-catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              />
+            )}
+          </div>
         )}
       </div>
 
-      {selectedActivity && (
-        <Modal
-          isOpen={true}
-          onClose={() => setSelectedActivity(null)}
-          title={`${t('activities.reserveExp', 'Reserve')}: ${selectedActivity.title}`}
-          subtitle={`${t('activities.schedule', 'Schedule')}: ${selectedActivity.schedule} · ${t('activities.duration', 'Duration')}: ${selectedActivity.duration}`}
-        >
-          <form onSubmit={handleBookActivity} className="space-y-4">
-            <div className="p-3 rounded-[var(--radius-button)] bg-bg border border-border text-xs flex justify-between items-center">
-              <span>{language === 'km' ? 'តម្លៃក្នុងម្នាក់៖' : 'Price per guest:'}</span>
-              <span className="font-serif font-bold text-gold text-sm">
-                {formatCurrency(selectedActivity.pricePerPerson, currency)}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-muted font-medium block">
-                  {t('activities.preferredDate', 'Preferred Date')}
-                </label>
-                <input
-                  type="date"
-                  value={bookingDate}
-                  onChange={(e) => setBookingDate(e.target.value)}
-                  required
-                  className="w-full bg-surface border border-border text-text rounded-[var(--radius-input)] p-2 text-xs focus:outline-none focus:border-gold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-muted font-medium block">
-                  {t('search.guestsRooms', 'Guests')}
-                </label>
-                <select
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(Number(e.target.value))}
-                  className="w-full bg-surface border border-border text-text rounded-[var(--radius-input)] p-2 text-xs focus:outline-none focus:border-gold cursor-pointer"
-                >
-                  <option value={1}>1 {t('search.guest', 'Guest')}</option>
-                  <option value={2}>2 {t('search.guests', 'Guests')}</option>
-                  <option value={3}>3 {t('search.guests', 'Guests')}</option>
-                  <option value={4}>4 {t('search.guests', 'Guests')}</option>
-                  <option value={6}>6+ {t('search.guests', 'Guests')}</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="p-3 rounded bg-surface/50 border border-border flex justify-between text-xs font-semibold">
-              <span>{t('common.totalDue', 'Estimated Total')}:</span>
-              <span className="text-gold font-serif text-sm">
-                {formatCurrency(selectedActivity.pricePerPerson * guestCount, currency)}
-              </span>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedActivity(null)}
-              >
-                {t('common.cancel', 'Cancel')}
-              </Button>
-              <Button
-                type="submit"
-                variant="gold"
-                size="sm"
-              >
-                {t('activities.confirmExp', 'Confirm Experience')}
-              </Button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      <ActivityBookingModal
+        isOpen={Boolean(selectedActivity)}
+        activity={selectedActivity}
+        display={selectedDisplay}
+        currency={currency}
+        t={t}
+        user={user}
+        onClose={closeBookingModal}
+      />
     </div>
   );
 };

@@ -1,8 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
-  Star,
   Sparkles,
   Waves,
   Shield,
@@ -12,7 +11,7 @@ import {
 import { HeroSection } from '../components/ui/HeroSection.jsx';
 import { SearchWidget } from '../features/search/components/SearchWidget.jsx';
 import { BranchCard } from '../components/branch/BranchCard.jsx';
-import { RoomCard } from '../components/room/RoomCard.jsx';
+import { RoomCard, RoomCardGrid } from '../components/room/RoomCard.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { formatCurrency } from '../util/currency.js';
 import { useApp } from '../context/AppContext.jsx';
@@ -28,6 +27,18 @@ import { StarRatingDisplay } from '../components/reviews/StarRating.jsx';
 import heroImage from '../assets/images/hero_solara_resort_1790692958491.jpg';
 import { RevealOnScroll } from '../components/motion/RevealOnScroll.jsx';
 import { StaggerItem } from '../components/motion/StaggerItem.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { ROUTES } from '../config/routes.js';
+import { PopularDishes } from '../components/dining/PopularDishes.jsx';
+import {
+  DISH_CATEGORIES,
+  DINING_POPULAR_PAGE_SIZE,
+  popularDishes,
+} from '../data/diningData.js';
+import { MainsolaraResort } from './MainsolaraResort.jsx';
+
+/** Destination tiles per page (Explore Destinations — matches lg:grid-cols-4). */
+const HOME_DESTINATIONS_PAGE_SIZE = 4;
 
 export const HomePage = () => {
   const navigate = useNavigate();
@@ -52,9 +63,45 @@ export const HomePage = () => {
     services: cmsServices,
     diningVenues: cmsDining,
     reviews: cmsReviews,
+    error: cmsContentError,
   } = useWebsiteContent();
 
-  const destinations = buildDestinationTiles(catalogBranches);
+  const destinations = useMemo(
+    () => buildDestinationTiles(catalogBranches),
+    [catalogBranches]
+  );
+  const [destinationsPage, setDestinationsPage] = useState(1);
+
+  const destinationsTotalPages = Math.max(
+    1,
+    Math.ceil(destinations.length / HOME_DESTINATIONS_PAGE_SIZE)
+  );
+
+  const paginatedDestinations = useMemo(() => {
+    const start = (destinationsPage - 1) * HOME_DESTINATIONS_PAGE_SIZE;
+    return destinations.slice(start, start + HOME_DESTINATIONS_PAGE_SIZE);
+  }, [destinations, destinationsPage]);
+
+  useEffect(() => {
+    setDestinationsPage(1);
+  }, [destinations.length]);
+
+  useEffect(() => {
+    if (destinationsPage > destinationsTotalPages) {
+      setDestinationsPage(destinationsTotalPages);
+    }
+  }, [destinationsPage, destinationsTotalPages]);
+
+  const destinationsSummary = useMemo(() => {
+    if (branchesLoading || destinations.length === 0) return null;
+    const start = (destinationsPage - 1) * HOME_DESTINATIONS_PAGE_SIZE + 1;
+    const end = Math.min(destinationsPage * HOME_DESTINATIONS_PAGE_SIZE, destinations.length);
+    if (language === 'km') {
+      return `បង្ហាញ ${start}–${end} នៃ ${destinations.length} ទីតាំង`;
+    }
+    return `Showing ${start}–${end} of ${destinations.length} destinations`;
+  }, [branchesLoading, destinations.length, destinationsPage, language]);
+
   const featuredBranches = catalogBranches.slice(0, 4);
   const activities = cmsActivities.map((a) => (localize ? localize(a) : a));
   const services = cmsServices.map((s) => (localize ? localize(s) : s));
@@ -66,19 +113,23 @@ export const HomePage = () => {
     loading: guestReviewsLoading,
     error: guestReviewsError,
     summary: guestReviewsSummary,
+    reload: reloadGuestReviews,
   } = useGuestReviews({ status: 'approved', per_page: 30 });
 
-  const guestReviewsApiFailed = !guestReviewsLoading && Boolean(guestReviewsError);
   const showGuestReviews = approvedGuestReviews.length > 0;
   const showCmsReviews =
     cmsReviewsLocalized.length > 0 &&
     !showGuestReviews &&
-    (!guestReviewsLoading || guestReviewsApiFailed);
+    !guestReviewsLoading &&
+    !cmsContentError;
 
   const showGuestReviewSkeletons =
     guestReviewsLoading && !showGuestReviews && !showCmsReviews;
   const showReviewsSection =
-    guestReviewsLoading || showGuestReviews || showCmsReviews;
+    guestReviewsLoading ||
+    showGuestReviews ||
+    showCmsReviews ||
+    Boolean(guestReviewsError);
 
   const guestReviewSummary = useMemo(() => {
     if (!showGuestReviews) return null;
@@ -117,6 +168,15 @@ export const HomePage = () => {
     }
     return [];
   }, [showGuestReviews, showCmsReviews, approvedGuestReviews, cmsReviewsLocalized, t]);
+
+  const dishCategories = useMemo(
+    () =>
+      DISH_CATEGORIES.map((cat) => ({
+        ...cat,
+        label: t(`dining.category.${cat.id}`, cat.label),
+      })),
+    [t]
+  );
 
   return (
     <div className="w-full flex flex-col">
@@ -177,6 +237,9 @@ export const HomePage = () => {
               <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
                 {t('home.destinationsTitle', 'Explore Destinations')}
               </h2>
+              {destinationsSummary && (
+                <p className="text-xs text-muted mt-2">{destinationsSummary}</p>
+              )}
             </div>
             <Button
               variant="outline"
@@ -196,10 +259,9 @@ export const HomePage = () => {
             )}
             {!branchesError && branchesLoading && (
               <>
-                <ResortCardSkeleton />
-                <ResortCardSkeleton />
-                <ResortCardSkeleton />
-                <ResortCardSkeleton />
+                {Array.from({ length: HOME_DESTINATIONS_PAGE_SIZE }, (_, i) => (
+                  <ResortCardSkeleton key={i} />
+                ))}
               </>
             )}
             {!branchesError && !branchesLoading && destinations.length === 0 && (
@@ -209,7 +271,7 @@ export const HomePage = () => {
             )}
             {!branchesError &&
               !branchesLoading &&
-              destinations.map((dest, index) => (
+              paginatedDestinations.map((dest, index) => (
               <StaggerItem
                 key={dest.name}
                 index={index}
@@ -249,8 +311,20 @@ export const HomePage = () => {
               </StaggerItem>
               ))}
           </div>
+
+          {!branchesError && !branchesLoading && destinationsTotalPages > 1 && (
+            <Pagination
+              className="mt-10 pt-8 border-t border-border"
+              page={destinationsPage}
+              totalPages={destinationsTotalPages}
+              onPageChange={setDestinationsPage}
+            />
+          )}
         </div>
       </RevealOnScroll>
+
+      {/* 3. Detail about Solara Main Branch */}
+      <MainsolaraResort/>
 
       {/* 4. POPULAR BRANCHES */}
       <RevealOnScroll as="section" className="py-20 bg-surface/30 border-y border-border">
@@ -330,13 +404,15 @@ export const HomePage = () => {
               <RoomCardSkeleton />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch auto-rows-fr">
-              {catalogRooms.slice(0, 3).map((room, index) => (
+            <RoomCardGrid
+              rooms={catalogRooms}
+              pageSize={3}
+              renderItem={(room, index) => (
                 <StaggerItem key={room.id} index={index}>
                   <RoomCard room={room} />
                 </StaggerItem>
-              ))}
-            </div>
+              )}
+            />
           )}
         </div>
       </RevealOnScroll>
@@ -464,23 +540,32 @@ export const HomePage = () => {
       </RevealOnScroll>
       )}
 
-      {/* 8. DINING HIGHLIGHT */}
-      {diningVenues.length > 0 && (
-      <RevealOnScroll as="section" className="py-20 bg-surface/50 border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+      {/* 8. DINING — POPULAR DISHES & VENUES */}
+      <RevealOnScroll as="section" className="bg-surface/50 border-t border-border">
+        <PopularDishes
+          dishes={popularDishes}
+          categories={dishCategories}
+          currency={currency}
+          t={t}
+          pageSize={DINING_POPULAR_PAGE_SIZE}
+          onReserve={() => navigate(`${ROUTES.dining}#table-reservation`)}
+        />
+
+        {diningVenues.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4 pt-4 border-t border-border">
             <div>
               <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
                 {t('home.diningTag', 'Epicurean Artistry')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
-                {t('home.diningTitle', 'Gastronomy by the Sea & Forest')}
+                {t('home.diningVenuesTitle', 'Our Restaurants & Lounges')}
               </h2>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/dining')}
+              onClick={() => navigate(ROUTES.dining)}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
               {t('home.exploreDining', 'Explore Menus & Tables')}
@@ -521,8 +606,8 @@ export const HomePage = () => {
             ))}
           </div>
         </div>
+        )}
       </RevealOnScroll>
-      )}
 
       {/* 9. PROMOTION / SPECIAL OFFER BANNER */}
       <RevealOnScroll as="section" className="py-16 bg-bg">
@@ -587,19 +672,21 @@ export const HomePage = () => {
                     : t('home.verifiedReviews', 'verified reviews')}
                 </span>
               </div>
-            ) : showGuestReviews ? null : (
-              <div className="flex items-center justify-center gap-1.5 text-gold">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-gold" />
-                ))}
-                <span className="ml-2 text-xs font-semibold text-text">
-                  {t('home.reviewsSummary', '4.94 Overall Rating across 1,040+ Verified Reviews')}
-                </span>
-              </div>
-            )}
+            ) : showCmsReviews ? (
+              <p className="text-xs text-muted">
+                {t('home.cmsTestimonialsNote', 'Stories curated by our resort team')}
+              </p>
+            ) : null}
           </div>
 
           <div className="max-w-7xl mx-auto">
+            {guestReviewsError && !showGuestReviews && !showCmsReviews && !guestReviewsLoading && (
+              <ErrorState
+                title={t('home.reviewsErrorTitle', 'Unable to load guest reviews')}
+                message={guestReviewsError}
+                onRetry={reloadGuestReviews}
+              />
+            )}
             {showGuestReviewSkeletons && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <RoomCardSkeleton />

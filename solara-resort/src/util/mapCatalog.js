@@ -52,12 +52,18 @@ function roomDisplayName(room) {
 function primaryRoomImage(room) {
   const images = room?.images || [];
   const primary = images.find((img) => img.is_primary) || images[0];
-  return primary?.url || resolveStorageUrl(primary?.image_path) || CATALOG_IMAGE_PLACEHOLDER;
+  return (
+    resolveStorageUrl(primary?.image_path) ||
+    resolveStorageUrl(primary?.url) ||
+    CATALOG_IMAGE_PLACEHOLDER
+  );
 }
 
 function roomGallery(room) {
   const images = room?.images || [];
-  return images.map((img) => img.url || resolveStorageUrl(img.image_path)).filter(Boolean);
+  return images
+    .map((img) => resolveStorageUrl(img.image_path) || resolveStorageUrl(img.url))
+    .filter(Boolean);
 }
 
 /** Branch destination card — same UI shape as resort cards. */
@@ -71,7 +77,15 @@ export function mapBranchFromApi(row) {
   const rating = Number(row.rating ?? row.stars ?? 4.9);
   const reviewsCount = Number(row.review_count ?? 28);
   const facilities = facilityNames(row.facilities);
-  const amenities = facilities.length > 0 ? facilities : defaultBranchAmenities(row);
+  const branchAmenities = Array.isArray(row.amenities)
+    ? row.amenities.map((a) => String(a).trim()).filter(Boolean)
+    : [];
+  const amenities =
+    branchAmenities.length > 0
+      ? branchAmenities
+      : facilities.length > 0
+        ? facilities
+        : defaultBranchAmenities(row);
 
   return {
     id: row.id,
@@ -81,6 +95,7 @@ export function mapBranchFromApi(row) {
     slug: row.slug,
     name: row.name,
     description: row.description || row.tagline || brand.tagline || brand.description || '',
+    description_km: row.description_km || '',
     tagline: row.tagline || brand.tagline || row.city || '',
     destination: row.city || '',
     city: row.city || '',
@@ -92,11 +107,11 @@ export function mapBranchFromApi(row) {
     checkinTime: row.checkin_time || '14:00',
     checkoutTime: row.checkout_time || '12:00',
     featuredImage:
-      row.cover_image_url ||
+      resolveStorageUrl(row.cover_image_url) ||
       resolveStorageUrl(row.cover_image) ||
       resolveStorageUrl(brand.cover_image) ||
       defaultBranchImage(row),
-    logoUrl: brand.logo_url || resolveStorageUrl(brand.logo),
+    logoUrl: resolveStorageUrl(brand.logo_url) || resolveStorageUrl(brand.logo),
     startingPrice,
     startingPriceOriginal,
     startingPriceDiscountPercent,
@@ -177,8 +192,10 @@ export function mapResortFromApi(row) {
     contactPhone: row.phone,
     contactEmail: row.email,
     featuredImage:
-      row.cover_image_url || resolveStorageUrl(row.cover_image) || CATALOG_IMAGE_PLACEHOLDER,
-    logoUrl: row.logo_url || resolveStorageUrl(row.logo),
+      resolveStorageUrl(row.cover_image_url) ||
+      resolveStorageUrl(row.cover_image) ||
+      CATALOG_IMAGE_PLACEHOLDER,
+    logoUrl: resolveStorageUrl(row.logo_url) || resolveStorageUrl(row.logo),
     startingPrice,
     startingPriceOriginal,
     startingPriceDiscountPercent,

@@ -3,7 +3,18 @@ import { Button } from "antd";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
 import { PriceWithDiscount } from "./RoomPrice.jsx";
-import { primaryRoomImage, roomActionClass, roomFeatures, roomImageSrc, roomTypeAmenities } from "./roomHelpers";
+import {
+  primaryRoomImage,
+  roomActionClass,
+  roomFeatures,
+  roomImageSrc,
+  roomTypeAmenities,
+  roomPageTitleClass,
+  roomPageSubTextClass,
+  roomCardClass,
+  roomDividerClass,
+  roomMutedSurfaceClass,
+} from "./roomHelpers";
 
 export default function RoomFeatureChips({ room, compact = false }) {
   const dark = useDarkMode();
@@ -17,7 +28,7 @@ export function RoomTypeAmenityChips({ type, facilities = [], compact = false })
 
 function AmenityChips({ names, compact, dark }) {
   if (!names.length) {
-    return <p className={`text-xs ${dark ? "text-gray-500" : "text-[#829AB1]"}`}>No amenities listed</p>;
+    return <p className={`text-xs ${roomPageSubTextClass(dark)}`}>No amenities listed</p>;
   }
   const shown = compact ? names.slice(0, 4) : names;
   return (
@@ -27,14 +38,14 @@ function AmenityChips({ names, compact, dark }) {
           key={name}
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
             compact ? "text-[10px]" : "text-xs"
-          } ${dark ? "bg-gray-700 text-gray-200" : "bg-[#F5F8FC] text-[#102A43]"}`}
+          } ${dark ? "bg-gray-700 text-gray-200" : "bg-brand-surface-light text-brand-navy"}`}
         >
           {!compact && <MdCheckCircle size={14} className={dark ? "text-green-400" : "text-green-500"} />}
           {name}
         </span>
       ))}
       {compact && names.length > 4 && (
-        <span className={`text-[10px] ${dark ? "text-gray-500" : "text-[#829AB1]"}`}>+{names.length - 4}</span>
+        <span className={`text-[10px] ${roomPageSubTextClass(dark)}`}>+{names.length - 4}</span>
       )}
     </div>
   );
@@ -44,13 +55,13 @@ export function RoomFeaturePanel({ room, onClose, onEdit, onDelete, canEdit, can
   const dark = useDarkMode();
   if (!room) return null;
 
-  const card = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
-  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
-  const subText = dark ? "text-gray-400" : "text-[#829AB1]";
-  const bodyText = dark ? "text-gray-200" : "text-[#102A43]";
-  const divider = dark ? "border-gray-700" : "border-[#D9E2EC]";
-  const metaBg = dark ? "bg-gray-700/50 border-gray-600" : "bg-[#F5F8FC] border-[#D9E2EC]";
-  const emptyImg = dark ? "bg-gray-700 text-gray-400" : "bg-[#F5F8FC] text-[#829AB1]";
+  const card = roomCardClass(dark);
+  const titleCls = roomPageTitleClass(dark);
+  const subText = roomPageSubTextClass(dark);
+  const bodyText = dark ? "text-gray-200" : "text-brand-navy";
+  const divider = roomDividerClass(dark);
+  const metaBg = dark ? "bg-gray-700/50 border-gray-600" : "bg-brand-surface-light border-brand-border-light";
+  const emptyImg = roomMutedSurfaceClass(dark);
   const images = Array.isArray(room.images) ? room.images : [];
   const primary = primaryRoomImage(room);
   const image = roomImageSrc(primary);
@@ -67,7 +78,7 @@ export function RoomFeaturePanel({ room, onClose, onEdit, onDelete, canEdit, can
     { icon: <MdLayers size={18} aria-hidden />, label: "Floor", value: room.floor ? `Floor ${room.floor}` : "—" },
   ];
 
-  const actionFocus = "focus-visible:!ring-2 focus-visible:!ring-[#FF6B00]/50 focus-visible:!ring-offset-1 min-h-9 px-3";
+  const actionFocus = "focus-visible:!ring-2 focus-visible:!ring-brand-accent/50 focus-visible:!ring-offset-1 min-h-9 px-3";
 
   return (
     <article className={`rounded-2xl shadow-sm border overflow-hidden transition ${card}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
@@ -135,7 +146,7 @@ export function RoomFeaturePanel({ room, onClose, onEdit, onDelete, canEdit, can
                     key={img.id}
                     src={src}
                     alt={`Room ${room.room_number} additional photo`}
-                    className={`aspect-[4/3] w-full rounded-lg object-cover border transition hover:opacity-90 ${dark ? "border-gray-600" : "border-[#D9E2EC]"}`}
+                    className={`aspect-[4/3] w-full rounded-lg object-cover border transition hover:opacity-90 ${dark ? "border-brand-border-dark" : "border-brand-border-light"}`}
                   />
                 ) : null;
               })}
@@ -145,7 +156,7 @@ export function RoomFeaturePanel({ room, onClose, onEdit, onDelete, canEdit, can
 
         <section className={`mb-4 pb-4 border-b ${divider}`}>
           <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${subText}`}>Description</h4>
-          <div className={`h-px mb-2.5 ${dark ? "bg-gray-700" : "bg-[#D9E2EC]"}`} />
+          <div className={`h-px mb-2.5 ${dark ? "bg-brand-border-dark" : "bg-brand-border-light"}`} />
           <p className={`text-sm leading-relaxed max-h-32 overflow-y-auto pr-1 ${bodyText}`}>
             {description}
           </p>

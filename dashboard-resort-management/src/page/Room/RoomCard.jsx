@@ -4,7 +4,19 @@ import { useDarkMode } from "../../util/DarkModeContext";
 import { RoomStatusBadge } from "./RoomStatus.jsx";
 import RoomFeatureChips from "./RoomFeature.jsx";
 import { PriceWithDiscount } from "./RoomPrice.jsx";
-import { effectiveDiscountPercent, primaryRoomImage, roomActionClass, roomImageSrc } from "./roomHelpers";
+import {
+  effectiveDiscountPercent,
+  primaryRoomImage,
+  roomActionClass,
+  roomImageSrc,
+  roomPageTitleClass,
+  roomPageSubTextClass,
+  roomCellTextClass,
+  roomCardHoverClass,
+  roomMutedSurfaceClass,
+  roomDividerClass,
+  roomPriceAccentClass,
+} from "./roomHelpers";
 import ReviewRating from "./reviews/ReviewRating";
 
 export default function RoomCard({
@@ -17,10 +29,10 @@ export default function RoomCard({
   canDelete,
 }) {
   const dark = useDarkMode();
-  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
-  const subText = dark ? "text-gray-400" : "text-[#829AB1]";
-  const bodyText = dark ? "text-gray-300" : "text-[#486581]";
-  const card = dark ? "bg-gray-800 border-gray-700 hover:bg-gray-700/40" : "bg-white border-[#D9E2EC] hover:bg-[#F5F8FC]";
+  const titleCls = roomPageTitleClass(dark);
+  const subText = roomPageSubTextClass(dark);
+  const bodyText = roomCellTextClass(dark);
+  const card = roomCardHoverClass(dark);
   const image = roomImageSrc(primaryRoomImage(room));
   const typeName = room.room_type?.name || "Room";
   const capacity = room.room_type?.max_occupancy;
@@ -33,7 +45,7 @@ export default function RoomCard({
       {image ? (
         <img src={image} alt={`Room ${room.room_number}`} className="w-full h-40 object-cover" />
       ) : (
-        <div className={`h-40 flex items-center justify-center text-sm ${dark ? "bg-gray-700 text-gray-400" : "bg-[#F5F8FC] text-[#829AB1]"}`}>
+        <div className={`h-40 flex items-center justify-center text-sm ${roomMutedSurfaceClass(dark)}`}>
           No image
         </div>
       )}
@@ -52,7 +64,7 @@ export default function RoomCard({
           <span className="inline-flex items-center gap-1">
             <MdPeople size={14} /> {capacity != null ? `${capacity} guests` : "—"}
           </span>
-          <span className="inline-flex items-center gap-1 font-semibold text-[#FF6B00]">
+          <span className={`inline-flex items-center gap-1 ${roomPriceAccentClass()}`}>
             <MdAttachMoney size={14} />
             <PriceWithDiscount
               price={room.price_per_night}
@@ -64,7 +76,7 @@ export default function RoomCard({
         </div>
         <RoomFeatureChips room={room} compact />
 
-        <div className={`mt-3 pt-3 border-t ${dark ? "border-gray-700" : "border-[#D9E2EC]"}`}>
+        <div className={`mt-3 pt-3 border-t ${roomDividerClass(dark)}`}>
           <ReviewRating value={avgRating} size={16} />
         </div>
 

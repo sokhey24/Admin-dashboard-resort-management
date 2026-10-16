@@ -26,7 +26,8 @@ export function mapCustomerUser(apiUser, roles = []) {
   const name = apiUser.name ?? '';
   const version = apiUser.updated_at || apiUser.profile_image;
   const resolvedUrl =
-    apiUser.profile_image_url || resolveStorageUrl(apiUser.profile_image);
+    resolveStorageUrl(apiUser.profile_image_url) ||
+    resolveStorageUrl(apiUser.profile_image);
   const avatar = resolvedUrl
     ? withAvatarCacheBuster(resolvedUrl, version)
     : avatarFallback(name);

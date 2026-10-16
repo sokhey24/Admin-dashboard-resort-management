@@ -71,7 +71,7 @@ class BookingController extends Controller
     {
         $this->service->assertAccessible($booking, $request->user());
 
-        $booking->load(['user', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice', 'statusLogs']);
+        $booking->load(['user', 'branch', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice', 'statusLogs']);
         $this->attachReviewEligibility(collect([$booking]), $request->user());
 
         return response()->json($booking);
@@ -109,7 +109,7 @@ class BookingController extends Controller
 
         $booking = $this->service->createBooking($data, $request->user());
 
-        return response()->json(['data' => $booking->load(['user', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice'])], 201);
+        return response()->json(['data' => $booking->load(['user', 'branch', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice'])], 201);
     }
 
     public function update(Request $request, Booking $booking): JsonResponse

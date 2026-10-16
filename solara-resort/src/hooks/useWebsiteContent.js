@@ -13,7 +13,10 @@ export function useWebsiteContent() {
     setError(null);
     try {
       const data = await fetchWebsiteContent();
-      setGrouped(data && typeof data === 'object' ? data : {});
+      const payload = data?.data ?? data;
+      const grouped =
+        payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+      setGrouped(grouped);
     } catch (err) {
       setGrouped({});
       setError(getApiErrorMessage(err, 'Unable to load website content.'));

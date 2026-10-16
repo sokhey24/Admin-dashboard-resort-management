@@ -143,13 +143,13 @@ export default function RoomImageUploader({
                     {!image.is_primary && (
                       <Button
                         loading={busyId === image.id}
-                        className={roomActionClass(dark, "edit")}
+                        className={roomActionClass(dark)}
                         onClick={() => setPrimaryExisting(image)}
                       >
                         <MdStar size={12} /> Primary
                       </Button>
                     )}
-                    <Button className={roomActionClass(dark, "delete")} onClick={() => setRemoveTarget(image)}>
+                    <Button className={roomActionClass(dark)} onClick={() => setRemoveTarget(image)}>
                       <MdClose size={12} />
                     </Button>
                   </div>
@@ -170,11 +170,11 @@ export default function RoomImageUploader({
               )}
               <div className="absolute bottom-1 right-1 flex gap-1">
                 {!item.isPrimary && (
-                  <Button className={roomActionClass(dark, "edit")} onClick={() => markPendingPrimary(item.id)}>
+                  <Button className={roomActionClass(dark)} onClick={() => markPendingPrimary(item.id)}>
                     <MdStar size={12} /> Primary
                   </Button>
                 )}
-                <Button className={roomActionClass(dark, "delete")} onClick={() => removePending(item.id)}>
+                <Button className={roomActionClass(dark)} onClick={() => removePending(item.id)}>
                   <MdClose size={12} />
                 </Button>
               </div>

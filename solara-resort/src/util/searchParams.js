@@ -84,3 +84,44 @@ export function buildRoomsSearchPath(criteria) {
   const qs = next.toString();
   return qs ? `/rooms?${qs}` : '/rooms';
 }
+
+/**
+ * City/region label for sanctuary tabs — branch selection wins over stale destination param.
+ */
+export function sanctuaryRegionFromCriteria(criteria, branchOptions = []) {
+  if (criteria?.branchId) {
+    const match = branchOptions.find(
+      (o) => String(o.branchId ?? o.value) === String(criteria.branchId)
+    );
+    const city =
+      match?.destination ||
+      match?.branch?.city ||
+      match?.branch?.location?.split?.(',')?.[0]?.trim() ||
+      '';
+    if (city) return city;
+  }
+  return criteria?.destination || '';
+}
+
+export function sanctuaryRegionMatches(locKey, activeRegion) {
+  if (!locKey && !activeRegion) return true;
+  if (!locKey || !activeRegion) return false;
+  const a = activeRegion.toLowerCase();
+  const k = locKey.toLowerCase();
+  return a.includes(k) || k.includes(a);
+}
+
+/**
+ * Region tab / sidebar: filter by destination only — must not keep a specific branch id.
+ */
+export function applyDestinationRegionParams(baseParams, destination) {
+  const next = new URLSearchParams(baseParams);
+  if (destination) {
+    next.set('destination', destination);
+  } else {
+    next.delete('destination');
+  }
+  next.delete('branchId');
+  next.delete('branch_id');
+  return next;
+}

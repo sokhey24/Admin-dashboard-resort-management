@@ -1,19 +1,34 @@
 import { useMemo, useState } from "react";
-import { MdSearch, MdAdd, MdEdit, MdDelete, MdClose } from "react-icons/md";
+import { MdSearch, MdAdd, MdEdit, MdClose } from "react-icons/md";
 import { useDarkMode } from "../../util/DarkModeContext";
 import { Button } from "antd";
+import wokBeefChili from "../../assets/images/dining/wok_beef_chili.png";
+import thaiRedCurry from "../../assets/images/dining/thai_red_curry.png";
+import goldenHerbSoup from "../../assets/images/dining/golden_herb_soup.png";
+import savoryCongee from "../../assets/images/dining/savory_congee.png";
+import latteArt from "../../assets/images/dining/latte_art.png";
+import tropicalBlueCocktail from "../../assets/images/dining/tropical_blue_cocktail.png";
 
 const PAGE_SIZE = 8;
 
 const CATEGORIES = ["Main Course", "Starter", "Dessert", "Beverage", "Seafood"];
 
+const DINING_GALLERY = [
+  { src: wokBeefChili, alt: "Wok-seared beef with chili and herbs" },
+  { src: thaiRedCurry, alt: "Thai red curry with coconut and basil" },
+  { src: goldenHerbSoup, alt: "Golden herb broth" },
+  { src: savoryCongee, alt: "Savory rice porridge with greens" },
+  { src: latteArt, alt: "Artisan latte" },
+  { src: tropicalBlueCocktail, alt: "Tropical blue refreshment" },
+];
+
 const INIT_DATA = [
-  { key: 1, name: "Grilled Salmon",      category: "Main Course", price: 28, status: "Available"   },
-  { key: 2, name: "Caesar Salad",        category: "Starter",     price: 12, status: "Available"   },
-  { key: 3, name: "Beef Steak",          category: "Main Course", price: 45, status: "Available"   },
-  { key: 4, name: "Chocolate Lava Cake", category: "Dessert",     price: 14, status: "Available"   },
-  { key: 5, name: "Tropical Smoothie",   category: "Beverage",    price: 8,  status: "Out of Stock" },
-  { key: 6, name: "Lobster Bisque",      category: "Starter",     price: 18, status: "Available"   },
+  { key: 1, name: "Beef Lok Lak",           category: "Main Course", price: 22, status: "Available",    image: wokBeefChili },
+  { key: 2, name: "Signature Thai Red Curry", category: "Main Course", price: 19, status: "Available",    image: thaiRedCurry },
+  { key: 3, name: "Golden Herb Broth",      category: "Starter",     price: 16, status: "Available",    image: goldenHerbSoup },
+  { key: 4, name: "Savory Rice Porridge",   category: "Starter",     price: 14, status: "Available",    image: savoryCongee },
+  { key: 5, name: "Artisan Latte",          category: "Beverage",    price: 6,  status: "Available",    image: latteArt },
+  { key: 6, name: "Solara Blue Splash",     category: "Beverage",    price: 12, status: "Out of Stock", image: tropicalBlueCocktail },
 ];
 
 const STATUS_STYLE = {
@@ -57,7 +72,12 @@ function MenuItemModal({ item, onClose, onSaved, dark }) {
 
   const handleSave = () => {
     if (!validate()) return;
-    onSaved({ ...form, price: Number(form.price), key: item?.key ?? Date.now() });
+    onSaved({
+      ...form,
+      price: Number(form.price),
+      key: item?.key ?? Date.now(),
+      image: item?.image,
+    });
     onClose();
   };
 
@@ -122,8 +142,9 @@ export default function Menu() {
   const handleSaved = (item) => {
     setData(prev => {
       const idx = prev.findIndex(d => d.key === item.key);
-      if (idx >= 0) { const next = [...prev]; next[idx] = item; return next; }
-      return [...prev, item];
+      const withImage = { ...item, image: item.image ?? latteArt };
+      if (idx >= 0) { const next = [...prev]; next[idx] = withImage; return next; }
+      return [...prev, withImage];
     });
   };
 
@@ -157,6 +178,14 @@ export default function Menu() {
 
   return (
     <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-5 rounded-xl overflow-hidden border shadow-sm ${card}`}>
+        {DINING_GALLERY.map((photo) => (
+          <div key={photo.alt} className="aspect-[4/3] overflow-hidden">
+            <img src={photo.src} alt={photo.alt} className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        ))}
+      </div>
+
       <div className="flex justify-between items-center mb-5">
         <h2 className={`text-[26px] font-bold ${titleCls}`}>Restaurant Menu</h2>
         <Button onClick={() => { setEditing(null); setModal(true); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00]">
@@ -183,17 +212,25 @@ export default function Menu() {
           <table className={`min-w-full divide-y ${divider}`}>
             <thead className={thead}>
               <tr>
-                {["No.", "Item", "Category", "Price", "Status", "Action"].map(h => (
-                  <th key={h} className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText} ${h === "No." ? "w-12 px-4" : ""} ${h === "Action" ? "text-center" : ""}`}>{h}</th>
+                {["No.", "Photo", "Item", "Category", "Price", "Status", "Action"].map(h => (
+                  <th key={h} className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText} ${h === "No." ? "w-12 px-4" : ""} ${h === "Photo" ? "w-20 px-4" : ""} ${h === "Action" ? "text-center" : ""}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className={`${tbody} divide-y`}>
               {pageItems.length === 0 ? (
-                <tr><td colSpan={6} className={`py-16 text-center text-sm ${subText}`}>No items found</td></tr>
+                <tr><td colSpan={7} className={`py-16 text-center text-sm ${subText}`}>No items found</td></tr>
               ) : pageItems.map((item, idx) => (
                 <tr key={item.key} className={`transition-colors ${rowHover}`}>
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                  <td className="px-4 py-3">
+                    <img
+                      src={item.image ?? latteArt}
+                      alt={item.name}
+                      className="w-14 h-14 rounded-lg object-cover ring-1 ring-black/5"
+                      loading="lazy"
+                    />
+                  </td>
                   <td className={`px-6 py-4 text-sm font-medium ${titleCls}`}>{item.name}</td>
                   <td className={`px-6 py-4 text-sm ${cellText}`}>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? "bg-gray-700 text-gray-300 ring-gray-600" : "bg-[#F5F8FC] text-[#486581] ring-gray-200"}`}>{item.category}</span>

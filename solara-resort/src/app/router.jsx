@@ -11,6 +11,8 @@ import { AboutPage } from '../pages/AboutPage.jsx';
 import { ActivitiesPage } from '../pages/ActivitiesPage.jsx';
 import { ServicesPage } from '../pages/ServicesPage.jsx';
 import { DiningPage } from '../pages/DiningPage.jsx';
+import { MenuListPage } from '../pages/MenuListPage.jsx';
+import { MenuDetailPage } from '../pages/MenuDetailPage.jsx';
 import { GalleryPage } from '../pages/GalleryPage.jsx';
 import { ContactPage } from '../pages/ContactPage.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
@@ -54,6 +56,8 @@ export function AppRouter() {
           <Route path="activities" element={<ActivitiesPage />} />
           <Route path="services" element={<ServicesPage />} />
           <Route path="dining" element={<DiningPage />} />
+          <Route path="dining/menu" element={<MenuListPage />} />
+          <Route path="dining/menu/:dishId" element={<MenuDetailPage />} />
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="contact" element={<ContactPage />} />
           <Route path="login" element={<LoginPage />} />

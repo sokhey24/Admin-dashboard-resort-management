@@ -17,6 +17,7 @@ export const LoginPage = () => {
 
   const [email, setEmail] = useState(() => location.state?.email ?? '');
   const [password, setPassword] = useState('');
+  const [registeredNotice] = useState(() => Boolean(location.state?.registered));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [twoFactorToken, setTwoFactorToken] = useState(null);
@@ -122,6 +123,15 @@ export const LoginPage = () => {
                 )}
           </p>
         </div>
+
+        {registeredNotice && !error && !twoFactorToken && (
+          <div className="p-3 rounded-[var(--radius-button)] bg-gold/10 border border-gold/30 text-xs text-text text-left">
+            {t(
+              'auth.registerSuccessSignIn',
+              'Your account was created. Sign in with your email and password to continue.'
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="p-3 rounded-[var(--radius-button)] bg-error/10 border border-error/30 text-xs text-error text-left">

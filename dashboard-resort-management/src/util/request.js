@@ -51,7 +51,7 @@ export const request = (url = "", method = "", data = {}) => {
         if (status === 422) errors.message = data?.message ?? "Validation failed.";
         if (status === 429) errors.message = data?.message ?? "Too many requests. Please wait before trying again.";
         if (status === 503) errors.message = data?.message ?? "Service unavailable. Please try again later.";
-        if (status === 500) errors.message = "Server Error. Please try again later.";
+        if (status === 500) errors.message = data?.message ?? "Server Error. Please try again later.";
         if (data?.error) {
           errors.message = data.error === "Unauthorized" ? "Invalid email or password." : data.error;
         }

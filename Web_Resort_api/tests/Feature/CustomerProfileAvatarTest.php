@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -12,7 +11,6 @@ use Tests\TestCase;
 
 class CustomerProfileAvatarTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected function customer(string $email = 'guest@example.com', string $name = 'Guest User'): User
     {

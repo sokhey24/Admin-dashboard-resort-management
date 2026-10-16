@@ -33,7 +33,7 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasColumn('branches', 'status')) {
+        if (Schema::hasColumn('branches', 'status') && DB::getDriverName() === 'mysql') {
             DB::statement("ALTER TABLE branches MODIFY status ENUM('active', 'inactive', 'maintenance') NOT NULL DEFAULT 'active'");
         }
 
@@ -50,8 +50,12 @@ return new class extends Migration
 
         foreach (['bookings', 'room_types', 'restaurants', 'food_categories', 'restaurant_tables', 'food_orders'] as $tableName) {
             if (Schema::hasTable($tableName) && ! Schema::hasColumn($tableName, 'branch_id')) {
-                Schema::table($tableName, function (Blueprint $table) {
-                    $table->foreignId('branch_id')->nullable()->after('resort_id')->constrained('branches')->nullOnDelete();
+                Schema::table($tableName, function (Blueprint $table) use ($tableName) {
+                    $col = $table->foreignId('branch_id')->nullable();
+                    if (Schema::hasColumn($tableName, 'resort_id')) {
+                        $col->after('resort_id');
+                    }
+                    $col->constrained('branches')->nullOnDelete();
                 });
             }
         }
@@ -74,7 +78,7 @@ return new class extends Migration
             }
         }
 
-        if (Schema::hasColumn('branches', 'city')) {
+        if (Schema::hasColumn('branches', 'city') && DB::getDriverName() === 'mysql') {
             DB::table('branches')
                 ->where(function ($q) {
                     $q->whereNull('city')->orWhere('city', '');
@@ -103,7 +107,7 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasColumn('branches', 'status')) {
+        if (Schema::hasColumn('branches', 'status') && DB::getDriverName() === 'mysql') {
             DB::statement("ALTER TABLE branches MODIFY status ENUM('active', 'inactive') NOT NULL DEFAULT 'active'");
         }
     }

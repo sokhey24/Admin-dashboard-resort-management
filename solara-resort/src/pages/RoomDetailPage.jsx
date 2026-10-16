@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext.jsx';
 import { useRoomDetail } from '../hooks/useCatalog.js';
 import { buildBookingPath, validateBookingStay } from '../util/bookingSelection.js';
 import { FavoriteButton } from '../components/catalog/FavoriteButton.jsx';
+import { RoomRelated } from '../related/RoomRelated.jsx';
 
 export const RoomDetailPage = () => {
   const { id } = useParams();
@@ -349,6 +350,8 @@ export const RoomDetailPage = () => {
           </aside>
         </div>
       </div>
+
+      <RoomRelated room={room} />
     </div>
   );
 };

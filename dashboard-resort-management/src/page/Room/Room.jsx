@@ -14,7 +14,7 @@ import ReviewPagination from "./reviews/ReviewPagination";
 import useCatalogData from "../../hooks/useCatalogData";
 import { useCatalogStore } from "../../store/CatalogStore";
 import { useBranchStore } from "../../store/useBranchStore";
-import { MAX_DISCOUNT_PERCENT, ROOM_STATUSES, applyFormErrors, asList, clampPercent, paginationFrom, roomPrimaryBtnClass, roomModalOkClass, roomModalCancelClass, roomSearchClass, roomActionClass } from "./roomHelpers";
+import { MAX_DISCOUNT_PERCENT, ROOM_STATUSES, applyFormErrors, asList, clampPercent, filterRoomTypesByBranch, paginationFrom, roomPrimaryBtnClass, roomModalOkClass, roomModalCancelClass, roomSearchClass, roomActionClass } from "./roomHelpers";
 
 const EMPTY_FILTERS = {
   status: undefined,
@@ -52,9 +52,12 @@ export default function Room() {
   const [deleting, setDeleting] = useState(false);
   const [formImages, setFormImages] = useState([]);
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [branchRoomTypes, setBranchRoomTypes] = useState(null);
+  const [branchTypesLoading, setBranchTypesLoading] = useState(false);
   const [reviewsByRoom, setReviewsByRoom] = useState({});
   const [form] = Form.useForm();
   const watchResort = Form.useWatch("resort_id", form);
+  const watchBranch = Form.useWatch("branch_id", form);
   const priceWatch = Form.useWatch("price_per_night", form);
   const discountWatch = Form.useWatch("discount_percent", form);
   const roomTypeWatch = Form.useWatch("room_type_id", form);
@@ -132,9 +135,49 @@ export default function Room() {
   const formBranches = watchResort
     ? branches.filter((b) => String(b.resort_id) === String(watchResort))
     : branches;
-  const formRoomTypes = watchResort
-    ? roomTypes.filter((t) => String(t.resort_id) === String(watchResort))
-    : roomTypes;
+  const formRoomTypes = useMemo(() => {
+    if (formOpen && watchResort && watchBranch && branchTypesLoading) return [];
+    const source = branchRoomTypes !== null ? branchRoomTypes : roomTypes;
+    return filterRoomTypesByBranch(source, watchResort, watchBranch);
+  }, [formOpen, branchRoomTypes, branchTypesLoading, roomTypes, watchResort, watchBranch]);
+
+  const filterRoomTypes = useMemo(() => {
+    const resortScope = filters.resort_id ?? primaryResortId;
+    const branchScope = filters.branch_id ?? globalBranchId;
+    return filterRoomTypesByBranch(roomTypes, resortScope, branchScope);
+  }, [roomTypes, filters.resort_id, filters.branch_id, globalBranchId, primaryResortId]);
+
+  useEffect(() => {
+    if (!formOpen || !watchResort || !watchBranch) {
+      setBranchRoomTypes(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setBranchRoomTypes(null);
+    setBranchTypesLoading(true);
+    const params = new URLSearchParams({
+      per_page: "200",
+      resort_id: String(watchResort),
+      branch_id: String(watchBranch),
+      assignable_to_branch: "1",
+    });
+    request(`admin/room-types?${params.toString()}`, "get").then((res) => {
+      if (cancelled) return;
+      setBranchRoomTypes(res?.errors ? [] : asList(res));
+      setBranchTypesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [formOpen, watchResort, watchBranch]);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    const currentTypeId = form.getFieldValue("room_type_id");
+    if (!currentTypeId) return;
+    if (!formRoomTypes.some((t) => String(t.id) === String(currentTypeId))) {
+      form.setFieldValue("room_type_id", undefined);
+    }
+  }, [formOpen, formRoomTypes, form]);
+
   const filterBranches = filters.resort_id
     ? branches.filter((b) => String(b.resort_id) === String(filters.resort_id))
     : branches;
@@ -228,9 +271,8 @@ export default function Room() {
 
   return (
     <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
-      <div className={`sticky top-0 z-20 -mx-4 px-4 pt-1 pb-4 mb-4 border-b ${
-        dark ? "bg-gray-900/95 border-gray-700 backdrop-blur-sm" : "bg-[#F5F8FC]/95 border-[#D9E2EC] backdrop-blur-sm"
-      }`}>
+      <div className={`sticky top-0 z-20 -mx-4 px-4 pt-1 pb-4 mb-4 border-b ${dark ? "bg-gray-900/95 border-gray-700 backdrop-blur-sm" : "bg-[#F5F8FC]/95 border-[#D9E2EC] backdrop-blur-sm"
+        }`}>
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className={`text-[26px] font-bold ${titleCls}`}>Room Management</h2>
@@ -258,14 +300,14 @@ export default function Room() {
               options={ROOM_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
               onChange={(value) => { setFilters((f) => ({ ...f, status: value })); setPage(1); }} />
             <Select allowClear showSearch optionFilterProp="label" placeholder="Room Type" className="min-w-[150px]" value={filters.room_type_id}
-              options={roomTypes.map((t) => ({ value: t.id, label: t.name }))}
+              options={filterRoomTypes.map((t) => ({ value: t.id, label: t.name }))}
               onChange={(value) => { setFilters((f) => ({ ...f, room_type_id: value })); setPage(1); }} />
             <Select allowClear showSearch optionFilterProp="label" placeholder="Resort" className="min-w-[150px]" value={filters.resort_id}
               options={resorts.map((r) => ({ value: r.id, label: r.name }))}
               onChange={(value) => { setFilters((f) => ({ ...f, resort_id: value, branch_id: undefined })); setPage(1); }} />
             <Select allowClear showSearch optionFilterProp="label" placeholder="Branch" className="min-w-[150px]" value={filters.branch_id}
               options={filterBranches.map((b) => ({ value: b.id, label: b.name }))}
-              onChange={(value) => { setFilters((f) => ({ ...f, branch_id: value })); setPage(1); }} />
+              onChange={(value) => { setFilters((f) => ({ ...f, branch_id: value, room_type_id: undefined })); setPage(1); }} />
             {hasFilters && (
               <Button className={roomActionClass(dark)} onClick={() => { setSearchInput(""); setSearch(""); setFilters(EMPTY_FILTERS); setPage(1); }}>Reset</Button>
             )}
@@ -346,15 +388,34 @@ export default function Room() {
               }}
             />
           </Form.Item>
-          <Form.Item name="branch_id" label="Branch">
-            <Select allowClear showSearch optionFilterProp="label" options={formBranches.map((b) => ({ value: b.id, label: b.name }))} />
+          <Form.Item name="branch_id" label="Branch" rules={[{ required: true, message: "Select a branch" }]}>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              disabled={!watchResort}
+              placeholder={watchResort ? "Select branch" : "Select a resort first"}
+              options={formBranches.map((b) => ({ value: b.id, label: b.name }))}
+              onChange={() => form.setFieldValue("room_type_id", undefined)}
+            />
           </Form.Item>
           <Form.Item name="room_type_id" label="Room Type" rules={[{ required: true, message: "Select a room type" }]}>
             <Select
               showSearch
               optionFilterProp="label"
-              disabled={!watchResort}
-              placeholder={watchResort ? "Select room type" : "Select a resort first"}
+              loading={branchTypesLoading}
+              disabled={!watchResort || !watchBranch}
+              placeholder={
+                !watchResort
+                  ? "Select a resort first"
+                  : !watchBranch
+                    ? "Select a branch first"
+                    : branchTypesLoading
+                      ? "Loading room types…"
+                      : formRoomTypes.length
+                        ? "Select room type"
+                        : "No room types for this branch — add one in Room Type Management"
+              }
               options={formRoomTypes.map((t) => ({ value: t.id, label: t.name }))}
             />
           </Form.Item>

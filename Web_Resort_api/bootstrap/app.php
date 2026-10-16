@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \App\Http\Middleware\PermissionMiddleware::class,
             'reports.access' => \App\Http\Middleware\ReportsAccessMiddleware::class,
             'dashboard.access' => \App\Http\Middleware\DashboardAccessMiddleware::class,
+            'optional.sanctum' => \App\Http\Middleware\OptionalSanctumAuth::class,
         ]);
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,

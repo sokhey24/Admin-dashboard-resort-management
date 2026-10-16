@@ -1,7 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { ProfileStore } from "../../store/ProfileStore";
 import useRole from "../../util/useRole";
-import { getHomeByRole } from "./ProtectedRoute";
 
 export default function RoleRoute({ children, allowedRoles }) {
   const { profile } = ProfileStore();
@@ -13,7 +12,7 @@ export default function RoleRoute({ children, allowedRoles }) {
   }
 
   if (!allowedRoles.includes(role)) {
-    return <Navigate to={getHomeByRole(role)} replace />;
+    return <Navigate to="/403" state={{ from: location }} replace />;
   }
 
   return children;

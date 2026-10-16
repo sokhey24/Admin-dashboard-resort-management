@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class CustomerFavoritesIsolationTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected function customer(string $email): User
     {

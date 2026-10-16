@@ -15,6 +15,9 @@ import { PageSkeleton } from '../components/ui/Skeleton.jsx';
 import { useApp } from '../context/AppContext.jsx';
 import { formatCurrency } from '../util/currency.js';
 import { useBookingDetail } from '../hooks/useBooking.js';
+import { bookingNeedsPayment } from '../util/mapBooking.js';
+import { bookingStatusLabel, paymentStatusLabel } from '../util/bookingStatusLabels.js';
+import { formatPersonName } from '../util/formatName.js';
 
 export const ConfirmationPage = () => {
   const [searchParams] = useSearchParams();
@@ -45,11 +48,33 @@ export const ConfirmationPage = () => {
     );
   }
 
-  const isPaid = booking.paymentStatus === 'paid';
+  const paymentKey = String(booking.paymentStatus || 'unpaid').toLowerCase();
+  const isPaid = paymentKey === 'paid';
+  const isPartial = paymentKey === 'partially_paid';
+  const needsPayment = bookingNeedsPayment(booking);
   const guest = booking.guestInfo || {};
+  const residentName = formatPersonName(guest.firstName, guest.lastName);
+  const confirmationCode = booking.confirmationCode || booking.id;
+  const codeDisplay = confirmationCode.startsWith('#') ? confirmationCode : `#${confirmationCode}`;
+
+  const amountLabel = isPaid
+    ? t('confirm.totalPaid', 'Total paid')
+    : isPartial
+      ? t('confirm.balanceDue', 'Balance due')
+      : t('confirm.totalDue', 'Total due');
+
+  const amountValue = isPaid
+    ? booking.pricing.totalUSD
+    : Math.max(Number(booking.balanceDue) || 0, 0);
+
+  const reservationLabel = bookingStatusLabel(booking.status, t);
+  const paymentLabel = paymentStatusLabel(booking.paymentStatus, t);
+
+  const locationLine = [booking.branchName, booking.branchLocation].filter(Boolean).join(' · ');
+  const propertyLine = booking.branchName ? booking.brandName : booking.brandName;
 
   return (
-    <div className="w-full min-h-screen pt-28 pb-24 bg-bg flex items-center justify-center">
+    <div className="w-full min-h-screen pt-28 pb-24 bg-bg flex items-center justify-center print:pt-8">
       <div className="max-w-2xl w-full mx-auto px-4 sm:px-6">
         <motion.div
           className="bg-surface border border-border rounded-[var(--radius-modal)] p-8 sm:p-12 shadow-2xl text-center space-y-8"
@@ -66,101 +91,141 @@ export const ConfirmationPage = () => {
 
           <motion.div variants={staggerItem(10)} className="space-y-2">
             <span className="text-xs uppercase tracking-[0.25em] text-gold font-bold block">
-              {t('confirm.guaranteed', 'Reservation Saved')}
+              {isPaid
+                ? t('confirm.guaranteed', 'Reservation guaranteed')
+                : t('confirm.received', 'Reservation received')}
             </span>
             <h1 className="text-3xl sm:text-4xl font-serif font-bold text-text">
-              {t('confirm.title', 'Your Sanctuary Awaits')}
+              {t('confirm.title', 'Your sanctuary awaits')}
             </h1>
             <p className="text-xs sm:text-sm text-muted max-w-md mx-auto leading-relaxed font-light">
               {t(
                 'confirm.subtitle',
-                'Your reservation is recorded with Solara. Payment status reflects what the resort has received.'
+                'Your stay is saved with Solara. A confirmation email will be sent when contact details are on file.'
               )}
             </p>
           </motion.div>
 
-          <motion.div variants={staggerItem(10)} className="p-4 rounded-[var(--radius-button)] bg-bg border border-border/80 flex items-center justify-between">
-            <div className="text-left">
-              <span className="text-[10px] uppercase text-muted block">{t('confirm.code', 'Confirmation Code')}</span>
-              <span className="text-xl font-mono font-bold text-gold">#{booking.id}</span>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] uppercase text-muted block">{t('common.status', 'Status')}</span>
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                {booking.status} · {booking.paymentStatus}
+          <motion.div
+            variants={staggerItem(10)}
+            className="p-4 rounded-[var(--radius-button)] bg-bg border border-border/80 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left"
+          >
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-muted block">
+                {t('confirm.code', 'Confirmation code')}
               </span>
+              <span className="text-lg sm:text-xl font-mono font-bold text-gold break-all">{codeDisplay}</span>
+            </div>
+            <div className="sm:text-right space-y-2">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted block">
+                  {t('confirm.reservationStatus', 'Reservation')}
+                </span>
+                <span className="text-xs font-semibold text-text capitalize">{reservationLabel}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-muted block">
+                  {t('confirm.paymentLabel', 'Payment')}
+                </span>
+                <span
+                  className={`text-xs font-bold uppercase tracking-wider ${
+                    isPaid ? 'text-emerald-400' : needsPayment ? 'text-amber-400' : 'text-text'
+                  }`}
+                >
+                  {paymentLabel}
+                </span>
+              </div>
             </div>
           </motion.div>
 
-          <motion.div variants={staggerItem(12)} className="p-6 rounded-[var(--radius-card)] bg-surface-elevated border border-border/60 text-xs text-left space-y-4">
+          <motion.div
+            variants={staggerItem(12)}
+            className="p-6 rounded-[var(--radius-card)] bg-surface-elevated border border-border/60 text-xs text-left space-y-4"
+          >
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-border/60">
-              <div>
+              <div className="min-w-0">
                 <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold block mb-0.5">
-                  {booking.brandName || 'Solara Resort & Spa'}
+                  {propertyLine}
                 </span>
-                <h3 className="text-lg font-serif font-bold text-text">{booking.roomName}</h3>
-                <p className="text-xs text-gold-light font-medium">
-                  {booking.branchName ? `Branch: ${booking.branchName}` : booking.resortName}
-                  {booking.branchLocation ? ` · ${booking.branchLocation}` : ''}
-                </p>
+                <h3 className="text-lg font-serif font-bold text-text break-words">{booking.roomName}</h3>
+                {locationLine ? (
+                  <p className="text-xs text-gold-light font-medium mt-0.5">{locationLine}</p>
+                ) : (
+                  <p className="text-xs text-muted mt-0.5">{t('confirm.branchPending', 'Branch details will appear once assigned.')}</p>
+                )}
               </div>
-              <div className="sm:text-right">
-                <span className="text-[10px] uppercase text-muted block">
-                  {isPaid ? t('common.totalDue', 'Total Paid') : t('confirm.balanceDue', 'Balance Due')}
-                </span>
+              <div className="sm:text-right shrink-0">
+                <span className="text-[10px] uppercase text-muted block">{amountLabel}</span>
                 <span className="text-lg font-bold font-serif text-gold">
-                  {formatCurrency(booking.pricing.totalUSD, currency)}
+                  {formatCurrency(amountValue, currency)}
                 </span>
+                {booking.nights ? (
+                  <p className="text-[10px] text-muted mt-1">
+                    {booking.nights} {booking.nights === 1 ? t('confirm.night', 'night') : t('confirm.nights', 'nights')}
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-muted">
               <div>
-                <span className="text-[10px] uppercase block">{t('search.checkIn', 'Check-In Date')}</span>
+                <span className="text-[10px] uppercase block">{t('search.checkIn', 'Check-in')}</span>
                 <span className="font-medium text-text">{booking.checkIn}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase block">{t('search.checkOut', 'Check-Out Date')}</span>
+                <span className="text-[10px] uppercase block">{t('search.checkOut', 'Check-out')}</span>
                 <span className="font-medium text-text">{booking.checkOut}</span>
               </div>
-              {(guest.firstName || guest.lastName) && (
+              {residentName && (
                 <div>
-                  <span className="text-[10px] uppercase block">{t('confirm.leadResident', 'Lead Resident')}</span>
-                  <span className="font-medium text-text">
-                    {guest.firstName} {guest.lastName}
-                  </span>
+                  <span className="text-[10px] uppercase block">{t('confirm.leadResident', 'Lead guest')}</span>
+                  <span className="font-medium text-text">{residentName}</span>
                 </div>
               )}
               <div>
-                <span className="text-[10px] uppercase block">{t('confirm.guestCount', 'Guest Count')}</span>
+                <span className="text-[10px] uppercase block">{t('confirm.guestCount', 'Guests')}</span>
                 <span className="font-medium text-text">
-                  {booking.guests.adults} Adults, {booking.guests.children} Children
+                  {booking.guests.adults}{' '}
+                  {booking.guests.adults === 1 ? t('confirm.adult', 'adult') : t('confirm.adults', 'adults')},{' '}
+                  {booking.guests.children}{' '}
+                  {booking.guests.children === 1 ? t('confirm.child', 'child') : t('confirm.children', 'children')}
                 </span>
               </div>
             </div>
 
             {guest.specialRequests && (
               <div className="pt-2 border-t border-border/40 text-[11px] text-muted">
-                <span className="font-semibold text-text">{t('booking.specialRequests', 'Special Requests')}: </span>
+                <span className="font-semibold text-text">{t('booking.specialRequests', 'Special requests')}: </span>
                 <span>{guest.specialRequests}</span>
               </div>
             )}
           </motion.div>
 
-          <motion.div variants={staggerItem(10)} className="p-4 rounded-[var(--radius-button)] bg-gold/10 border border-gold/30 text-xs text-left flex items-start gap-3">
+          {needsPayment && (
+            <motion.div variants={staggerItem(8)}>
+              <Button variant="gold" size="md" className="w-full sm:w-auto" onClick={() => navigate(`/payment?bookingId=${booking.apiId}`)}>
+                {t('confirm.completePayment', 'Complete payment')}
+              </Button>
+            </motion.div>
+          )}
+
+          <motion.div
+            variants={staggerItem(10)}
+            className="p-4 rounded-[var(--radius-button)] bg-gold/10 border border-gold/30 text-xs text-left flex items-start gap-3"
+          >
             <Sparkles className="w-5 h-5 text-gold shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="font-semibold text-text">{t('confirm.preArrival', 'Pre-Arrival Concierge Coordination')}</span>
+              <span className="font-semibold text-text">{t('confirm.preArrival', 'Pre-arrival concierge')}</span>
               <p className="text-muted leading-relaxed font-light text-[11px]">
                 {t(
                   'confirm.preArrivalDesc',
-                  'Your dedicated Solara butler guild will contact you via WhatsApp 48 hours prior to arrival to confirm private island speedboat transfers and dietary arrangements.'
+                  'Our concierge team may contact you before arrival to arrange transfers and preferences.'
                 )}
               </p>
             </div>
           </motion.div>
 
-          <motion.div variants={staggerItem(8)} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <motion.div variants={staggerItem(8)} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 print:hidden">
             <Button
               variant="gold"
               size="md"
@@ -168,7 +233,7 @@ export const ConfirmationPage = () => {
               onClick={() => navigate('/account/bookings')}
               leftIcon={<FileText className="w-4 h-4" />}
             >
-              {t('confirm.viewAccount', 'View in Resident Account')}
+              {t('confirm.viewAccount', 'View in my account')}
             </Button>
             <Button
               variant="outline"
@@ -177,7 +242,7 @@ export const ConfirmationPage = () => {
               onClick={() => navigate('/')}
               leftIcon={<Home className="w-4 h-4" />}
             >
-              {t('confirm.returnHome', 'Return to Homepage')}
+              {t('confirm.returnHome', 'Return home')}
             </Button>
             <Button
               variant="ghost"
@@ -186,7 +251,7 @@ export const ConfirmationPage = () => {
               onClick={() => window.print()}
               leftIcon={<Printer className="w-4 h-4" />}
             >
-              {t('confirm.printReceipt', 'Print Receipt')}
+              {t('confirm.printReceipt', 'Print summary')}
             </Button>
           </motion.div>
         </motion.div>

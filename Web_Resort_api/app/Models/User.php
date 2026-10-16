@@ -73,6 +73,10 @@ class User extends Authenticatable
      */
     public function permissions(): array
     {
+        if ($this->isAdmin()) {
+            return Permission::query()->pluck('name')->all();
+        }
+
         $rolePerms = $this->roles()
             ->with('permissions')
             ->get()
@@ -93,6 +97,10 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
         return in_array($permission, $this->permissions());
     }
 

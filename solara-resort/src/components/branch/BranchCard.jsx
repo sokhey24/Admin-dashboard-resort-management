@@ -15,14 +15,12 @@ export const BranchCard = ({ branch, featured = false }) => {
 
   return (
     <div
-      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full w-full ${
-        featured ? 'lg:col-span-2 md:flex-row' : ''
-      }`}
+      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full w-full ${featured ? 'lg:col-span-2 md:flex-row' : ''
+        }`}
     >
       <div
-        className={`relative overflow-hidden bg-slate-900 shrink-0 ${
-          featured ? 'md:w-1/2 aspect-[16/10] md:aspect-auto' : 'aspect-[16/10] w-full'
-        }`}
+        className={`relative overflow-hidden bg-slate-900 shrink-0 ${featured ? 'md:w-1/2 aspect-[16/10] md:aspect-auto' : 'aspect-[16/10] w-full'
+          }`}
       >
         {item.featuredImage ? (
           <img

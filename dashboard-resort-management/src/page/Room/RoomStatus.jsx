@@ -6,7 +6,33 @@ import { useDarkMode } from "../../util/DarkModeContext";
 import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
 import { PriceWithDiscount } from "./RoomPrice.jsx";
-import { MAX_DISCOUNT_PERCENT, ROOM_STATUSES, STATUS_STYLE, applyFormErrors, asList, effectiveDiscountPercent, roomActionClass, roomModalOkClass, roomModalCancelClass } from "./roomHelpers";
+import {
+  MAX_DISCOUNT_PERCENT,
+  ROOM_STATUSES,
+  STATUS_STYLE,
+  STATUS_COLORS,
+  applyFormErrors,
+  asList,
+  effectiveDiscountPercent,
+  roomActionClass,
+  roomModalOkClass,
+  roomModalCancelClass,
+  roomPageTitleClass,
+  roomPageSubTextClass,
+  roomCardClass,
+  roomCardHeaderBorderClass,
+  roomTableHeaderTextClass,
+  roomCellMutedClass,
+  roomPageShellClass,
+  roomTableHeadClass,
+  roomTableBodyClass,
+  roomRowHoverClass,
+  roomCellTextClass,
+  roomStatusSearchClass,
+  roomPaginationNavBtnClass,
+  roomPaginationPageClass,
+  roomCountBadgeClass,
+} from "./roomHelpers";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { useCatalogStore, withBranchScope } from "../../store/CatalogStore";
 
@@ -156,34 +182,30 @@ export default function RoomStatus() {
   const pageItems   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const { available, occupied, maintenance, reserved } = statusStats;
 
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
-  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
-  const titleCls  = dark ? "text-gray-100"                 : "text-[#102A43]";
-  const subText   = dark ? "text-gray-400"                 : "text-[#829AB1]";
-  const thead     = dark ? "bg-gray-700/60"                : "bg-[#F5F8FC]";
-  const thText    = dark ? "text-gray-400"                 : "text-[#829AB1]";
-  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-gray-100";
-  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-[#F5F8FC]";
-  const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
-  const cellMuted = dark ? "text-[#829AB1]"                 : "text-[#829AB1]";
-  const divider   = dark ? "divide-gray-700"               : "divide-gray-200";
-  const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
-    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48";
-  const pageBtn   = dark
-    ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
-    : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
+  const card      = roomCardClass(dark);
+  const cardHdr   = roomCardHeaderBorderClass(dark);
+  const titleCls  = roomPageTitleClass(dark);
+  const subText   = roomPageSubTextClass(dark);
+  const thead     = roomTableHeadClass(dark);
+  const thText    = roomTableHeaderTextClass(dark);
+  const tbody     = roomTableBodyClass(dark);
+  const rowHover  = roomRowHoverClass(dark);
+  const cellText  = roomCellTextClass(dark);
+  const cellMuted = roomCellMutedClass();
+  const divider   = dark ? "divide-brand-border-dark" : "divide-gray-200";
+  const searchCls = roomStatusSearchClass(dark);
+  const pageBtn   = roomPaginationNavBtnClass(dark);
 
   return (
-    <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
+    <div className={roomPageShellClass(dark)} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>Room Status</h2>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Available",   value: available,   color: "#52c41a" },
-          { label: "Occupied",    value: occupied,    color: "#ff4d4f" },
-          { label: "Reserved",    value: reserved,    color: "#1677ff" },
-          { label: "Maintenance", value: maintenance, color: "#faad14" },
+          { label: "Available",   value: available,   color: STATUS_COLORS.available },
+          { label: "Occupied",    value: occupied,    color: STATUS_COLORS.occupied },
+          { label: "Reserved",    value: reserved,    color: STATUS_COLORS.reserved },
+          { label: "Maintenance", value: maintenance, color: STATUS_COLORS.maintenance },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 ${card}`}>
             <p className={`text-[13px] font-semibold uppercase tracking-wide mb-1 ${subText}`}>{s.label}</p>
@@ -196,7 +218,7 @@ export default function RoomStatus() {
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
             <span className={`text-[18px] font-semibold ${titleCls}`}>All Rooms</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FF6B00]/10 text-[#102A43] ring-[#FF6B00]/20"}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${roomCountBadgeClass(dark)}`}>
               {filtered.length} rooms
             </span>
           </div>
@@ -261,7 +283,7 @@ export default function RoomStatus() {
             <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
               <Button key={p} onClick={() => setPage(p)}
-                className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${page === p ? "bg-[#FF6B00] text-white" : dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`}>{p}</Button>
+                className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${roomPaginationPageClass(dark, page === p)}`}>{p}</Button>
             ))}
             <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</Button>
           </div>

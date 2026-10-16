@@ -29,6 +29,7 @@ class AdminDashboardService
         return [
             'statistics'            => $this->getStatistics($today, $filters, $user),
             'monthly_revenue'       => $this->getMonthlyRevenue($filters, $user),
+            'monthly_performance'   => $this->getMonthlyPerformance($filters, $user),
             'booking_statistics'    => $this->getBookingStatistics($filters, $user),
             'room_statistics'       => $this->getRoomStatistics($filters, $user),
             'restaurant_statistics' => $this->getRestaurantStatistics($filters, $user),
@@ -221,6 +222,62 @@ class AdminDashboardService
             ])
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Monthly resort bookings vs restaurant food orders (same year / filter scope as monthly_revenue).
+     *
+     * @return array<int, array{month: string, bookings: int, restaurant_orders: int}>
+     */
+    private function getMonthlyPerformance(array $filters, ?User $user): array
+    {
+        $year = ! empty($filters['year']) ? (int) $filters['year'] : Carbon::now()->year;
+
+        $bookingsQuery = $this->scopedBookings($user, $filters)->whereYear('created_at', $year);
+        $ordersQuery   = $this->scopedFoodOrders($user, $filters)->whereYear('created_at', $year);
+
+        if (! empty($filters['date'])) {
+            $bookingsQuery->whereDate('created_at', $filters['date']);
+            $ordersQuery->whereDate('created_at', $filters['date']);
+        } elseif (! empty($filters['month'])) {
+            $bookingsQuery->whereMonth('created_at', $filters['month']);
+            $ordersQuery->whereMonth('created_at', $filters['month']);
+        }
+
+        $bookingsByMonth = $bookingsQuery
+            ->select(
+                DB::raw('MONTH(created_at) as month_num'),
+                DB::raw('MONTHNAME(created_at) as month'),
+                DB::raw('COUNT(*) as bookings')
+            )
+            ->groupBy('month_num', 'month')
+            ->orderBy('month_num')
+            ->get()
+            ->keyBy('month_num');
+
+        $ordersByMonth = $ordersQuery
+            ->select(
+                DB::raw('MONTH(created_at) as month_num'),
+                DB::raw('MONTHNAME(created_at) as month'),
+                DB::raw('COUNT(*) as restaurant_orders')
+            )
+            ->groupBy('month_num', 'month')
+            ->orderBy('month_num')
+            ->get()
+            ->keyBy('month_num');
+
+        $monthNums = $bookingsByMonth->keys()->merge($ordersByMonth->keys())->unique()->sort()->values();
+
+        return $monthNums->map(function ($monthNum) use ($bookingsByMonth, $ordersByMonth) {
+            $bookingRow = $bookingsByMonth->get($monthNum);
+            $orderRow   = $ordersByMonth->get($monthNum);
+
+            return [
+                'month'              => $bookingRow?->month ?? $orderRow?->month,
+                'bookings'           => (int) ($bookingRow?->bookings ?? 0),
+                'restaurant_orders'  => (int) ($orderRow?->restaurant_orders ?? 0),
+            ];
+        })->values()->all();
     }
 
     private function getBookingStatistics(array $filters, ?User $user): array

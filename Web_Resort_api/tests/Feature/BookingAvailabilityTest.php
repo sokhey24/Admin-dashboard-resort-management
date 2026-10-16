@@ -9,12 +9,10 @@ use App\Models\RoomType;
 use App\Models\User;
 use App\Services\BookingService;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BookingAvailabilityTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected Room $room;
 

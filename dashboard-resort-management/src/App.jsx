@@ -71,8 +71,10 @@ import Notification      from "./page/Settings/Notification";
 import Manage_Resort from "./page/ManagerSystem/Manage_Resort";
 import Manage_restaurand from "./page/ManagerSystem/Manage_restaurand";
 import Manage_WebContent from "./page/ManagerSystem/Manage_WebContent";
+import Manage_SolaraActivities from "./page/ManagerSystem/Manage_SolaraActivities";
 import ProductsAdd      from "./page/products/ProductsAdd";
 import Reports          from "./page/reports/Reports";
+import AccessDenied     from "./page/errors/AccessDenied";
 
 export default function App() {
   return (
@@ -87,6 +89,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route index element={<RoleHome />} />
           <Route path="profile" element={<ProfileSetting />} />
+          <Route path="403" element={<AccessDenied />} />
 
           {/* Admin Dashboard */}
           <Route path="dashboard" element={
@@ -124,6 +127,12 @@ export default function App() {
           <Route path="manager/website" element={
             <PermissionRoute requires="admin.resorts.view">
               <Manage_WebContent />
+            </PermissionRoute>
+          }/>
+
+          <Route path="manager/solara-activities" element={
+            <PermissionRoute requires="admin.resorts.view">
+              <Manage_SolaraActivities />
             </PermissionRoute>
           }/>
 
@@ -301,7 +310,11 @@ export default function App() {
           } />
 
           {/* Products */}
-          <Route path="products/add" element={<ProductsAdd />} />
+          <Route path="products/add" element={
+            <PermissionRoute requires={["admin.dashboard.view", "admin.resorts.view"]}>
+              <ProductsAdd />
+            </PermissionRoute>
+          } />
 
           {/* Settings — any authenticated user */}
           <Route path="settings/general_settings" element={<GeneralSettings />} />

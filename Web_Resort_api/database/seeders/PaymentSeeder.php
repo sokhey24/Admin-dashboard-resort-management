@@ -200,6 +200,7 @@ class PaymentSeeder extends Seeder
             'source' => $source,
             'reference_type' => $refType,
             'reference_id' => $refId,
+            'booking_id' => $refType === Booking::class ? $refId : null,
             'user_id' => $userId,
             'amount' => $amount,
             'currency' => 'USD',

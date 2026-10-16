@@ -8,6 +8,8 @@ export const ROUTES = {
   activities: '/activities',
   services: '/services',
   dining: '/dining',
+  menuList: '/dining/menu',
+  menuDetail: (id) => `/dining/menu/${id}`,
   gallery: '/gallery',
   contact: '/contact',
   login: '/login',

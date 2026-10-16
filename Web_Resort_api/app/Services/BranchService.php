@@ -171,8 +171,35 @@ class BranchService
             'terms_and_conditions' => $branch->resort->terms_and_conditions,
         ] : null;
         $row['facilities'] = $branch->resort?->facilities?->toArray() ?? [];
+        $row['amenities'] = $this->resolveBranchAmenities($branch);
 
         return array_merge($row, $metrics);
+    }
+
+    /**
+     * Branch-specific amenity labels (admin-defined), with resort facilities as fallback.
+     *
+     * @return array<int, string>
+     */
+    protected function resolveBranchAmenities(Branch $branch): array
+    {
+        if (is_array($branch->amenities)) {
+            return collect($branch->amenities)
+                ->map(fn ($v) => trim((string) $v))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $facilities = $branch->resort?->facilities ?? collect();
+
+        return $facilities
+            ->pluck('name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function formatBranchDetail(Branch $branch): array
@@ -207,18 +234,8 @@ class BranchService
             return $rtArr;
         })->values();
 
-        // Aggregate unique amenities from room types and facilities
-        $amenities = collect();
-        foreach ($branchRoomTypes as $rt) {
-            if (is_array($rt->amenities)) {
-                $amenities = $amenities->concat($rt->amenities);
-            }
-        }
+        $uniqueAmenities = $this->resolveBranchAmenities($branch);
         $facilities = $branch->resort?->facilities ?? collect();
-        foreach ($facilities as $f) {
-            $amenities->push($f->name);
-        }
-        $uniqueAmenities = $amenities->filter()->unique()->values()->all();
 
         return $this->formatBranchRow($branch, [
             'rooms_count' => $rooms->count(),

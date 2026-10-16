@@ -8,16 +8,24 @@ import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { ResortCardSkeleton } from '../components/ui/Skeleton.jsx';
 import { formatCurrency } from '../util/currency.js';
 import { useApp } from '../context/AppContext.jsx';
-import { useSearchDestinationOptions, useResortSearchResults } from '../hooks/useSearch.js';
+import {
+  BRANCHES_PAGE_SIZE,
+  useSearchDestinationOptions,
+  useResortSearchResults,
+} from '../hooks/useSearch.js';
 import { SearchWidget } from '../features/search/components/SearchWidget.jsx';
 import { SearchStayNotice } from '../features/search/components/SearchStayNotice.jsx';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { usePaginationMeta } from '../hooks/useCatalog.js';
+import {
+  applyDestinationRegionParams,
+  sanctuaryRegionFromCriteria,
+  sanctuaryRegionMatches,
+} from '../util/searchParams.js';
 import heroImage from '../assets/images/hero_solara_resort_1790692958491.jpg';
 import { StaggerItem } from '../components/motion/StaggerItem.jsx';
 import { RevealOnScroll } from '../components/motion/RevealOnScroll.jsx';
 
-// Signature primary locations for Solara Brand
 const SIGNATURE_LOCATIONS = [
   { key: '', label: 'All Locations', desc: 'Across Cambodia' },
   { key: 'Kampot', label: 'Kampot', desc: 'Riverside & Bokor' },
@@ -50,32 +58,74 @@ export const BranchesPage = () => {
     reload,
   } = useResortSearchResults({ page, sort, maxPrice, minRating });
 
-  const { page: currentPage, lastPage } = usePaginationMeta(meta);
-  const { destinationOptions: filterDestinationOptions } = useSearchDestinationOptions();
+  const { page: currentPage, lastPage, total: totalFromApi, perPage } = usePaginationMeta(meta);
+  const { destinationOptions: filterDestinationOptions, branchOptions } =
+    useSearchDestinationOptions();
+
+  const activeRegion = useMemo(
+    () => sanctuaryRegionFromCriteria(criteria, branchOptions),
+    [criteria, branchOptions]
+  );
+
+  const showingAllBranches = !criteria.branchId && !criteria.destination;
 
   const destinationOptions = useMemo(
     () => [
       {
         value: '',
         label: t('search.allDestinations', 'All Locations & Branches'),
-        count: total || filteredBranches.length,
+        count: totalFromApi || total || filteredBranches.length,
       },
-      ...filterDestinationOptions.map((opt) => ({
-        ...opt,
-        count: opt.count ?? 0,
-      })),
+      ...filterDestinationOptions
+        .filter((opt) => opt.value !== '')
+        .map((opt) => ({
+          ...opt,
+          count: opt.count ?? 0,
+        })),
     ],
-    [filterDestinationOptions, filteredBranches.length, total, t]
+    [filterDestinationOptions, filteredBranches.length, total, totalFromApi, t]
   );
 
-  const activeDestination = criteria.destination || '';
+  const resultsSummary = useMemo(() => {
+    if (status === 'loading') {
+      return t('search.loadingResults', 'Locating sanctuaries…');
+    }
+    const totalCount = totalFromApi || total || filteredBranches.length;
+    if (totalCount === 0) {
+      return language === 'km' ? 'គ្មានសាខា' : 'No branches to show';
+    }
+    const pageSize = perPage || BRANCHES_PAGE_SIZE;
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, totalCount);
+    if (language === 'km') {
+      return `បង្ហាញ ${start}–${end} នៃ ${totalCount} សាខា`;
+    }
+    return `Showing ${start}–${end} of ${totalCount} branches`;
+  }, [
+    status,
+    totalFromApi,
+    total,
+    filteredBranches.length,
+    perPage,
+    currentPage,
+    language,
+    t,
+  ]);
 
   useEffect(() => {
     setSort(sortParam);
     setMaxPrice(maxPriceParam);
     setMinRating(ratingParam);
     setPage(1);
-  }, [sortParam, maxPriceParam, ratingParam, criteria.destination, criteria.checkIn, criteria.checkOut]);
+  }, [
+    sortParam,
+    maxPriceParam,
+    ratingParam,
+    criteria.destination,
+    criteria.branchId,
+    criteria.checkIn,
+    criteria.checkOut,
+  ]);
 
   const updateParam = (key, value) => {
     const next = new URLSearchParams(searchParams);
@@ -95,14 +145,26 @@ export const BranchesPage = () => {
     setSearchParams(new URLSearchParams());
   };
 
-  const syncDestinationFilter = (value) => {
+  const syncDestinationFilter = (destination) => {
     setPage(1);
-    updateParam('destination', value);
+    setSearchParams(applyDestinationRegionParams(searchParams, destination || ''));
+  };
+
+  const isSidebarOptionActive = (opt) => {
+    if (!opt.value) {
+      return showingAllBranches;
+    }
+    if (criteria.branchId) {
+      return false;
+    }
+    return (
+      criteria.destination === opt.value ||
+      sanctuaryRegionMatches(opt.value, criteria.destination)
+    );
   };
 
   return (
     <div className="w-full pb-24">
-      {/* 1. HERO SECTION */}
       <HeroSection
         image={heroImage}
         badge={t('brand.name', 'SOLARA RESORT & SPA')}
@@ -114,12 +176,10 @@ export const BranchesPage = () => {
         heightClass="min-h-[460px]"
       />
 
-      {/* 2. SEARCH WIDGET INTEGRATION */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
         <SearchWidget />
       </div>
 
-      {/* 3. LOCATION SELECTOR HERO TABS */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         <div className="bg-surface/80 backdrop-blur-md border border-border rounded-[var(--radius-card)] p-3 sm:p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-2 px-1 text-xs font-semibold text-gold uppercase tracking-wider">
@@ -129,16 +189,14 @@ export const BranchesPage = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {SIGNATURE_LOCATIONS.map((loc) => {
-              const isSelected =
-                (!loc.key && !activeDestination) ||
-                (loc.key && activeDestination.toLowerCase().includes(loc.key.toLowerCase()));
+              const isSelected = sanctuaryRegionMatches(loc.key, activeRegion);
 
               return (
                 <button
                   key={loc.label}
                   type="button"
                   onClick={() => syncDestinationFilter(loc.key)}
-                  className={`flex flex-col text-left p-3 rounded-[var(--radius-button)] transition-all cursor-pointer border ${
+                  className={`flex flex-col text-left p-3 rounded-[var(--radius-button)] transition-all duration-300 border cursor-pointer ${
                     isSelected
                       ? 'bg-gold/15 border-gold shadow-md text-text font-semibold'
                       : 'bg-surface border-border hover:border-gold/40 text-muted hover:text-text'
@@ -158,27 +216,24 @@ export const BranchesPage = () => {
         </div>
       </div>
 
-      {/* 4. MAIN CONTENT AREA */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         <SearchStayNotice criteria={criteria} />
 
-        {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-border">
           <div>
             <h2 className="text-2xl font-serif font-bold text-text">
-              {activeDestination ? `Sanctuaries in ${activeDestination}` : 'All Solara Resort Branches'}
+              {criteria.branchId
+                ? t('branches.filteredBranch', 'Selected branch')
+                : activeRegion
+                  ? `Sanctuaries in ${activeRegion}`
+                  : 'All Solara Resort Branches'}
             </h2>
-            <p className="text-xs text-muted mt-0.5">
-              {status === 'loading'
-                ? t('search.loadingResults', 'Locating sanctuaries…')
-                : language === 'km'
-                  ? `បង្ហាញ ${filteredBranches.length} នៃ ${total || filteredBranches.length} សាខា`
-                  : `Showing ${filteredBranches.length} branches · Under Solara Resort & Spa brand`}
-            </p>
+            <p className="text-xs text-muted mt-0.5">{resultsSummary}</p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
               className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-[var(--radius-button)] bg-surface border border-border text-xs text-text cursor-pointer"
             >
@@ -215,24 +270,23 @@ export const BranchesPage = () => {
 
         {status === 'loading' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ResortCardSkeleton />
-            <ResortCardSkeleton />
-            <ResortCardSkeleton />
-            <ResortCardSkeleton />
+            {Array.from({ length: BRANCHES_PAGE_SIZE }, (_, i) => (
+              <ResortCardSkeleton key={i} />
+            ))}
           </div>
         )}
 
         {(status === 'results' || status === 'empty') && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Sidebar Filters */}
             <aside className={`lg:block ${mobileFilterOpen ? 'block' : 'hidden'} space-y-6 lg:col-span-1`}>
               <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-6">
                 <div className="flex items-center justify-between pb-3 border-b border-border">
                   <span className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
                     {t('branches.filterTitle', 'Filter Branches')}
                   </span>
-                  {(activeDestination || minRating > 0 || maxPrice < 1000) && (
+                  {(!showingAllBranches || minRating > 0 || maxPrice < 1000) && (
                     <button
+                      type="button"
                       onClick={handleClearFilters}
                       className="text-xs text-gold hover:underline flex items-center gap-1 cursor-pointer"
                     >
@@ -242,7 +296,6 @@ export const BranchesPage = () => {
                   )}
                 </div>
 
-                {/* Destinations list */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-medium text-text block">
                     {t('search.destination', 'Branch / Location')}
@@ -254,7 +307,7 @@ export const BranchesPage = () => {
                         type="button"
                         onClick={() => syncDestinationFilter(opt.value)}
                         className={`w-full text-left px-2.5 py-1.5 rounded transition-colors flex items-center justify-between cursor-pointer ${
-                          activeDestination === opt.value
+                          isSidebarOptionActive(opt)
                             ? 'bg-gold/15 text-gold font-medium border border-gold/30'
                             : 'hover:bg-surface-hover text-muted hover:text-text'
                         }`}
@@ -268,7 +321,6 @@ export const BranchesPage = () => {
                   </div>
                 </div>
 
-                {/* Nightly Budget */}
                 <div className="space-y-2.5 pt-4 border-t border-border">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-medium text-text">{t('resorts.budget', 'Nightly Budget')}</span>
@@ -290,7 +342,6 @@ export const BranchesPage = () => {
                   />
                 </div>
 
-                {/* Minimum Rating */}
                 <div className="space-y-2.5 pt-4 border-t border-border">
                   <label className="text-xs font-medium text-text block">
                     {t('resorts.minRating', 'Minimum Rating')}
@@ -323,7 +374,6 @@ export const BranchesPage = () => {
               </div>
             </aside>
 
-            {/* Results Grid */}
             <main className="lg:col-span-3 space-y-6">
               {status === 'empty' ? (
                 <EmptyState
@@ -347,10 +397,13 @@ export const BranchesPage = () => {
 
               {status === 'results' && lastPage > 1 && (
                 <Pagination
-                  className="pt-8"
+                  className="pt-8 border-t border-border"
                   page={currentPage}
                   totalPages={lastPage}
-                  onPageChange={setPage}
+                  onPageChange={(next) => {
+                    setPage(next);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                 />
               )}
             </main>

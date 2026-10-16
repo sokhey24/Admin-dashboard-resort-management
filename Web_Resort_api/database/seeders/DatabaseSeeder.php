@@ -23,10 +23,7 @@ class DatabaseSeeder extends Seeder
         // 3. Seed admin + staff accounts
         $this->call(AdminUserSeeder::class);
 
-        // 4. Seed sample payments (resort infrastructure + sample bookings)
-        $this->call(PaymentSeeder::class);
-
-        // 5. Seed sample customers
+        // 4. Seed sample customers
         $customerRole = Role::where('name', 'customer')->value('id');
 
         $customers = [
@@ -64,6 +61,10 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        // 5. Seed sample payments (resort infrastructure + sample bookings)
+        $this->call(PaymentSeeder::class);
+
+        // 6. Seed loyalty and bookings
         $this->call(CustomerLoyaltySeeder::class);
         $this->call(CustomerBookingSeeder::class);
     }

@@ -1,188 +1,236 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { HeroSection } from '../components/ui/HeroSection.jsx';
-import { Modal } from '../components/ui/Modal.jsx';
+import { Button } from '../components/ui/Button.jsx';
 import { MARKETING_IMAGES } from '../constants/marketingImages.js';
-import { Eye } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
+import { GALLERY_FIXTURE, GALLERY_CATEGORY_VALUES } from '../data/galleryData.js';
+import { EmptyState } from '../components/ui/EmptyState.jsx';
+import { GalleryFilters } from '../components/gallery/GalleryFilters.jsx';
+import { GalleryCard } from '../components/gallery/GalleryCard.jsx';
+import { GalleryLightbox } from '../components/gallery/GalleryLightbox.jsx';
+import { GALLERY_PAGE_SIZE } from '../components/gallery/GallerySkeleton.jsx';
+import { paginateItems } from '../util/paginateList.js';
+import { ListPagination } from '../components/ui/ListPagination.jsx';
+
+const CATEGORY_I18N = {
+  All: 'gallery.all',
+  Resort: 'gallery.categoryResort',
+  Rooms: 'gallery.categoryRooms',
+  Dining: 'gallery.categoryDining',
+  Wellness: 'gallery.categoryWellness',
+  Pool: 'gallery.categoryPool',
+  Nature: 'gallery.categoryNature',
+  Experiences: 'gallery.categoryExperiences',
+};
+
+const CATEGORY_DEFAULTS = {
+  All: 'All Collections',
+  Resort: 'Resort',
+  Rooms: 'Rooms',
+  Dining: 'Dining',
+  Wellness: 'Wellness',
+  Pool: 'Pool',
+  Nature: 'Nature',
+  Experiences: 'Experiences',
+};
 
 export const GalleryPage = () => {
-  const { t, language } = useApp();
+  const { t, localize, language } = useApp();
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [activeImage, setActiveImage] = useState(null);
+  const [listPage, setListPage] = useState(1);
+  const [activeImageId, setActiveImageId] = useState(null);
 
-  const galleryItems = [
-    {
-      id: 'gal-1',
-      src: MARKETING_IMAGES.hero,
-      title: 'Ocean Sanctuary at Twilight',
-      title_km: 'រមណីយដ្ឋានមាត់សមុទ្រពេលព្រលប់',
-      category: 'Resort & Ocean',
-      category_km: 'សំណង់រមណីយដ្ឋាន',
-      caption: 'The main tier infinity pool overlooking the sunset waters of Koh Rong.',
-      caption_km: 'អាងហែលទឹកធំមើលឃើញផ្ទៃសមុទ្រពេលថ្ងៃលិចនៅកោះរ៉ុង។'
-    },
-    {
-      id: 'gal-2',
-      src: MARKETING_IMAGES.villa,
-      title: 'Oceanfront Royal Pool Villa',
-      title_km: 'វីឡាអាងហែលទឹកមាត់សមុទ្រ រ៉ូយ៉ាល់',
-      category: 'Villas & Suites',
-      category_km: 'បន្ទប់ និងវីឡា',
-      caption: 'Handcrafted teak furnishings and private plunge pool hovering above the tides.',
-      caption_km: 'គ្រឿងសង្ហារិមឈើប្រណីតធ្វើដោយដៃ និងអាងហែលទឹកឯកជនលើផ្ទៃទឹកសមុទ្រ។'
-    },
-    {
-      id: 'gal-3',
-      src: MARKETING_IMAGES.dining,
-      title: 'The Azure Wave Coastal Restaurant',
-      title_km: 'ភោជនីយដ្ឋានមាត់សមុទ្រ អាសួរ វ៉េវ',
-      category: 'Dining & Wine',
-      category_km: 'ភោជនីយដ្ឋាន & ម្ហូបអាហារ',
-      caption: 'Candlelit oceanfront tables serving fresh line-caught seafood and vintage champagnes.',
-      caption_km: 'តុអាហារអុជទៀនមាត់សមុទ្រ បម្រើគ្រឿងសមុទ្រស្រស់ៗ និងស្រាសំប៉ាញល្បីៗ។'
-    },
-    {
-      id: 'gal-4',
-      src: MARKETING_IMAGES.spa,
-      title: 'Celestial Lotus Spa Sanctuary',
-      title_km: 'ជម្រកស្ប៉ាផ្កាឈូកទិព្វ',
-      category: 'Wellness & Spa',
-      category_km: 'ស្ប៉ា & សម្រាកកាយ',
-      caption: 'Natural stone reflection pools and restorative herbal therapy sala.',
-      caption_km: 'អាងទឹកថ្មធម្មជាតិ និងសាលាព្យាបាលដោយឱសថបុរាណ។'
-    },
-    {
-      id: 'gal-5',
-      src: MARKETING_IMAGES.villa,
-      title: 'Angkor Heritage Pavilion Suite',
-      title_km: 'បន្ទប់ស្វីតពន្លាបេតិកភណ្ឌអង្គរ',
-      category: 'Villas & Suites',
-      category_km: 'បន្ទប់ និងវីឡា',
-      caption: 'Hand-carved sandstone details surrounded by ancient banyan canopy in Siem Reap.',
-      caption_km: 'ចម្លាក់ថ្មភក់ធ្វើដោយដៃ កណ្តាលម្លប់ដើមជ្រៃបុរាណនៅសៀមរាប។'
-    },
-    {
-      id: 'gal-6',
-      src: MARKETING_IMAGES.hero,
-      title: 'Private Twin-Hull Catamaran Expedition',
-      title_km: 'ដំណើរកម្សាន្តទូកកាតាម៉ារ៉ានឯកជន',
-      category: 'Resort & Ocean',
-      category_km: 'សំណង់រមណីយដ្ឋាន',
-      caption: 'Setting sail across the protected coral reefs and remote island atolls.',
-      caption_km: 'ជិះទូកកម្សាន្តកាត់ផ្កាថ្មធម្មជាតិ និងកោះនានាក្នុងសមុទ្រកម្ពុជា។'
-    },
-    {
-      id: 'gal-7',
-      src: MARKETING_IMAGES.spa,
-      title: 'Bokor Mountain Cloud Deck',
-      title_km: 'រានហាលទស្សនាពពកលើភ្នំបូកគោ',
-      category: 'Wellness & Spa',
-      category_km: 'ស្ប៉ា & សម្រាកកាយ',
-      caption: 'Panoramic mist-shrouded observation platform at 1,075m elevation.',
-      caption_km: 'ទីតាំងមើលទេសភាពអ័ព្ទត្រជាក់កម្ពស់ ១,០៧៥ ម៉ែត្រលើភ្នំបូកគោ។'
-    },
-    {
-      id: 'gal-8',
-      src: MARKETING_IMAGES.dining,
-      title: 'Saffron & Spice Royal Khmer Banquet',
-      title_km: 'ពិធីលៀងសាយភោជន៍ព្រះរាជវាំងខ្មែរ',
-      category: 'Dining & Wine',
-      category_km: 'ភោជនីយដ្ឋាន & ម្ហូបអាហារ',
-      caption: 'Traditional clay-oven gastronomy and organic farm herb pairings.',
-      caption_km: 'ម្ហូបចម្អិនដោយឡដីឥដ្ឋបុរាណ ជាមួយបន្លែឱសថសរីរាង្គ។'
+  const photos = GALLERY_FIXTURE;
+  const catalogEmpty = photos.length === 0;
+
+  const categories = useMemo(
+    () =>
+      GALLERY_CATEGORY_VALUES.map((value) => ({
+        value,
+        label: t(CATEGORY_I18N[value], CATEGORY_DEFAULTS[value]),
+      })),
+    [t]
+  );
+
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === 'All') return photos;
+    return photos.filter((item) => item.category === selectedCategory);
+  }, [photos, selectedCategory]);
+
+  const filterEmpty = !catalogEmpty && filteredItems.length === 0;
+
+  useEffect(() => {
+    setListPage(1);
+  }, [selectedCategory]);
+
+  const galleryPagination = useMemo(
+    () => paginateItems(filteredItems, listPage, GALLERY_PAGE_SIZE),
+    [filteredItems, listPage]
+  );
+
+  useEffect(() => {
+    if (listPage > galleryPagination.totalPages) {
+      setListPage(galleryPagination.totalPages);
     }
-  ];
+  }, [listPage, galleryPagination.totalPages]);
 
-  const categories = [
-    { value: 'All', label: t('gallery.all', 'All Collections') },
-    { value: 'Resort & Ocean', label: t('gallery.sanctuaries', 'Sanctuary Architecture') },
-    { value: 'Villas & Suites', label: t('gallery.villas', 'Villas & Suites') },
-    { value: 'Dining & Wine', label: t('gallery.dining', 'Gastronomy') },
-    { value: 'Wellness & Spa', label: t('gallery.wellness', 'Spa & Wellness') },
-  ];
+  const pagedItems = galleryPagination.items;
 
-  const filteredItems = selectedCategory === 'All'
-    ? galleryItems
-    : galleryItems.filter((item) => item.category === selectedCategory);
+  const activeIndex = useMemo(() => {
+    if (!activeImageId) return -1;
+    return filteredItems.findIndex((item) => item.id === activeImageId);
+  }, [activeImageId, filteredItems]);
+
+  const activeItem = activeIndex >= 0 ? filteredItems[activeIndex] : null;
+  const activeDisplay = activeItem ? (localize ? localize(activeItem) : activeItem) : null;
+
+  useEffect(() => {
+    if (activeImageId && activeIndex < 0) {
+      setActiveImageId(null);
+    }
+  }, [activeImageId, activeIndex]);
+
+  const openLightbox = useCallback((item) => {
+    setActiveImageId(item.id);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setActiveImageId(null);
+  }, []);
+
+  const goPrevious = useCallback(() => {
+    if (filteredItems.length === 0) return;
+    const idx = activeIndex >= 0 ? activeIndex : 0;
+    const prev = (idx - 1 + filteredItems.length) % filteredItems.length;
+    setActiveImageId(filteredItems[prev].id);
+  }, [filteredItems, activeIndex]);
+
+  const goNext = useCallback(() => {
+    if (filteredItems.length === 0) return;
+    const idx = activeIndex >= 0 ? activeIndex : 0;
+    const next = (idx + 1) % filteredItems.length;
+    setActiveImageId(filteredItems[next].id);
+  }, [filteredItems, activeIndex]);
+
+  const scrollToGallery = () => {
+    document.getElementById('gallery-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const counterLabel =
+    activeIndex >= 0
+      ? t('gallery.imageCounter', '{current} / {total}')
+          .replace('{current}', String(activeIndex + 1))
+          .replace('{total}', String(filteredItems.length))
+      : '';
 
   return (
-    <div className="w-full pb-24">
+    <div className="w-full pb-24 overflow-x-hidden">
       <HeroSection
         image={MARKETING_IMAGES.hero}
-        badge={language === 'km' ? 'វិចិត្រសាលរូបភាព' : 'Visual Sanctuary'}
-        title={t('gallery.pageTitle', 'The Solara Photography Collection')}
-        subtitle={t('gallery.pageSubtitle', 'A visual homage to our sanctuaries across Cambodia’s turquoise atolls, ancient rainforests, and cloud-veiled highlands.')}
-        heightClass="min-h-[440px]"
-      />
+        badge={t('gallery.badge', 'The Solara Collection')}
+        title={t('gallery.heroTitle', 'A Visual Journey Through Solara')}
+        subtitle={t(
+          'gallery.heroSubtitle',
+          'Explore the spaces, experiences, and moments that define the Solara Resort experience.'
+        )}
+        heightClass="min-h-[440px] sm:min-h-[480px] lg:min-h-[520px]"
+      >
+        <Button variant="gold" size="md" type="button" onClick={scrollToGallery} className="shadow-lg">
+          {t('gallery.exploreCta', 'Explore the Collection')}
+        </Button>
+      </HeroSection>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-12">
-          {categories.map((cat) => (
-            <button
-              key={cat.value}
-              type="button"
-              onClick={() => setSelectedCategory(cat.value)}
-              className={`px-4 py-2 rounded-[var(--radius-button)] text-xs font-medium transition-colors cursor-pointer ${
-                selectedCategory === cat.value
-                  ? 'bg-gold text-slate-950 font-semibold shadow-sm'
-                  : 'bg-surface border border-border text-text-secondary hover:text-text hover:bg-surface-hover'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 sm:mt-12">
+        <section className="text-center max-w-2xl mx-auto space-y-4 mb-10 sm:mb-14">
+          <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block">
+            {t('gallery.introEyebrow', 'Photography')}
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-text tracking-tight">
+            {t('gallery.introTitle', 'Moments Worth Remembering')}
+          </h2>
+          <p className="text-xs sm:text-sm text-muted leading-relaxed font-light">
+            {t(
+              'gallery.introDesc',
+              'Architecture bathed in golden light, serene wellness rituals, coastal dining, and guest experiences captured across our sanctuaries.'
+            )}
+          </p>
+        </section>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => setActiveImage(item)}
-              className="group relative aspect-square rounded-[var(--radius-card)] overflow-hidden bg-slate-900 border border-border cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300"
-            >
-              <img
-                src={item.src}
-                alt={language === 'km' ? item.title_km : item.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                loading="lazy"
+        {catalogEmpty ? (
+          <EmptyState
+            title={t('gallery.emptyCatalogTitle', 'No photos yet')}
+            description={t(
+              'gallery.emptyCatalogDesc',
+              'Resort photography will appear here once our team publishes the collection.'
+            )}
+          />
+        ) : (
+          <>
+            <GalleryFilters
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelect={(value) => {
+                setSelectedCategory(value);
+                setListPage(1);
+              }}
+              ariaLabel={t('gallery.filtersAria', 'Gallery collections')}
+            />
+
+            {filterEmpty ? (
+              <EmptyState
+                title={t('gallery.emptyFilterTitle', 'No Images Found')}
+                description={t('gallery.emptyFilterDesc', 'Try another collection.')}
+                actionText={t('gallery.viewAllCollections', 'View All Collections')}
+                onAction={() => setSelectedCategory('All')}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
-                <span className="text-[10px] uppercase tracking-wider text-gold-light font-semibold mb-1">
-                  {language === 'km' ? item.category_km : item.category}
-                </span>
-                <h4 className="text-base font-serif font-bold text-white mb-1">
-                  {language === 'km' ? item.title_km : item.title}
-                </h4>
-                <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                  {language === 'km' ? item.caption_km : item.caption}
-                </p>
-                <div className="mt-3 flex items-center gap-1.5 text-[10px] text-gold font-medium">
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{t('gallery.clickEnlarge', 'Click to view full image')}</span>
+            ) : (
+              <div id="gallery-grid">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 auto-rows-auto">
+                  {pagedItems.map((rawItem) => {
+                    const display = localize ? localize(rawItem) : rawItem;
+                    return (
+                      <GalleryCard
+                        key={rawItem.id}
+                        item={rawItem}
+                        display={display}
+                        viewImageLabel={t('gallery.viewImage', 'View Image')}
+                        onOpen={openLightbox}
+                      />
+                    );
+                  })}
                 </div>
+                {galleryPagination.showPagination && (
+                  <ListPagination
+                    className="mt-8"
+                    page={galleryPagination.page}
+                    totalPages={galleryPagination.totalPages}
+                    total={galleryPagination.total}
+                    startIndex={galleryPagination.startIndex}
+                    endIndex={galleryPagination.endIndex}
+                    language={language}
+                    onPageChange={(nextPage) => {
+                      setListPage(nextPage);
+                      document.getElementById('gallery-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                  />
+                )}
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </>
+        )}
       </div>
 
-      {activeImage && (
-        <Modal
-          isOpen={true}
-          onClose={() => setActiveImage(null)}
-          title={language === 'km' ? activeImage.title_km : activeImage.title}
-          subtitle={language === 'km' ? activeImage.caption_km : activeImage.caption}
-          maxWidth="4xl"
-        >
-          <div className="w-full aspect-[16/10] overflow-hidden rounded-[var(--radius-button)] bg-slate-950">
-            <img
-              src={activeImage.src}
-              alt={language === 'km' ? activeImage.title_km : activeImage.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        </Modal>
-      )}
+      <GalleryLightbox
+        isOpen={Boolean(activeItem)}
+        item={activeItem}
+        display={activeDisplay}
+        counterLabel={counterLabel}
+        prevLabel={t('gallery.previousImage', 'Previous image')}
+        nextLabel={t('gallery.nextImage', 'Next image')}
+        onClose={closeLightbox}
+        onPrevious={goPrevious}
+        onNext={goNext}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Empty, Form, Input, InputNumber, Modal, Select, Spin, message } from "antd";
+import { Button, Col, Empty, Form, Input, InputNumber, Modal, Row, Select, Spin, message } from "antd";
 import { MdAdd, MdDelete, MdEdit, MdSearch, MdVisibility } from "react-icons/md";
 import { request } from "../../util/request";
 import { useDarkMode } from "../../util/DarkModeContext";
@@ -7,6 +7,7 @@ import usePermission from "../../util/usePermission";
 import useRole from "../../util/useRole";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import useCatalogData from "../../hooks/useCatalogData";
+import { useBranchStore } from "../../store/useBranchStore";
 import { RoomTypeAmenityChips } from "./RoomFeature.jsx";
 import { DiscountPreview, PriceWithDiscount } from "./RoomPrice.jsx";
 import ReviewPagination from "./reviews/ReviewPagination";
@@ -49,10 +50,13 @@ export default function RoomTypes() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState();
   const [resortId, setResortId] = useState();
+  const [branchId, setBranchId] = useState();
   const [sort, setSort] = useState("name");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const { resorts, facilities, refreshRoomTypes } = useCatalogData({ autoFetch: false });
+  const { resorts, branches, facilities, refreshRoomTypes } = useCatalogData({ autoFetch: false });
+  const globalBranchId = useBranchStore((s) => s.selectedBranchId);
+  const primaryResortId = resorts[0]?.id;
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
@@ -60,8 +64,16 @@ export default function RoomTypes() {
   const [confirm, setConfirm] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [form] = Form.useForm();
+  const watchResort = Form.useWatch("resort_id", form);
   const basePriceWatch = Form.useWatch("base_price", form);
   const discountWatch = Form.useWatch("discount_percent", form);
+
+  const formBranches = watchResort
+    ? branches.filter((b) => String(b.resort_id) === String(watchResort))
+    : branches;
+  const filterBranches = resortId
+    ? branches.filter((b) => String(b.resort_id) === String(resortId))
+    : branches;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -82,8 +94,10 @@ export default function RoomTypes() {
     if (search) params.set("search", search);
     if (status) params.set("status", status);
     if (resortId) params.set("resort_id", String(resortId));
+    else if (primaryResortId) params.set("resort_id", String(primaryResortId));
+    if (branchId) params.set("branch_id", String(branchId));
     return params.toString();
-  }, [page, perPage, search, status, sort, resortId]);
+  }, [page, perPage, search, status, sort, resortId, branchId, primaryResortId]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -118,6 +132,8 @@ export default function RoomTypes() {
       amenities: [],
       breakfast_included: false,
       free_cancellation: true,
+      ...(primaryResortId ? { resort_id: primaryResortId } : {}),
+      ...(globalBranchId ? { branch_id: globalBranchId } : {}),
     });
     setFormOpen(true);
   };
@@ -126,6 +142,7 @@ export default function RoomTypes() {
     setEditing(row);
     form.setFieldsValue({
       resort_id: row.resort_id,
+      branch_id: row.branch_id,
       name: row.name,
       description: row.description,
       base_price: row.base_price != null ? Number(row.base_price) : undefined,
@@ -187,7 +204,7 @@ export default function RoomTypes() {
   const thText = dark ? "text-gray-400" : "text-[#829AB1]";
   const tbody = dark ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-100";
   const divider = dark ? "divide-gray-700" : "divide-gray-200";
-  const hasFilters = Boolean(searchInput || status || resortId);
+  const hasFilters = Boolean(searchInput || status || resortId || branchId);
 
   return (
     <div className={`min-h-full rounded-xl p-4 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
@@ -201,9 +218,12 @@ export default function RoomTypes() {
           <Select allowClear placeholder="Status" className="min-w-[120px]" value={status} options={TYPE_STATUSES.map((s) => ({ value: s, label: s }))} onChange={(v) => { setStatus(v); setPage(1); }} />
           <Select allowClear showSearch optionFilterProp="label" placeholder="Resort" className="min-w-[150px]" value={resortId}
             options={resorts.map((r) => ({ value: r.id, label: r.name }))}
-            onChange={(v) => { setResortId(v); setPage(1); }} />
+            onChange={(v) => { setResortId(v); setBranchId(undefined); setPage(1); }} />
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Branch" className="min-w-[150px]" value={branchId}
+            options={filterBranches.map((b) => ({ value: b.id, label: b.name }))}
+            onChange={(v) => { setBranchId(v); setPage(1); }} />
           <Select className="min-w-[140px]" value={sort} options={[{ value: "name", label: "Name" }, { value: "base_price", label: "Price" }, { value: "max_occupancy", label: "Capacity" }]} onChange={(v) => { setSort(v); setPage(1); }} />
-          {hasFilters && <Button type="link" onClick={() => { setSearchInput(""); setSearch(""); setStatus(undefined); setResortId(undefined); setPage(1); }}>Reset</Button>}
+          {hasFilters && <Button type="link" onClick={() => { setSearchInput(""); setSearch(""); setStatus(undefined); setResortId(undefined); setBranchId(undefined); setPage(1); }}>Reset</Button>}
           {canCreate && <Button type="primary" icon={<MdAdd />} className="!bg-[#FF6B00] !border-[#FF6B00]" onClick={openCreate}>Add Room Type</Button>}
         </div>
       </div>
@@ -239,7 +259,7 @@ export default function RoomTypes() {
             <table className={`min-w-full divide-y ${divider}`}>
               <thead className={thead}>
                 <tr>
-                  {["No.", "Room Type", "Resort", "Base Price", "Discount", "Max Occupancy", "Bed Count", "Bed Type", "Size (sqm)", "Status", "Action"].map((h) => (
+                  {["No.", "Room Type", "Resort", "Branch", "Base Price", "Discount", "Max Occupancy", "Bed Count", "Bed Type", "Size (sqm)", "Status", "Action"].map((h) => (
                     <th key={h} className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap ${thText} ${h === "No." ? "w-12" : ""} ${h === "Action" ? "text-center" : ""}`}>{h}</th>
                   ))}
                 </tr>
@@ -252,6 +272,7 @@ export default function RoomTypes() {
                       <p className={`text-sm font-semibold ${titleCls}`}>{row.name}</p>
                     </td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.resort?.name || "—"}</td>
+                    <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>{row.branch?.name || "—"}</td>
                     <td className={`px-4 py-4 text-sm whitespace-nowrap ${cellText}`}>
                       <PriceWithDiscount price={row.base_price} percent={row.discount_percent} dark={dark} />
                     </td>
@@ -269,12 +290,12 @@ export default function RoomTypes() {
                           <MdVisibility size={14} /> View
                         </Button> */}
                         {canEdit && (
-                          <Button className={roomActionClass(dark, "edit")} onClick={() => openEdit(row)} classNames={"px-4 py-2 w-2"}> 
+                          <Button className={`${roomActionClass(dark)} px-4 py-2`} onClick={() => openEdit(row)}>
                             <MdEdit size={16} /> Edit
                           </Button>
                         )}
                         {canDelete && (
-                          <Button className={roomActionClass(dark, "delete")} onClick={() => setConfirm({ type: "delete", row })} classNames={"border-red-500"}>
+                          <Button className={`${roomActionClass(dark)} border-red-500`} onClick={() => setConfirm({ type: "delete", row })}>
                             <MdDelete size={16} /> Delete
                           </Button>
                         )}
@@ -291,55 +312,136 @@ export default function RoomTypes() {
         </div>
       </div>
 
-      <Modal title={editing ? "Edit Room Type" : "Add Room Type"} open={formOpen} onOk={saveType} onCancel={() => setFormOpen(false)} confirmLoading={saving} destroyOnClose>
-        <Form form={form} layout="vertical">
-          <Form.Item name="resort_id" label="Resort" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={resorts.map((r) => ({ value: r.id, label: r.name }))} /></Form.Item>
-          <Form.Item name="name" label="Room Type Name" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="description" label="Description"><Input.TextArea rows={3} /></Form.Item>
-          <Form.Item name="max_occupancy" label="Max occupancy" rules={[{ required: true }]}><InputNumber min={1} max={50} className="w-full" /></Form.Item>
-          <Form.Item name="bed_count" label="Bed count"><InputNumber min={1} max={20} className="w-full" /></Form.Item>
-          <Form.Item name="bed_type" label="Bed type"><Input /></Form.Item>
-          <Form.Item name="size_sqm" label="Size (sqm)"><InputNumber min={0} className="w-full" /></Form.Item>
-          <Form.Item
-            name="amenities"
-            label="Amenity tags (guest site pills)"
-            tooltip="Shown on the resort “Choose your room” cards — e.g. Wi-Fi, Garden view."
-          >
-            <Select
-              mode="tags"
-              placeholder="Select or type amenities"
-              options={GUEST_AMENITY_PRESETS.map((a) => ({ value: a, label: a }))}
-            />
-          </Form.Item>
-          <Form.Item name="breakfast_included" label="Breakfast on guest card">
-            <Select
-              options={[
-                { value: true, label: "Breakfast included" },
-                { value: false, label: "Breakfast available (not included)" },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="free_cancellation" label="Cancellation policy">
-            <Select
-              options={[
-                { value: true, label: "Free cancellation" },
-                { value: false, label: "Non-refundable" },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="base_price" label="Base price" rules={[{ required: true }]}><InputNumber min={0} prefix="$" className="w-full" /></Form.Item>
-          <Form.Item
-            name="discount_percent"
-            label="Discount (%)"
-            tooltip="Applies to every room of this type unless a room sets its own discount."
-            rules={[{ type: "number", min: 0, max: MAX_DISCOUNT_PERCENT, message: "Discount must be between 0 and 100." }]}
-          >
-            <InputNumber min={0} max={MAX_DISCOUNT_PERCENT} step={0.5} className="w-full" suffix="%" />
-          </Form.Item>
-          <div className="mb-4">
-            <DiscountPreview price={basePriceWatch ?? 0} percent={discountWatch ?? 0} dark={dark} />
-          </div>
-          <Form.Item name="status" label="Status"><Select options={TYPE_STATUSES.map((s) => ({ value: s, label: s }))} /></Form.Item>
+      <Modal
+        title={editing ? "Edit Room Type" : "Add Room Type"}
+        open={formOpen}
+        onOk={saveType}
+        onCancel={() => setFormOpen(false)}
+        confirmLoading={saving}
+        destroyOnClose
+        width={920}
+        style={{ top: 48 }}
+        okText="Save"
+        styles={{ body: { maxHeight: "calc(100vh - 11rem)", overflowY: "auto", paddingBottom: 8 } }}
+      >
+        <Form form={form} layout="vertical" className="room-type-form-grid">
+          <Row gutter={[16, 0]}>
+            <Col xs={24} md={12}>
+              <Form.Item name="resort_id" label="Resort" rules={[{ required: true }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  options={resorts.map((r) => ({ value: r.id, label: r.name }))}
+                  onChange={() => form.setFieldValue("branch_id", undefined)}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="branch_id" label="Branch" rules={[{ required: true, message: "Select a branch" }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  disabled={!watchResort}
+                  placeholder={watchResort ? "Select branch" : "Select a resort first"}
+                  options={formBranches.map((b) => ({ value: b.id, label: b.name }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item
+                name="name"
+                label="Room Type Name"
+                rules={[{ required: true }]}
+                tooltip="Names must be unique within the selected branch. Different branches may use the same name (e.g. Deluxe)."
+                extra="One branch cannot have two types with the same name; other branches can reuse the name."
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item name="description" label="Description">
+                <Input.TextArea rows={2} placeholder="Guest-facing overview of this room category…" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="max_occupancy" label="Max occupancy" rules={[{ required: true }]}>
+                <InputNumber min={1} max={50} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="bed_count" label="Bed count">
+                <InputNumber min={1} max={20} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="bed_type" label="Bed type">
+                <Input placeholder="e.g. King" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="size_sqm" label="Size (sqm)">
+                <InputNumber min={0} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="status" label="Status">
+                <Select options={TYPE_STATUSES.map((s) => ({ value: s, label: s }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item
+                name="amenities"
+                label="Amenity tags (guest site pills)"
+                tooltip="Shown on the resort “Choose your room” cards — e.g. Wi-Fi, Garden view."
+              >
+                <Select
+                  mode="tags"
+                  placeholder="Select or type amenities"
+                  options={GUEST_AMENITY_PRESETS.map((a) => ({ value: a, label: a }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="breakfast_included" label="Breakfast on guest card">
+                <Select
+                  options={[
+                    { value: true, label: "Breakfast included" },
+                    { value: false, label: "Breakfast available (not included)" },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="free_cancellation" label="Cancellation policy">
+                <Select
+                  options={[
+                    { value: true, label: "Free cancellation" },
+                    { value: false, label: "Non-refundable" },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="base_price" label="Base price" rules={[{ required: true }]}>
+                <InputNumber min={0} prefix="$" className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="discount_percent"
+                label="Discount (%)"
+                tooltip="Applies to every room of this type unless a room sets its own discount."
+                rules={[{ type: "number", min: 0, max: MAX_DISCOUNT_PERCENT, message: "Discount must be between 0 and 100." }]}
+              >
+                <InputNumber min={0} max={MAX_DISCOUNT_PERCENT} step={0.5} className="w-full" suffix="%" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={16}>
+              <Form.Item label="Price preview">
+                <DiscountPreview price={basePriceWatch ?? 0} percent={discountWatch ?? 0} dark={dark} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
 
@@ -348,7 +450,7 @@ export default function RoomTypes() {
           <div className="flex flex-col gap-2">
             <div className="flex justify-between"><h3 className={`text-lg font-bold ${titleCls}`}>{viewing.name}</h3><TypeStatusBadge status={viewing.status} dark={dark} /></div>
             <p className={`text-sm ${cellText}`}>{viewing.description || "No description provided."}</p>
-            <p className={`text-sm ${cellText}`}>Resort: {viewing.resort?.name || "—"}</p>
+            <p className={`text-sm ${cellText}`}>Resort: {viewing.resort?.name || "—"} · Branch: {viewing.branch?.name || "—"}</p>
             <p className={`text-sm ${cellText}`}>
               <PriceWithDiscount price={viewing.base_price} percent={viewing.discount_percent} dark={dark} suffix=" / night" />
             </p>

@@ -81,12 +81,11 @@ export const RegisterPage = () => {
       return;
     }
 
-    if (result.user) {
-      navigate(nextUrl, { replace: true });
-      return;
-    }
-
-    navigate(`/login?next=${encodeURIComponent(nextUrl)}`, { replace: true });
+    const afterLogin = '/';
+    navigate(`/login?next=${encodeURIComponent(afterLogin)}`, {
+      replace: true,
+      state: { email: result.email ?? email, registered: true },
+    });
   };
 
   return (

@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
+use App\Models\Branch;
 use App\Models\Coupon;
 use App\Models\Resort;
 use App\Models\Role;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -20,9 +20,10 @@ use Tests\TestCase;
  */
 class RoomDiscountTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected Resort $resort;
+
+    protected Branch $branch;
 
     protected User $guest;
 
@@ -40,6 +41,13 @@ class RoomDiscountTest extends TestCase
             'address' => 'Coastal Road', 'city' => 'Sihanoukville',
         ]);
 
+        $this->branch = Branch::create([
+            'resort_id' => $this->resort->id,
+            'name' => 'Solara Main',
+            'address' => 'Coastal Road',
+            'status' => 'active',
+        ]);
+
         $this->guest = User::create([
             'name' => 'Guest', 'email' => 'guest@example.com', 'password' => bcrypt('secret'),
         ]);
@@ -55,6 +63,7 @@ class RoomDiscountTest extends TestCase
     {
         $type = RoomType::create([
             'resort_id' => $this->resort->id,
+            'branch_id' => $this->branch->id,
             'name' => 'Type '.$number,
             'base_price' => $price,
             'discount_percent' => $typePct,
@@ -63,6 +72,7 @@ class RoomDiscountTest extends TestCase
 
         return Room::create([
             'resort_id' => $this->resort->id,
+            'branch_id' => $this->branch->id,
             'room_type_id' => $type->id,
             'room_number' => $number,
             'price_per_night' => $price,
@@ -74,6 +84,7 @@ class RoomDiscountTest extends TestCase
     protected function quote(array $overrides = []): \Illuminate\Testing\TestResponse
     {
         return $this->postJson('/api/customer/booking/quote', array_merge([
+            'branch_id' => $this->branch->id,
             'check_in' => '2027-03-01',
             'check_out' => '2027-03-04',
             'adults' => 2,
