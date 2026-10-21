@@ -36,12 +36,16 @@ axiosClient.interceptors.response.use(
     const isLogin = url.includes('auth/login');
     const isRegister = url.includes('auth/register');
     const isTwoFactor = url.includes('auth/two-factor');
+    const isForgotPassword = url.includes('auth/forgot-password');
+    const isPasswordReset = url.includes('auth/reset');
 
     if (
       status === 401 &&
       !isLogin &&
       !isRegister &&
       !isTwoFactor &&
+      !isForgotPassword &&
+      !isPasswordReset &&
       getAccessToken()
     ) {
       clearAccessToken();

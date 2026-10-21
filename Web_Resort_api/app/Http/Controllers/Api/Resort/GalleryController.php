@@ -12,8 +12,13 @@ class GalleryController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $q = GalleryPhoto::query();
-        app(\App\Services\ResortAccessService::class)->applyResortColumnScope($q, $request->user());
+        $q = GalleryPhoto::query()->orderByDesc('id');
+
+        // Public customer catalog must list published photos for guests,
+        // including signed-in customers. Staff/admin gallery stays resort-scoped.
+        if (! $request->is('api/customer/*') && ! $request->is('customer/*')) {
+            app(\App\Services\ResortAccessService::class)->applyResortColumnScope($q, $request->user());
+        }
 
         return response()->json($q->get());
     }

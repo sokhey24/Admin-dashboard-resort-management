@@ -172,6 +172,13 @@ export function getAllMenuItems() {
   return popularDishes.map((dish) => getMenuItemById(dish.id));
 }
 
+/** Resolve saved dish ids from user favorites (static menu catalog). */
+export function getFavoriteDishesByIds(ids, catalog = popularDishes) {
+  if (!ids?.length) return [];
+  const set = new Set(ids.map(String));
+  return (catalog || []).filter((dish) => set.has(String(dish.id)));
+}
+
 export const DINING_RATING_SUMMARY = {
   average: 4.3,
   totalReviews: 128,

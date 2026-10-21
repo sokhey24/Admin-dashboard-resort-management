@@ -19,9 +19,11 @@ export function GalleryCard({ item, display, viewImageLabel, onOpen }) {
       <div
         className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/25 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 sm:p-5 text-white pointer-events-none"
       >
-        <span className="text-[10px] uppercase tracking-wider text-gold-light font-semibold mb-1">
-          {display.category}
-        </span>
+        {display.category ? (
+          <span className="text-[10px] uppercase tracking-wider text-gold-light font-semibold mb-1">
+            {display.category}
+          </span>
+        ) : null}
         <h3 className="text-sm sm:text-base font-serif font-bold text-white mb-1 line-clamp-2">
           {display.title}
         </h3>

@@ -43,7 +43,11 @@ class ReviewController extends Controller
 
     public function show(Review $review): ReviewResource
     {
-        $this->reviews->assertAccessible($review, request()->user());
+        $user = request()->user();
+        if ($user) {
+            $this->authorize('view', $review);
+        }
+        $this->reviews->assertAccessible($review, $user);
 
         return new ReviewResource($this->reviews->loadRelations($review));
     }
@@ -63,6 +67,7 @@ class ReviewController extends Controller
     public function update(Request $request, Review $review): ReviewResource
     {
         $user = $request->user();
+        $this->authorize('update', $review);
         $this->reviews->assertAccessible($review, $user);
 
         $data = $request->validate([
@@ -92,6 +97,7 @@ class ReviewController extends Controller
     public function destroy(Request $request, Review $review): JsonResponse
     {
         $user = $request->user();
+        $this->authorize('delete', $review);
         if ($user?->isGuestAccount()) {
             $this->reviews->deleteCustomerReview($review, $user);
         } else {

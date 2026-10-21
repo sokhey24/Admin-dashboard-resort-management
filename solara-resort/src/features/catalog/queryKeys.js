@@ -5,6 +5,7 @@ export const catalogKeys = {
   resort: (id) => ['catalog', 'resort', id],
   branch: (id) => ['catalog', 'branch', id],
   resortRooms: (resortId, params) => ['catalog', 'resort-rooms', resortId, params],
+  gallery: () => ['catalog', 'gallery'],
   resortGallery: (resortId) => ['catalog', 'resort-gallery', resortId],
   rooms: (params) => ['catalog', 'rooms', params],
   room: (id) => ['catalog', 'room', id],

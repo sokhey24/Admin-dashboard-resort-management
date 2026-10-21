@@ -11,11 +11,24 @@ export async function fetchMenuItems(params = {}) {
   return Array.isArray(data) ? data : data?.data ?? [];
 }
 
+export async function fetchMenuItem(menuItemId) {
+  const { data } = await axiosClient.get(`customer/menu-items/${menuItemId}`);
+  return data?.data ?? data;
+}
+
 export function menuItemImageUrl(item) {
   return resolveStorageUrl(item?.image) || null;
 }
 
 export async function submitGuestTableReservation(payload) {
   const { data } = await axiosClient.post('customer/table-reservation-requests', payload);
+  return data;
+}
+
+/**
+ * @param {object} payload Guest food order checkout body
+ */
+export async function createGuestFoodOrder(payload) {
+  const { data } = await axiosClient.post('customer/food-orders', payload);
   return data;
 }

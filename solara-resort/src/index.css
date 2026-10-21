@@ -79,6 +79,34 @@ html {
   scroll-behavior: smooth;
 }
 
+@keyframes activity-marquee-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.activity-marquee-mask {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+}
+
+.activity-marquee-track {
+  animation: activity-marquee-rtl 45s linear infinite;
+  will-change: transform;
+}
+
+.activity-marquee-track:hover {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -89,6 +117,16 @@ html {
   .animate-bounce,
   .animate-ping {
     animation: none !important;
+  }
+
+  .activity-marquee-mask {
+    mask-image: none;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .activity-marquee-track {
+    animation: none;
   }
 }
 

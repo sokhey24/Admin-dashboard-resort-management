@@ -215,6 +215,37 @@ export function mapResortFromApi(row) {
   };
 }
 
+/**
+ * Guest gallery card shape from Laravel GalleryPhoto rows.
+ * API columns: id, resort_id, path, title, caption. Category is optional if present.
+ */
+export function mapGalleryPhotoFromApi(row, index = 0) {
+  if (!row) return null;
+
+  const image =
+    resolveStorageUrl(row.path) || resolveStorageUrl(row.url) || resolveStorageUrl(row.image);
+  if (!image) return null;
+
+  const category = String(row.category ?? row.collection ?? '').trim();
+  const resortRel = row.resort && typeof row.resort === 'object' ? row.resort : null;
+
+  return {
+    id: String(row.id ?? `gallery-${index}`),
+    image,
+    title: String(row.title ?? '').trim(),
+    title_km: row.title_km || undefined,
+    caption: String(row.caption ?? '').trim(),
+    caption_km: row.caption_km || undefined,
+    category,
+    category_km: row.category_km || undefined,
+    resort: String(resortRel?.name ?? row.resort_name ?? '').trim(),
+    resort_km: resortRel?.name_km || row.resort_name_km || undefined,
+    tall: Number(row.id) % 5 === 0,
+    resortId: row.resort_id ?? null,
+    raw: row,
+  };
+}
+
 export function mapResortDetailFromApi(data, galleryPhotos = []) {
   const base = mapResortFromApi(data);
   if (!base) return null;

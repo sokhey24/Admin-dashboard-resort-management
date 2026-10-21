@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { getApiErrorMessage } from '../services/api/errors.js';
 import {
   createBookingRequest,
@@ -9,33 +10,67 @@ import {
 import { mapBookingFromApi, mapQuoteToSummary } from '../util/mapBooking.js';
 import { parseRoomAvailabilityFromError } from '../util/bookingAvailability.js';
 import { isBookingAvailabilityError, validateBookingStay } from '../util/bookingSelection.js';
+import { roomIdsFromSortKey } from '../util/roomIds.js';
 
-function buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode }) {
+function isRequestAborted(error) {
+  return (
+    axios.isCancel(error) ||
+    error?.code === 'ERR_CANCELED' ||
+    error?.name === 'CanceledError'
+  );
+}
+
+function buildQuotePayload({
+  roomIds,
+  branchId,
+  checkIn,
+  checkOut,
+  adults,
+  children,
+  couponCode,
+}) {
   const code = typeof couponCode === 'string' ? couponCode.trim() : '';
+  const branchNum = Number(branchId);
   return {
-    room_ids: [Number(roomId)],
+    room_ids: roomIds,
     check_in: checkIn,
     check_out: checkOut,
     adults: adults ?? 1,
     children: children ?? 0,
-    ...(branchId ? { branch_id: Number(branchId) } : {}),
+    branch_id: branchNum,
     ...(code ? { coupon_code: code } : {}),
   };
 }
 
-export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, children, couponCode }) {
+export function useBookingQuote({
+  roomIdsKey = '',
+  branchId,
+  checkIn,
+  checkOut,
+  adults,
+  children,
+  couponCode,
+}) {
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [roomAvailability, setRoomAvailability] = useState(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
+  const fetchGenerationRef = useRef(0);
+
+  const couponTrimmed = typeof couponCode === 'string' ? couponCode.trim() : '';
+
   const refetch = useCallback(() => {
     setRefreshNonce((n) => n + 1);
   }, []);
 
   useEffect(() => {
-    const validation = validateBookingStay({ roomId, checkIn, checkOut, adults });
+    const roomIds = roomIdsFromSortKey(roomIdsKey);
+    const roomId = roomIds[0] ?? null;
+    const branchNum = Number(branchId);
+
+    const validation = validateBookingStay({ roomId, roomIds, checkIn, checkOut, adults });
     if (!validation.valid) {
       setQuote(null);
       setError(validation.message || null);
@@ -44,35 +79,72 @@ export function useBookingQuote({ roomId, branchId, checkIn, checkOut, adults, c
       return;
     }
 
-    let cancelled = false;
+    if (!branchNum || branchNum <= 0) {
+      setQuote(null);
+      setError(null);
+      setRoomAvailability(null);
+      setLoading(false);
+      return;
+    }
+
+    const myGeneration = ++fetchGenerationRef.current;
+    const abortRef = { current: null };
+
     const timer = setTimeout(async () => {
+      abortRef.current = new AbortController();
       setLoading(true);
       setError(null);
       setRoomAvailability(null);
+
+      const payload = buildQuotePayload({
+        roomIds,
+        branchId: branchNum,
+        checkIn,
+        checkOut,
+        adults,
+        children,
+        couponCode: couponTrimmed,
+      });
+
       try {
-        const data = await fetchBookingQuote(
-          buildQuotePayload({ roomId, branchId, checkIn, checkOut, adults, children, couponCode })
-        );
-        if (!cancelled) {
-          setQuote(mapQuoteToSummary(data));
-          setRoomAvailability(null);
+        const data = await fetchBookingQuote(payload, { signal: abortRef.current.signal });
+        if (myGeneration !== fetchGenerationRef.current) {
+          return;
         }
+        setQuote(mapQuoteToSummary(data));
+        setRoomAvailability(null);
       } catch (err) {
-        if (!cancelled) {
-          setQuote(null);
-          setError(getApiErrorMessage(err, 'Unable to price this stay. Please adjust dates or room.'));
-          setRoomAvailability(parseRoomAvailabilityFromError(err));
+        if (myGeneration !== fetchGenerationRef.current) {
+          return;
         }
+        if (isRequestAborted(err)) {
+          return;
+        }
+        setQuote(null);
+        setError(getApiErrorMessage(err, 'Unable to price this stay. Please adjust dates or room.'));
+        setRoomAvailability(parseRoomAvailabilityFromError(err));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (myGeneration === fetchGenerationRef.current) {
+          setLoading(false);
+        }
       }
     }, refreshNonce > 0 ? 0 : 350);
 
     return () => {
-      cancelled = true;
+      fetchGenerationRef.current += 1;
       clearTimeout(timer);
+      abortRef.current?.abort();
     };
-  }, [roomId, branchId, checkIn, checkOut, adults, children, couponCode, refreshNonce]);
+  }, [
+    roomIdsKey,
+    branchId,
+    checkIn,
+    checkOut,
+    adults,
+    children,
+    couponTrimmed,
+    refreshNonce,
+  ]);
 
   return { quote, loading, error, roomAvailability, refetch };
 }

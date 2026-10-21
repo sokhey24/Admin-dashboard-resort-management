@@ -16,3 +16,13 @@ Schedule::call(function () {
           ->orWhere('expires_at', '<', now()->subHours(24));
     })->delete();
 })->hourly()->name('cleanup-expired-otps')->withoutOverlapping();
+
+/*
+| Night audit — operational close (default 00:05 in NIGHT_AUDIT_TIMEZONE).
+| Requires a system cron: * * * * * php /path/to/artisan schedule:run
+*/
+Schedule::command('resort:night-audit')
+    ->dailyAt(config('night_audit.schedule_time', '00:05'))
+    ->timezone(config('night_audit.timezone', 'UTC'))
+    ->name('resort-night-audit')
+    ->withoutOverlapping();

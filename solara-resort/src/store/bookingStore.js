@@ -15,6 +15,8 @@ export const EMPTY_BOOKING_DRAFT = {
   resortId: null,
   resortName: '',
   roomId: null,
+  roomIds: [],
+  roomSelections: [],
   roomName: '',
   roomImage: '',
   ...defaultStayDates(),

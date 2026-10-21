@@ -1,14 +1,6 @@
 import axios from "axios";
 import config from "./config";
-
-const getToken = () => {
-  try {
-    const store = JSON.parse(localStorage.getItem("ResortProfileStore"));
-    return store?.state?.access_token || null;
-  } catch {
-    return null;
-  }
-};
+import { getToken, clearAdminSession, isAuthApiPath } from "./auth";
 
 const getLang = () => {
   try {
@@ -18,6 +10,33 @@ const getLang = () => {
     return "km";
   }
 };
+
+let handlingSessionExpiry = false;
+
+function handleSessionExpired(requestUrl, hadToken) {
+  if (!hadToken || isAuthApiPath(requestUrl)) {
+    return;
+  }
+  if (handlingSessionExpiry) {
+    return;
+  }
+  handlingSessionExpiry = true;
+
+  clearAdminSession();
+  window.dispatchEvent(new CustomEvent("admin:session-expired"));
+
+  const path = window.location.pathname || "";
+  const onLoginRoute = path === "/login" || path.endsWith("/login");
+  if (!onLoginRoute) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    const from = next && next !== "/" ? `&from=${encodeURIComponent(next)}` : "";
+    window.location.assign(`/login?session=expired${from}`);
+  }
+
+  window.setTimeout(() => {
+    handlingSessionExpiry = false;
+  }, 1500);
+}
 
 export const request = (url = "", method = "", data = {}) => {
   const token = getToken();
@@ -38,13 +57,16 @@ export const request = (url = "", method = "", data = {}) => {
     method,
     data,
     headers,
-    timeout: isLargeUpload ? 0 : 30000, // no timeout for file uploads, 30s for normal requests
+    timeout: isLargeUpload ? 0 : 30000,
   })
     .then((res) => res.data)
     .catch((error) => {
       const response = error.response;
       if (response) {
         const { status, data } = response;
+        if (status === 401) {
+          handleSessionExpired(url, Boolean(token));
+        }
         let errors = {};
         if (status === 401) errors.message = data?.message ?? "Invalid email or password.";
         if (status === 403) errors.message = data?.message ?? "Forbidden. You do not have permission to perform this action.";

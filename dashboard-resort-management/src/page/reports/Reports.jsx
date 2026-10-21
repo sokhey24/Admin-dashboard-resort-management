@@ -20,6 +20,7 @@ import useCatalogData from "../../hooks/useCatalogData";
 import { asList } from "../Room/roomHelpers";
 import PrintPortal from "../Payment/PrintPortal";
 import ReportsPrint from "./ReportsPrint";
+import NightAuditArchive from "./NightAuditArchive";
 import {
   DATE_PRESETS, REPORT_TYPES, presetToRange, buildReportQuery,
   fmtMoney, fmtPct, downloadReportCsv, statusPieData, roomStatusPie,
@@ -986,6 +987,8 @@ export default function Reports() {
           </div>
         )}
       </section>
+
+      <NightAuditArchive dark={dark} resortId={resortId} branches={allBranches} />
 
       <PrintPortal active={printOpen}>
         <ReportsPrint data={data} filters={filters} resorts={resorts} branches={branches} />

@@ -14,6 +14,9 @@ export function PopularDishes({
   currency,
   t,
   onReserve,
+  onBuyNow,
+  onAddToCart,
+  onDishOpen,
   pageSize = DINING_POPULAR_PAGE_SIZE,
 }) {
   const navigate = useNavigate();
@@ -51,6 +54,10 @@ export function PopularDishes({
   };
 
   const goToDish = (dishId) => {
+    if (onDishOpen) {
+      onDishOpen(dishId);
+      return;
+    }
     navigate(ROUTES.menuDetail(dishId));
   };
 
@@ -101,9 +108,19 @@ export function PopularDishes({
                 dish={dish}
                 currency={currency}
                 categoryLabel={getCategoryLabel(dish.category)}
-                actionLabel={t('dining.reserveToEnjoy', 'Reserve to Dine')}
-                onAction={onReserve}
-                onOpen={() => goToDish(dish.id)}
+                viewLabel={t('dining.viewDish', 'View')}
+                addToCartLabel={t('dining.addToCart', 'Add to Cart')}
+                onView={() => goToDish(dish.id)}
+                onAddToCart={
+                  onAddToCart ? () => onAddToCart(dish.id) : undefined
+                }
+                onBuyNow={
+                  !onAddToCart && onBuyNow
+                    ? () => onBuyNow(dish.id)
+                    : onReserve
+                      ? () => onReserve()
+                      : undefined
+                }
               />
             ))}
           </div>

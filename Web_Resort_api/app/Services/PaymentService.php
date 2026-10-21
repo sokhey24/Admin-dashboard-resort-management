@@ -185,11 +185,7 @@ class PaymentService
         }
 
         $totals = $this->bookingTotals($booking);
-        $alreadyPaid = (float) $booking->payments()
-            ->where('status', 'paid')
-            ->sum('paid_amount');
-        $refunded = (float) $booking->payments()->where('status', 'refunded')->sum('refund_amount');
-        $remaining = max(0, $totals['total'] - max(0, $alreadyPaid - $refunded));
+        $remaining = app(FolioService::class)->outstandingBalance($booking);
         if ($remaining <= 0) {
             throw ValidationException::withMessages(['amount' => ['This booking is already fully paid.']]);
         }
@@ -208,7 +204,8 @@ class PaymentService
         }
 
         $paidAmount = $status === 'paid' ? $requested : 0.0;
-        $ratio = $totals['total'] > 0 ? ($requested / $totals['total']) : 1;
+        $chargesTotal = app(FolioService::class)->ledgerFor($booking)['charges_total'];
+        $ratio = $chargesTotal > 0 ? ($requested / $chargesTotal) : 1;
 
         return DB::transaction(function () use ($booking, $actor, $method, $methodKey, $totals, $requested, $status, $paidAmount, $ratio, $input) {
             $payment = Payment::create([
@@ -249,6 +246,14 @@ class PaymentService
             $this->syncBookingBalance($fresh);
             $fresh->refresh();
             $this->upsertInvoice($fresh, $payment, $totals);
+
+            if ($status === 'paid') {
+                $bookingId = (int) $booking->id;
+                $paymentId = (int) $payment->id;
+                DB::afterCommit(function () use ($bookingId, $paymentId) {
+                    event(new \App\Events\BookingPaid($bookingId, $paymentId));
+                });
+            }
 
             return $payment->fresh(['guest', 'booking.rooms.roomType', 'booking.invoice', 'transactions']);
         });
@@ -308,7 +313,7 @@ class PaymentService
         return compact('subtotal', 'discount', 'roomDiscount', 'couponDiscount', 'tax', 'service', 'total');
     }
 
-    protected function assertBookingPayable(Booking $booking, User $actor): void
+    public function assertBookingPayable(Booking $booking, User $actor): void
     {
         if (in_array($booking->status, ['cancelled'], true)) {
             throw ValidationException::withMessages(['booking_id' => ['Cannot take payment for a cancelled booking.']]);
@@ -339,9 +344,7 @@ class PaymentService
         $this->assertBookingPayable($booking, $actor);
 
         $totals = $this->bookingTotals($booking);
-        $alreadyPaid = (float) $booking->payments()->where('status', 'paid')->sum('paid_amount');
-        $refunded = (float) $booking->payments()->where('status', 'refunded')->sum('refund_amount');
-        $remaining = max(0, $totals['total'] - max(0, $alreadyPaid - $refunded));
+        $remaining = app(FolioService::class)->outstandingBalance($booking);
         if ($remaining <= 0) {
             throw ValidationException::withMessages(['amount' => ['This booking is already fully paid.']]);
         }
@@ -369,7 +372,8 @@ class PaymentService
 
         $qr = $this->khqr->generate($remaining);
         $ttl = (int) config('services.bakong.qr_ttl_seconds', 300);
-        $ratio = $totals['total'] > 0 ? ($remaining / $totals['total']) : 1;
+        $chargesTotal = app(FolioService::class)->ledgerFor($booking)['charges_total'];
+        $ratio = $chargesTotal > 0 ? ($remaining / $chargesTotal) : 1;
 
         return DB::transaction(function () use ($booking, $actor, $gateway, $totals, $remaining, $qr, $ttl, $ratio) {
             $payment = Payment::create([
@@ -407,6 +411,74 @@ class PaymentService
             ]);
 
             return $payment->fresh(['guest', 'booking.rooms.roomType', 'transactions']);
+        });
+    }
+
+    public function initiateFoodOrderKhqr(FoodOrder $order, User $actor, string $gateway = 'aba-khqr'): Payment
+    {
+        $order = FoodOrder::with('orderItems')->findOrFail($order->id);
+        if ((int) $order->user_id !== (int) $actor->id) {
+            abort(403, 'You cannot pay for this order.');
+        }
+
+        $amount = (float) $order->total;
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['amount' => ['Order total must be greater than zero.']]);
+        }
+
+        $reusable = Payment::query()
+            ->where('reference_type', FoodOrder::class)
+            ->where('reference_id', $order->id)
+            ->where('status', 'pending')
+            ->where('method', 'qr_code')
+            ->whereNotNull('khqr_md5')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->latest('id')
+            ->first();
+        if ($reusable) {
+            return $reusable->fresh(['guest', 'reference', 'transactions']);
+        }
+
+        $qr = $this->khqr->generate($amount);
+        $ttl = (int) config('services.bakong.qr_ttl_seconds', 300);
+
+        return DB::transaction(function () use ($order, $actor, $gateway, $amount, $qr, $ttl) {
+            $payment = Payment::create([
+                'booking_id' => $order->booking_id,
+                'user_id' => $order->user_id,
+                'source' => 'restaurant',
+                'reference_type' => FoodOrder::class,
+                'reference_id' => $order->id,
+                'amount' => $amount,
+                'method' => 'qr_code',
+                'payment_method' => $gateway,
+                'gateway' => 'bakong',
+                'currency' => strtoupper((string) config('services.bakong.currency', 'USD')),
+                'subtotal' => $order->subtotal,
+                'tax' => $order->tax,
+                'service_charge' => $order->service_charge ?? 0,
+                'paid_amount' => 0,
+                'balance' => $amount,
+                'status' => 'pending',
+                'khqr_md5' => $qr['md5'],
+                'qr_payload' => $qr['qr'],
+                'expires_at' => now()->addSeconds($ttl),
+                'created_by' => $actor->id,
+                'transaction_ref' => 'KHQR-FO-'.strtoupper(uniqid()),
+            ]);
+
+            PaymentTransaction::create([
+                'payment_id' => $payment->id,
+                'gateway' => 'bakong',
+                'gateway_ref' => $payment->khqr_md5,
+                'amount' => $amount,
+                'status' => 'pending',
+                'response_data' => ['type' => 'khqr_init', 'food_order_id' => $order->id],
+            ]);
+
+            return $payment->fresh(['guest', 'reference', 'transactions']);
         });
     }
 
@@ -499,28 +571,86 @@ class PaymentService
             return ['status' => 'failed', 'message' => 'The paid amount did not match this booking.', 'paid' => false];
         }
 
-        $settled = DB::transaction(function () use ($payment, $data) {
-            $locked = Payment::whereKey($payment->id)->lockForUpdate()->first();
+        $settled = $this->settleResortPaymentRecord($payment, [
+            'gateway' => 'bakong',
+            'gateway_ref' => $data['hash'] ?? $payment->khqr_md5,
+            'payment_reference' => $data['hash'] ?? $payment->khqr_md5,
+            'bakong_hash' => $data['hash'] ?? null,
+            'response_data' => ['type' => 'khqr_settled', 'bakong' => $data],
+        ]);
+
+        $settledPayment = $settled['payment'];
+        $newlySettled = (bool) ($settled['newly_settled'] ?? false);
+
+        if ($newlySettled && $settledPayment->booking_id) {
+            event(new \App\Events\BookingPaid((int) $settledPayment->booking_id, (int) $settledPayment->id));
+        }
+
+        Log::info('KHQR verify: payment settled', [
+            'payment_id' => $settledPayment->id,
+            'booking_id' => $settledPayment->booking_id,
+            'expected_amount' => (float) $settledPayment->amount,
+            'bakong_hash' => $data['hash'] ?? null,
+        ]);
+
+        return [
+            'status' => 'paid',
+            'message' => 'Payment confirmed.',
+            'paid' => true,
+            'payment' => $settledPayment,
+        ];
+    }
+
+    protected function khqrVerifyGraceSeconds(): int
+    {
+        return max(0, (int) config('services.bakong.verify_grace_seconds', 180));
+    }
+
+    /**
+     * Idempotent resort booking settlement (KHQR, Stripe, staff cash, etc.).
+     *
+     * @param  array{gateway: string, gateway_ref: string, response_data: array, payment_reference?: ?string, card_last4?: ?string, card_brand?: ?string, bakong_hash?: ?string}  $meta
+     * @return array{payment: Payment, newly_settled: bool}
+     */
+    public function settleResortPaymentRecord(Payment $payment, array $meta): array
+    {
+        return DB::transaction(function () use ($payment, $meta) {
+            $locked = Payment::whereKey($payment->id)->lockForUpdate()->firstOrFail();
             if ($locked->status === 'paid') {
-                return $locked;
+                return [
+                    'payment' => $locked->fresh(['guest', 'booking.invoice', 'booking.rooms.roomType', 'transactions']),
+                    'newly_settled' => false,
+                ];
             }
 
-            $locked->update([
+            $patch = [
                 'status' => 'paid',
                 'paid_amount' => $locked->amount,
                 'balance' => 0,
                 'paid_at' => now(),
-                'bakong_hash' => $data['hash'] ?? null,
-                'payment_reference' => $data['hash'] ?? $locked->khqr_md5,
-            ]);
+            ];
+            if (! empty($meta['payment_reference'])) {
+                $patch['payment_reference'] = $meta['payment_reference'];
+            }
+            if (! empty($meta['bakong_hash'])) {
+                $patch['bakong_hash'] = $meta['bakong_hash'];
+            }
+            if (! empty($meta['card_last4'])) {
+                $patch['card_last4'] = $meta['card_last4'];
+            }
+            if (! empty($meta['card_brand'])) {
+                $patch['card_brand'] = $meta['card_brand'];
+            }
+
+            $locked->update($patch);
 
             PaymentTransaction::create([
                 'payment_id' => $locked->id,
-                'gateway' => 'bakong',
-                'gateway_ref' => $data['hash'] ?? $locked->khqr_md5,
+                'gateway' => $meta['gateway'],
+                'gateway_ref' => $meta['gateway_ref'],
                 'amount' => $locked->amount,
                 'status' => 'success',
-                'response_data' => ['type' => 'khqr_settled', 'bakong' => $data],
+                'response_data' => $meta['response_data'],
             ]);
 
             $booking = Booking::with(['payments', 'invoice', 'rooms'])->find($locked->booking_id);
@@ -530,27 +660,11 @@ class PaymentService
                 $this->upsertInvoice($booking, $locked->fresh(), $this->bookingTotals($booking));
             }
 
-            return $locked->fresh(['guest', 'booking.invoice', 'booking.rooms.roomType', 'transactions']);
+            return [
+                'payment' => $locked->fresh(['guest', 'booking.invoice', 'booking.rooms.roomType', 'transactions']),
+                'newly_settled' => true,
+            ];
         });
-
-        Log::info('KHQR verify: payment settled', [
-            'payment_id' => $settled->id,
-            'booking_id' => $settled->booking_id,
-            'expected_amount' => (float) $settled->amount,
-            'bakong_hash' => $data['hash'] ?? null,
-        ]);
-
-        return [
-            'status' => 'paid',
-            'message' => 'Payment confirmed.',
-            'paid' => true,
-            'payment' => $settled,
-        ];
-    }
-
-    protected function khqrVerifyGraceSeconds(): int
-    {
-        return max(0, (int) config('services.bakong.verify_grace_seconds', 180));
     }
 
     protected function applyListFilters($query, array $filters, string $source, bool $includeStatus = true): void
@@ -690,13 +804,6 @@ class PaymentService
         if (! $booking) {
             return;
         }
-        $totals = $this->bookingTotals($booking);
-        $paid = (float) $booking->payments()->where('status', 'paid')->sum('paid_amount');
-        $refunded = (float) $booking->payments()->where('status', 'refunded')->sum('refund_amount');
-        $net = max(0, $paid - $refunded);
-        $booking->forceFill([
-            'deposit_amount' => $net,
-            'balance_due' => max(0, $totals['total'] - $net),
-        ])->save();
+        app(FolioService::class)->recalculateAndPersistBalance($booking);
     }
 }

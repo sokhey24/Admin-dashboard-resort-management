@@ -232,23 +232,26 @@ class ProfileService
             'favorites' => [
                 'resorts' => [],
                 'rooms' => [],
+                'dishes' => [],
             ],
         ];
     }
 
     /**
      * @param  mixed  $favorites
-     * @return array{resorts: list<string>, rooms: list<string>}
+     * @return array{resorts: list<string>, rooms: list<string>, dishes: list<string>}
      */
     public function normalizeFavorites(mixed $favorites): array
     {
         $src = is_array($favorites) ? $favorites : [];
         $resorts = array_values(array_unique(array_map('strval', $src['resorts'] ?? [])));
         $rooms = array_values(array_unique(array_map('strval', $src['rooms'] ?? [])));
+        $dishes = array_values(array_unique(array_map('strval', $src['dishes'] ?? [])));
 
         return [
             'resorts' => array_slice($resorts, 0, 200),
             'rooms' => array_slice($rooms, 0, 200),
+            'dishes' => array_slice($dishes, 0, 200),
         ];
     }
 

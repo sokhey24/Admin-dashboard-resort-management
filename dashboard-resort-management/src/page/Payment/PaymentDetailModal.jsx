@@ -11,6 +11,7 @@ import { guestCountLabel, normalizeDocumentRooms } from "./invoiceDocumentHelper
 import { bookingRoomLabel, roomSummary } from "./paymentHelpers";
 import { InvoiceRoomAccommodationSection, InvoiceRoomFeatures } from "./InvoiceRoomSections";
 import PaymentDetailResortInvoice from "./PaymentDetailResortInvoice";
+import { usePaymentReceipt } from "../../hooks/usePaymentReceipt";
 
 // ── Helpers ────────────────────────────────────────────────────
 const fmtAmt = (v) =>
@@ -80,9 +81,9 @@ function getActions(status, can) {
 // ── ActionDropdown (exported for table row use) ────────────────
 export function ActionDropdown({ payment, dark, onView, onRefunded }) {
   const [open, setOpen]     = useState(false);
-  const [pdfBusy, setPdf]   = useState(false);
   const ref                 = useRef(null);
   const { can }             = usePermission();
+  const { pdfBusy, generatePdf } = usePaymentReceipt();
 
   useEffect(() => {
     const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -110,23 +111,10 @@ export function ActionDropdown({ payment, dark, onView, onRefunded }) {
     }
 
     if (key === "pdf" || key === "download") {
-      setPdf(true);
-      message.loading({ content: "Generating PDF…", key: "pdf_row" });
-      try {
-        const res = await request(`admin/payments/${payment.id}/receipt/pdf`, "get");
-        if (res?.errors) throw new Error(res.errors.message);
-        message.success({ content: "Payment receipt generated successfully.", key: "pdf_row", duration: 3 });
-        if (key === "download" && res?.url) {
-          const a = document.createElement("a");
-          a.href = res.url;
-          a.download = res.filename ?? `${payment.payment_id}_Payment_Receipt.pdf`;
-          a.click();
-        }
-      } catch {
-        message.error({ content: "Unable to generate payment receipt. Please try again.", key: "pdf_row", duration: 4 });
-      } finally {
-        setPdf(false);
-      }
+      await generatePdf(payment.id, payment.payment_id, {
+        download: key === "download",
+        messageKey: "pdf_row",
+      });
     }
   };
 
@@ -169,10 +157,10 @@ export function ActionDropdown({ payment, dark, onView, onRefunded }) {
 export default function PaymentDetailModal({ payment, open, onClose, dark, autoPrint = false, onUpdated }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [khqrOpen, setKhqrOpen] = useState(false);
   const { can } = usePermission();
+  const { pdfBusy, generatePdf, printReceipt } = usePaymentReceipt();
 
   useEffect(() => {
     if (!open) {
@@ -199,31 +187,13 @@ export default function PaymentDetailModal({ payment, open, onClose, dark, autoP
   }, [autoPrint, data, loading]);
 
   const handlePrint = async () => {
-    if (data?.id) {
-      await request(`admin/payments/${data.id}/print`, "post");
-    }
-    setShowReceipt(true);
-    setTimeout(() => window.print(), 400);
+    await printReceipt(data?.id, {
+      onBeforePrint: () => setShowReceipt(true),
+    });
   };
 
   const handlePdf = async () => {
-    setPdfBusy(true);
-    message.loading({ content: "Generating PDF…", key: "pdf_modal" });
-    try {
-      const res = await request(`admin/payments/${data.id}/receipt/pdf`, "get");
-      if (res?.errors) throw new Error(res.errors.message);
-      message.success({ content: "Payment receipt generated successfully.", key: "pdf_modal", duration: 3 });
-      if (res?.url) {
-        const a = document.createElement("a");
-        a.href = res.url;
-        a.download = res.filename ?? `${data?.payment_id}_Payment_Receipt.pdf`;
-        a.click();
-      }
-    } catch {
-      message.error({ content: "Unable to generate payment receipt. Please try again.", key: "pdf_modal", duration: 4 });
-    } finally {
-      setPdfBusy(false);
-    }
+    await generatePdf(data.id, data?.payment_id, { download: true, messageKey: "pdf_modal" });
   };
 
   const p          = data;
@@ -336,8 +306,21 @@ export default function PaymentDetailModal({ payment, open, onClose, dark, autoP
                     <InfoRow label="Payment Method"  value={p.payment_method}                                                dark={dark} />
                     <InfoRow label="Transaction ID"  value={p.transaction_id}                                                dark={dark} />
                     <InfoRow label="Gateway"         value={p.gateway}                                                       dark={dark} />
-                    {p.card_last4 && (
-                      <InfoRow label="Card" value={`**** **** **** ${p.card_last4}`} dark={dark} />
+                    {p.payment_reference && p.gateway === "stripe" && (
+                      <InfoRow label="Stripe reference" value={p.payment_reference} dark={dark} />
+                    )}
+                    {(p.card_brand || p.card_last4) && (
+                      <InfoRow
+                        label="Card"
+                        value={
+                          p.card_brand && p.card_last4
+                            ? `${String(p.card_brand).toUpperCase()} •••• ${p.card_last4}`
+                            : p.card_last4
+                              ? `•••• ${p.card_last4}`
+                              : String(p.card_brand).toUpperCase()
+                        }
+                        dark={dark}
+                      />
                     )}
                   </Section>
 

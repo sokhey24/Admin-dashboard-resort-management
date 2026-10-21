@@ -46,7 +46,7 @@ export function GalleryLightbox({
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2 text-xs text-muted">
-          <span className="uppercase tracking-wider text-gold">{display.category}</span>
+          <span className="uppercase tracking-wider text-gold">{display.category || ''}</span>
           <span aria-live="polite">{counterLabel}</span>
         </div>
 

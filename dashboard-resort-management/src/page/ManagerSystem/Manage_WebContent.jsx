@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { message, Spin } from "antd";
 import { useDarkMode } from "../../util/DarkModeContext";
+import { getToken as getAdminToken } from "../../util/auth";
 
 const API      = "admin/website-content";
 const SITE_URL = "http://localhost:5500"; // adjust to your resort website port
@@ -316,11 +317,6 @@ function VideoUpload({ section, fieldKey, label, currentUrl, currentId, onSaved 
   const isLive  = !!currentUrl && !file;
   const preview = file ? URL.createObjectURL(file) : (currentUrl ?? null);
 
-  const getToken = () => {
-    try { return JSON.parse(localStorage.getItem("ResortProfileStore"))?.state?.access_token || null; }
-    catch { return null; }
-  };
-
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -345,7 +341,7 @@ function VideoUpload({ section, fieldKey, label, currentUrl, currentId, onSaved 
       await axios.post(config.base_url + API, fd, {
         headers: {
           "Content-Type": "multipart/form-data",
-          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+          ...(getAdminToken() ? { Authorization: `Bearer ${getAdminToken()}` } : {}),
         },
         timeout: 0,
         onUploadProgress: (e) => {

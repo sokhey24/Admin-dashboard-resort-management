@@ -5,6 +5,7 @@ import { catalogKeys } from '../features/catalog/queryKeys.js';
 import {
   queryBranchDetailBundle,
   queryBranchesPage,
+  queryGalleryPhotos,
   queryResortDetailBundle,
   queryResortsPage,
   queryRoomDetail,
@@ -126,6 +127,22 @@ export function useRoomTypes(params = { per_page: 50 }) {
   return {
     roomTypes: query.data ?? [],
     loading: query.isLoading,
+    error: query.isError ? getApiErrorMessage(query.error) : null,
+    reload: () => query.refetch(),
+  };
+}
+
+export function useGalleryPhotos({ enabled = true } = {}) {
+  const query = useQuery({
+    queryKey: catalogKeys.gallery(),
+    queryFn: queryGalleryPhotos,
+    enabled,
+  });
+
+  return {
+    photos: query.data ?? [],
+    loading: query.isLoading,
+    isFetching: query.isFetching,
     error: query.isError ? getApiErrorMessage(query.error) : null,
     reload: () => query.refetch(),
   };

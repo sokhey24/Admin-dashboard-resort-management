@@ -1,23 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MdSearch, MdAdd, MdEdit, MdDelete, MdClose } from "react-icons/md";
+import { Button, message } from "antd";
 import { useDarkMode } from "../../util/DarkModeContext";
-import { Button } from "antd";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { request } from "../../util/request";
+import { asList } from "../../util/asList";
+import useCatalogData from "../../hooks/useCatalogData";
 
 const PAGE_SIZE = 8;
 
-const INIT_DATA = [
-  { key: 1, name: "Starter",     items: 8,  status: "Active"   },
-  { key: 2, name: "Main Course", items: 15, status: "Active"   },
-  { key: 3, name: "Dessert",     items: 6,  status: "Active"   },
-  { key: 4, name: "Beverage",    items: 12, status: "Active"   },
-  { key: 5, name: "Seafood",     items: 9,  status: "Active"   },
-  { key: 6, name: "Vegetarian",  items: 7,  status: "Inactive" },
-];
-
 const STATUS_STYLE = {
-  Active:   { dot: "bg-green-500", light: "bg-green-50 text-green-700 ring-green-200",    dark: "bg-green-900/40 text-green-400 ring-green-700"   },
-  Inactive: { dot: "bg-red-500",   light: "bg-red-50 text-red-700 ring-red-200",           dark: "bg-red-900/40 text-red-400 ring-red-700"         },
+  Active: { dot: "bg-green-500", light: "bg-green-50 text-green-700 ring-green-200", dark: "bg-green-900/40 text-green-400 ring-green-700" },
+  Inactive: { dot: "bg-red-500", light: "bg-red-50 text-red-700 ring-red-200", dark: "bg-red-900/40 text-red-400 ring-red-700" },
 };
+
+function statusLabel(row) {
+  return row?.status === "inactive" ? "Inactive" : "Active";
+}
+
+function mapCategory(row) {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    resort_id: row.resort_id ?? "",
+    branch_id: row.branch_id ?? "",
+    status: row.status ?? "active",
+    items: Number(row.menu_items_count ?? row.items ?? 0),
+  };
+}
 
 function BadgeWithDot({ status, dark }) {
   const s = STATUS_STYLE[status] ?? STATUS_STYLE.Inactive;
@@ -29,28 +39,67 @@ function BadgeWithDot({ status, dark }) {
   );
 }
 
-function CategoryModal({ category, onClose, onSaved, dark }) {
+function CategoryModal({ category, resorts, branches, onClose, onSaved, dark }) {
   const isEdit = !!category;
   const [form, setForm] = useState(
-    isEdit ? { name: category.name, status: category.status } : { name: "", status: "Active" }
+    isEdit
+      ? {
+          name: category.name,
+          status: statusLabel(category),
+          resort_id: String(category.resort_id || resorts[0]?.id || ""),
+          branch_id: String(category.branch_id || ""),
+        }
+      : {
+          name: "",
+          status: "Active",
+          resort_id: String(resorts[0]?.id || ""),
+          branch_id: "",
+        }
   );
   const [errs, setErrs] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const resortBranches = branches.filter((b) => String(b.resort_id) === String(form.resort_id));
 
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Category name is required.";
+    if (!form.resort_id) e.resort_id = "Resort is required.";
+    if (!form.branch_id) e.branch_id = "Branch is required.";
     setErrs(e);
     return !Object.keys(e).length;
   };
 
   const set = (key) => (ev) => {
-    setForm(f => ({ ...f, [key]: ev.target.value }));
-    setErrs(p => ({ ...p, [key]: undefined }));
+    const value = ev.target.value;
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      if (key === "resort_id") next.branch_id = "";
+      return next;
+    });
+    setErrs((p) => ({ ...p, [key]: undefined, _: undefined }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
-    onSaved({ ...form, key: category?.key ?? Date.now() });
+    setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      resort_id: Number(form.resort_id),
+      branch_id: Number(form.branch_id),
+      status: form.status === "Inactive" ? "inactive" : "active",
+    };
+    const res = isEdit
+      ? await request(`admin/food-categories/${category.id}`, "put", payload)
+      : await request("admin/food-categories", "post", payload);
+    setSaving(false);
+    if (res?.errors) {
+      setErrs({ _: res.errors.message ?? "Failed to save category." });
+      message.error(res.errors.message ?? "Failed to save category.");
+      return;
+    }
+    message.success(isEdit ? "Category updated." : "Category created.");
+    onSaved();
     onClose();
   };
 
@@ -68,11 +117,32 @@ function CategoryModal({ category, onClose, onSaved, dark }) {
           </h3>
           <Button onClick={onClose}><MdClose size={14} /></Button>
         </div>
+        {errs._ && <p className="mb-3 text-xs text-red-500">{errs._}</p>}
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Category Name <span className="text-red-500">*</span></label>
             <input value={form.name} onChange={set("name")} className={inputCls("name")} placeholder="e.g. Starter" />
             {errs.name && <p className="mt-1 text-xs text-red-500">{errs.name}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>Resort <span className="text-red-500">*</span></label>
+            <select value={form.resort_id} onChange={set("resort_id")} className={inputCls("resort_id")}>
+              <option value="">Select resort</option>
+              {resorts.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+            {errs.resort_id && <p className="mt-1 text-xs text-red-500">{errs.resort_id}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>Branch <span className="text-red-500">*</span></label>
+            <select value={form.branch_id} onChange={set("branch_id")} className={inputCls("branch_id")}>
+              <option value="">Select branch</option>
+              {resortBranches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            {errs.branch_id && <p className="mt-1 text-xs text-red-500">{errs.branch_id}</p>}
           </div>
           <div>
             <label className={labelCls}>Status</label>
@@ -84,7 +154,9 @@ function CategoryModal({ category, onClose, onSaved, dark }) {
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <Button onClick={onClose} className={`px-4 py-2 text-sm rounded-lg border ${dark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-[#D9E2EC] text-[#486581] hover:bg-[#F5F8FC]"}`}>Cancel</Button>
-          <Button onClick={handleSave} className="px-4 py-2 text-sm rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00]">Save</Button>
+          <Button disabled={saving} onClick={handleSave} className="px-4 py-2 text-sm rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00] disabled:opacity-60">
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </div>
       </div>
     </div>
@@ -93,45 +165,81 @@ function CategoryModal({ category, onClose, onSaved, dark }) {
 
 export default function FoodCategory() {
   const dark = useDarkMode();
-  const [search,  setSearch]  = useState("");
-  const [page,    setPage]    = useState(1);
-  const [data,    setData]    = useState(INIT_DATA);
-  const [modal,   setModal]   = useState(false);
+  const { resorts, branches } = useCatalogData({ autoFetch: true });
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
-  const handleSaved = (item) => {
-    setData(prev => {
-      const idx = prev.findIndex(d => d.key === item.key);
-      if (idx >= 0) { const next = [...prev]; next[idx] = { ...next[idx], ...item }; return next; }
-      return [...prev, { ...item, items: 0 }];
-    });
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
+    request("admin/food-categories", "get")
+      .then((res) => {
+        if (res?.errors) {
+          setData([]);
+          setLoadError(res.errors.message ?? "Could not load food categories.");
+          message.error(res.errors.message ?? "Could not load food categories.");
+        } else {
+          setData(asList(res).map(mapCategory));
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setData([]);
+        setLoadError("Could not load food categories.");
+        setLoading(false);
+      });
   };
 
-  const handleDelete = (key) => setData(prev => prev.filter(d => d.key !== key));
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleDelete = async () => {
+    if (!confirm) return;
+    if (confirm.items > 0) {
+      message.error("Cannot delete a category that still has menu items.");
+      setConfirm(null);
+      return;
+    }
+    const res = await request(`admin/food-categories/${confirm.id}`, "delete");
+    if (res?.errors) {
+      message.error(res.errors.message ?? "Failed to delete category.");
+    } else {
+      message.success("Category deleted.");
+      load();
+    }
+    setConfirm(null);
+  };
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return data.filter(d => !q || d.name.toLowerCase().includes(q) || d.status.toLowerCase().includes(q));
+    return data.filter((d) => !q || d.name.toLowerCase().includes(q) || statusLabel(d).toLowerCase().includes(q));
   }, [data, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const card      = dark ? "bg-gray-800 border-gray-700"  : "bg-white border-[#D9E2EC]";
-  const cardHdr   = dark ? "border-gray-700"               : "border-[#D9E2EC]";
-  const titleCls  = dark ? "text-gray-100"                 : "text-[#102A43]";
-  const subText   = dark ? "text-gray-400"                 : "text-[#829AB1]";
-  const thead     = dark ? "bg-gray-700/60"                : "bg-[#F5F8FC]";
-  const thText    = dark ? "text-gray-400"                 : "text-[#829AB1]";
-  const tbody     = dark ? "bg-gray-800 divide-gray-700"   : "bg-white divide-gray-100";
-  const rowHover  = dark ? "hover:bg-gray-700/50"          : "hover:bg-[#F5F8FC]";
-  const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
-  const cellMuted = dark ? "text-[#829AB1]"                 : "text-[#829AB1]";
-  const divider   = dark ? "divide-gray-700"               : "divide-gray-200";
+  const card = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
+  const cardHdr = dark ? "border-gray-700" : "border-[#D9E2EC]";
+  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
+  const subText = dark ? "text-gray-400" : "text-[#829AB1]";
+  const thead = dark ? "bg-gray-700/60" : "bg-[#F5F8FC]";
+  const thText = dark ? "text-gray-400" : "text-[#829AB1]";
+  const tbody = dark ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-100";
+  const rowHover = dark ? "hover:bg-gray-700/50" : "hover:bg-[#F5F8FC]";
+  const cellText = dark ? "text-gray-300" : "text-[#486581]";
+  const cellMuted = dark ? "text-[#829AB1]" : "text-[#829AB1]";
+  const divider = dark ? "divide-gray-700" : "divide-gray-200";
   const searchCls = dark
     ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48"
     : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-48";
-  const pageBtn   = dark
+  const pageBtn = dark
     ? "px-3 py-1.5 rounded-[8px] border border-gray-600 text-xs font-semibold hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300"
     : "px-3 py-1.5 rounded-[8px] border border-[#D9E2EC] text-xs font-semibold hover:bg-[#F5F8FC] disabled:opacity-40 disabled:cursor-not-allowed";
 
@@ -144,6 +252,13 @@ export default function FoodCategory() {
         </Button>
       </div>
 
+      {loadError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
+          <span>{loadError}</span>
+          <Button onClick={load} className="text-red-700 font-medium">Retry</Button>
+        </div>
+      )}
+
       <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
         <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
           <div className="flex items-center gap-2">
@@ -154,7 +269,7 @@ export default function FoodCategory() {
           </div>
           <div className="relative">
             <MdSearch className={`absolute left-3 top-1/2 -translate-y-1/2 text-lg ${dark ? "text-gray-400" : "text-gray-400"}`} />
-            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search category…" className={searchCls} />
           </div>
         </div>
@@ -163,26 +278,28 @@ export default function FoodCategory() {
           <table className={`min-w-full divide-y ${divider}`}>
             <thead className={thead}>
               <tr>
-                {["No.", "Category", "Items", "Status", "Action"].map(h => (
+                {["No.", "Category", "Items", "Status", "Action"].map((h) => (
                   <th key={h} className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${thText} ${h === "No." ? "w-12 px-4" : ""} ${h === "Action" ? "text-center" : ""}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className={`${tbody} divide-y`}>
-              {pageItems.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={5} className={`py-16 text-center text-sm ${subText}`}>Loading categories…</td></tr>
+              ) : pageItems.length === 0 ? (
                 <tr><td colSpan={5} className={`py-16 text-center text-sm ${subText}`}>No categories found</td></tr>
               ) : pageItems.map((cat, idx) => (
-                <tr key={cat.key} className={`transition-colors ${rowHover}`}>
+                <tr key={cat.id} className={`transition-colors ${rowHover}`}>
                   <td className={`px-4 py-4 text-sm font-medium ${cellMuted}`}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                   <td className={`px-6 py-4 text-sm font-medium ${titleCls}`}>{cat.name}</td>
                   <td className={`px-6 py-4 text-sm ${cellText}`}>{cat.items}</td>
-                  <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={cat.status} dark={dark} /></td>
+                  <td className="px-6 py-4 whitespace-nowrap"><BadgeWithDot status={statusLabel(cat)} dark={dark} /></td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <Button onClick={() => { setEditing(cat); setModal(true); }} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-blue-900/40 text-blue-400 hover:bg-blue-900/70" : "bg-[#FFF3E8] text-[#FF6B00] hover:bg-orange-100"}`}>
                         <MdEdit size={14} /> Edit
                       </Button>
-                      <Button onClick={() => handleDelete(cat.key)} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
+                      <Button onClick={() => setConfirm(cat)} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${dark ? "bg-red-900/40 text-red-400 hover:bg-red-900/70" : "bg-red-50 text-red-600 hover:bg-red-100"}`}>
                         <MdDelete size={14} /> Delete
                       </Button>
                     </div>
@@ -196,12 +313,12 @@ export default function FoodCategory() {
         <div className={`px-6 py-3 border-t flex items-center justify-between text-sm ${cardHdr} ${subText}`}>
           <span>Page {page} of {totalPages} · {filtered.length} records</span>
           <div className="flex items-center gap-1">
-            <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className={pageBtn}>Previous</Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <Button key={p} onClick={() => setPage(p)}
                 className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${page === p ? "bg-[#FF6B00] text-white" : dark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-[#F5F8FC] text-[#486581]"}`}>{p}</Button>
             ))}
-            <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</Button>
+            <Button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className={pageBtn}>Next</Button>
           </div>
         </div>
       </div>
@@ -209,11 +326,27 @@ export default function FoodCategory() {
       {modal && (
         <CategoryModal
           category={editing}
+          resorts={resorts}
+          branches={branches}
           onClose={() => { setModal(false); setEditing(null); }}
-          onSaved={handleSaved}
+          onSaved={load}
           dark={dark}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirm}
+        dark={dark}
+        title="Delete Category"
+        message={confirm ? `Remove “${confirm.name}”?` : ""}
+        sub={confirm?.items > 0
+          ? "This category still has menu items. Delete or reassign those items first."
+          : "This cannot be undone."}
+        confirmText={confirm?.items > 0 ? "OK" : "Yes, Delete"}
+        danger={!(confirm?.items > 0)}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

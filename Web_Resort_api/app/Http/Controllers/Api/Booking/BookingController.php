@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Booking;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Booking\StoreBookingRequest;
 use App\Models\Booking;
 use App\Services\BookingService;
 use App\Services\ReviewService;
@@ -69,36 +70,21 @@ class BookingController extends Controller
 
     public function show(Request $request, Booking $booking): JsonResponse
     {
+        $this->authorize('view', $booking);
         $this->service->assertAccessible($booking, $request->user());
 
-        $booking->load(['user', 'branch', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon', 'payment', 'payments', 'invoice', 'statusLogs']);
+        $booking->load([
+            'user', 'branch', 'rooms.roomType', 'rooms.branch', 'rooms.images', 'resort', 'coupon',
+            'payment', 'payments', 'invoice', 'statusLogs', 'dateChanges.changedBy',
+        ]);
         $this->attachReviewEligibility(collect([$booking]), $request->user());
 
         return response()->json($booking);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreBookingRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => 'nullable|exists:users,id',
-            'resort_id' => 'required|exists:resorts,id',
-            'coupon_id' => 'nullable|exists:coupons,id',
-            'adults' => 'nullable|integer|min:1',
-            'children' => 'nullable|integer|min:0',
-            'check_in' => 'required|date',
-            'check_out' => 'required|date|after:check_in',
-            // Room discount is derived from the catalogue, never accepted here.
-            // Tax and service charge default to config and may only be overridden
-            // by staff on this authenticated route.
-            'coupon_code' => 'nullable|string|max:50',
-            'tax_amount' => 'nullable|numeric|min:0',
-            'service_charge_amount' => 'nullable|numeric|min:0',
-            'special_requests' => 'nullable|string',
-            'room_ids' => 'required|array|min:1',
-            'room_ids.*' => 'exists:rooms,id',
-            'branch_id' => 'nullable|integer|exists:branches,id',
-            'source' => 'nullable|in:walk_in,website,phone,ota,staff',
-        ]);
+        $data = $request->validated();
 
         $user = $request->user();
         if ($user?->isGuestAccount()) {
@@ -114,6 +100,7 @@ class BookingController extends Controller
 
     public function update(Request $request, Booking $booking): JsonResponse
     {
+        $this->authorize('update', $booking);
         $this->service->assertAccessible($booking, $request->user());
 
         $data = $request->validate([
@@ -162,6 +149,7 @@ class BookingController extends Controller
 
     public function destroy(Request $request, Booking $booking): JsonResponse
     {
+        $this->authorize('delete', $booking);
         $this->service->assertAccessible($booking, $request->user());
         $this->service->deleteBooking($booking);
 

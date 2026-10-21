@@ -9,11 +9,12 @@ import useRole from "../../util/useRole";
 
 const { Option } = Select;
 const PAGE_SIZE = 8;
-const STATUSES  = ["all", "pending", "processing", "completed", "cancelled"];
+const STATUSES  = ["all", "pending", "preparing", "served", "completed", "cancelled"];
 
 const STATUS_STYLE = {
   pending:    { dot: "bg-yellow-500", light: "bg-yellow-50 text-yellow-700 ring-yellow-200", dark: "bg-yellow-900/40 text-yellow-400 ring-yellow-700" },
-  processing: { dot: "bg-blue-500",   light: "bg-blue-50 text-blue-700 ring-blue-200",        dark: "bg-blue-900/40 text-blue-400 ring-blue-700"      },
+  preparing:  { dot: "bg-blue-500",   light: "bg-blue-50 text-blue-700 ring-blue-200",        dark: "bg-blue-900/40 text-blue-400 ring-blue-700"      },
+  served:     { dot: "bg-indigo-500", light: "bg-indigo-50 text-indigo-700 ring-indigo-200",  dark: "bg-indigo-900/40 text-indigo-400 ring-indigo-700"},
   completed:  { dot: "bg-green-500",  light: "bg-green-50 text-green-700 ring-green-200",     dark: "bg-green-900/40 text-green-400 ring-green-700"   },
   cancelled:  { dot: "bg-red-500",    light: "bg-red-50 text-red-700 ring-red-200",            dark: "bg-red-900/40 text-red-400 ring-red-700"         },
 };
@@ -210,7 +211,8 @@ export default function FoodOrder() {
           <Form.Item name="status" label="Status" rules={[{ required: true }]}>
             <Select>
               <Option value="pending">Pending</Option>
-              <Option value="processing">Processing</Option>
+              <Option value="preparing">Preparing</Option>
+              <Option value="served">Served</Option>
               <Option value="completed">Completed</Option>
               <Option value="cancelled">Cancelled</Option>
             </Select>

@@ -7,6 +7,17 @@ import {
   clampGuestCount,
   validateServiceInquiry,
 } from './serviceInquiryUtils.js';
+import { submitServiceInquiry } from '../../services/api/servicesApi.js';
+import { getApiErrorMessage, getValidationFieldErrors } from '../../services/api/errors.js';
+
+const API_FIELD_TO_FORM = {
+  preferred_date: 'inquiryDate',
+  resort_name: 'inquiryResort',
+  guest_count: 'guestCount',
+  guest_name: 'guestName',
+  guest_email: 'guestEmail',
+  guest_phone: 'guestPhone',
+};
 
 const fieldClass =
   'w-full bg-surface border text-text rounded-[var(--radius-input)] p-2.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus:border-gold';
@@ -30,6 +41,8 @@ export function ServiceInquiryModal({
   const [guestPhone, setGuestPhone] = useState('');
   const [inquiryNotes, setInquiryNotes] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const defaultResort = sanctuaries[0]?.name ?? '';
@@ -43,6 +56,8 @@ export function ServiceInquiryModal({
     setGuestPhone(user?.phone ?? '');
     setInquiryNotes('');
     setFieldErrors({});
+    setSubmitError('');
+    setIsSubmitting(false);
     setSuccess(false);
   }, [user, defaultResort]);
 
@@ -87,9 +102,9 @@ export function ServiceInquiryModal({
     setFieldErrors((prev) => ({ ...prev, guestCount: undefined }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!service) return;
+    if (!service || isSubmitting) return;
 
     const errors = validateServiceInquiry({
       inquiryDate,
@@ -103,7 +118,44 @@ export function ServiceInquiryModal({
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    setSuccess(true);
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const result = await submitServiceInquiry({
+        service_title: display.title,
+        service_id: service.id ?? null,
+        preferred_date: inquiryDate,
+        resort_name: inquiryResort,
+        guest_count: clampGuestCount(guestCount),
+        guest_name: guestName.trim(),
+        guest_email: guestEmail.trim(),
+        guest_phone: guestPhone.trim(),
+        special_requests: inquiryNotes.trim() || null,
+      });
+
+      if (!result?.success) {
+        setSubmitError(t('services.inquiryFailed', 'Unable to submit your inquiry. Please try again.'));
+        return;
+      }
+
+      setSuccess(true);
+    } catch (err) {
+      const apiErrors = getValidationFieldErrors(err);
+      if (Object.keys(apiErrors).length > 0) {
+        const mapped = {};
+        Object.entries(apiErrors).forEach(([key, message]) => {
+          const formKey = API_FIELD_TO_FORM[key] ?? key;
+          mapped[formKey] = message;
+        });
+        setFieldErrors(mapped);
+      }
+      setSubmitError(
+        getApiErrorMessage(err, t('services.inquiryFailed', 'Unable to submit your inquiry. Please try again.'))
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!service || !display) return null;
@@ -135,7 +187,7 @@ export function ServiceInquiryModal({
           <p className="text-sm text-muted leading-relaxed max-w-md mx-auto">
             {t(
               'services.inquirySuccessNote',
-              'This is a UI demonstration only—your inquiry was not sent to the server.'
+              'Your inquiry has been received. Our concierge team will contact you shortly.'
             )}
           </p>
           <Button variant="gold" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose}>
@@ -327,12 +379,27 @@ export function ServiceInquiryModal({
             </div>
           </div>
 
+          {submitError && (
+            <p className="text-[11px] text-error" role="alert">
+              {submitError}
+            </p>
+          )}
+
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose}>
+            <Button variant="outline" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose} disabled={isSubmitting}>
               {t('common.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" variant="gold" size="sm" className="w-full sm:w-auto min-w-[140px]">
-              {t('services.submitInquiry', 'Submit Inquiry')}
+            <Button
+              type="submit"
+              variant="gold"
+              size="sm"
+              className="w-full sm:w-auto min-w-[140px]"
+              isLoading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? t('services.inquirySubmitting', 'Submitting…')
+                : t('services.submitInquiry', 'Submit Inquiry')}
             </Button>
           </div>
         </form>

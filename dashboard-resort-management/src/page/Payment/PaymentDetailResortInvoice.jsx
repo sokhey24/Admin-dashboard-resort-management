@@ -227,6 +227,21 @@ export default function PaymentDetailResortInvoice({ payment }) {
         <div className="space-y-1">
           <p><span className="text-[#829AB1]">Method:</span> {docVal(payment.payment_method ?? payment.method, "—")}</p>
           <p><span className="text-[#829AB1]">Gateway:</span> {docVal(payment.gateway, "—")}</p>
+          {payment.gateway === "stripe" && payment.payment_reference && (
+            <p className="break-all">
+              <span className="text-[#829AB1]">Stripe ref:</span> {payment.payment_reference}
+            </p>
+          )}
+          {(payment.card_brand || payment.card_last4) && (
+            <p>
+              <span className="text-[#829AB1]">Card:</span>{" "}
+              {payment.card_brand && payment.card_last4
+                ? `${String(payment.card_brand).toUpperCase()} •••• ${payment.card_last4}`
+                : payment.card_last4
+                  ? `•••• ${payment.card_last4}`
+                  : String(payment.card_brand).toUpperCase()}
+            </p>
+          )}
           {/* {payment.transaction_id && (
             <p className="break-all"><span className="text-[#829AB1]">Transaction:</span> {payment.transaction_id}</p>
           )} */}

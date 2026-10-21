@@ -7,9 +7,11 @@ export function normalizeFavorites(input) {
   const src = input && typeof input === 'object' ? input : {};
   const resorts = Array.isArray(src.resorts) ? src.resorts.map(String) : [];
   const rooms = Array.isArray(src.rooms) ? src.rooms.map(String) : [];
+  const dishes = Array.isArray(src.dishes) ? src.dishes.map(String) : [];
   return {
     resorts: [...new Set(resorts)].slice(0, 200),
     rooms: [...new Set(rooms)].slice(0, 200),
+    dishes: [...new Set(dishes)].slice(0, 200),
   };
 }
 

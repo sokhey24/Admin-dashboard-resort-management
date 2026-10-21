@@ -10,7 +10,9 @@ export function syncBookingNotifications(existing, bookings, lang = 'en') {
   const list = Array.isArray(bookings) ? bookings : [];
   const prior = existing || [];
 
-  const manual = prior.filter((n) => !String(n.id).startsWith(PAYMENT_ALERT_PREFIX));
+  const manual = prior.filter(
+    (n) => !n.server && !String(n.id).startsWith(PAYMENT_ALERT_PREFIX)
+  );
 
   const readById = new Map(
     prior

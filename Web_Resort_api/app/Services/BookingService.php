@@ -55,6 +55,34 @@ class BookingService
             return;
         }
         $this->resortAccess->assertResortAccessible($user, (int) $booking->resort_id);
+
+        if ($this->branchAccess->bypassesBranchScope($user)) {
+            return;
+        }
+
+        $assigned = $this->branchAccess->assignedBranchIds($user);
+        if ($assigned === []) {
+            abort(403, 'You cannot access bookings for this branch.');
+        }
+
+        $booking->loadMissing('rooms');
+        $branchIds = $booking->rooms
+            ->pluck('branch_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($branchIds === []) {
+            return;
+        }
+
+        foreach ($branchIds as $branchId) {
+            if (! in_array($branchId, $assigned, true)) {
+                abort(403, 'You cannot access bookings for this branch.');
+            }
+        }
     }
 
     public function datesOverlap($existingIn, $existingOut, Carbon $newIn, Carbon $newOut): bool
@@ -292,8 +320,6 @@ class BookingService
             }
         }
 
-        $this->assertRoomsAvailable($roomIds, $checkIn, $checkOut);
-
         // Every money figure below is derived here; anything the caller sent for
         // discount, subtotal or total is discarded.
         $pivot = $this->buildRoomPivot($roomIds, $nights);
@@ -314,7 +340,9 @@ class BookingService
         $data['deposit_amount'] = 0;
         $data['balance_due'] = $totals['total'];
 
-        return DB::transaction(function () use ($data, $pivot, $coupon) {
+        return DB::transaction(function () use ($data, $pivot, $coupon, $roomIds, $checkIn, $checkOut) {
+            $this->assertRoomsAvailable($roomIds, $checkIn, $checkOut);
+
             $booking = Booking::create($data);
             $booking->rooms()->attach($pivot);
             $this->logStatus($booking, 'pending', $data['created_by'] ?? auth()->id(), null);
@@ -322,6 +350,11 @@ class BookingService
             if ($coupon) {
                 $this->coupons->markUsed($coupon);
             }
+
+            $bookingId = $booking->id;
+            DB::afterCommit(function () use ($bookingId) {
+                event(new \App\Events\BookingCreated($bookingId));
+            });
 
             return $booking->fresh();
         });
@@ -445,6 +478,11 @@ class BookingService
             $booking->update($patch);
             $this->logStatus($booking, $to, $actor?->id ?? auth()->id(), $from, $reason);
 
+            $bookingId = $booking->id;
+            DB::afterCommit(function () use ($bookingId, $from, $to) {
+                event(new \App\Events\BookingStatusChanged($bookingId, $from, $to));
+            });
+
             return $booking->fresh();
         });
     }
@@ -524,6 +562,11 @@ class BookingService
      * honouring the rate and percentage that were agreed when it was created.
      * Only rooms newly added to the booking are priced at today's rates.
      */
+    public function roomPivotForDateChange(array $roomIds, int $nights, Booking $booking): array
+    {
+        return $this->buildRoomPivotForUpdate($roomIds, $nights, $booking);
+    }
+
     protected function buildRoomPivotForUpdate(array $roomIds, int $nights, Booking $booking): array
     {
         $existing = $booking->rooms()->get()->keyBy('id');
@@ -594,13 +637,7 @@ class BookingService
 
     protected function syncBalance(Booking $booking): void
     {
-        $paid = (float) $booking->payments()->where('status', 'paid')->sum('paid_amount');
-        $refunded = (float) $booking->payments()->where('status', 'refunded')->sum('refund_amount');
-        $net = max(0, $paid - $refunded);
-        $booking->forceFill([
-            'deposit_amount' => $net,
-            'balance_due' => max(0, (float) $booking->total_amount - $net),
-        ])->save();
+        app(FolioService::class)->recalculateAndPersistBalance($booking);
     }
 
     protected function logStatus(Booking $booking, string $newStatus, ?int $userId, ?string $oldStatus = null, ?string $note = null): void

@@ -17,7 +17,7 @@ export function ActivityCard({
     <article
       className="group bg-surface border border-border hover:border-gold/40 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col h-full"
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-900 shrink-0">
+      <div className="relative aspect-[16/10] overflow-hidden shrink-0">
         <ActivityCardImage
           src={display.image}
           alt={display.title || imageFallbackLabel}

@@ -37,7 +37,7 @@ function EmployeeModal({ employee, onClose, onSaved, dark, branches }) {
           status: employee.status,
           branch_id: primaryBranch?.id ?? undefined,
         }
-      : { name: "", email: "", phone: "", status: "active", branch_id: undefined }
+      : { name: "", email: "", phone: "", status: "active", branch_id: undefined, password: "", password_confirmation: "" }
   );
   const [saving, setSaving] = useState(false);
   const [errs,   setErrs]   = useState({});
@@ -47,6 +47,14 @@ function EmployeeModal({ employee, onClose, onSaved, dark, branches }) {
     if (!form.name.trim())  e.name  = "Full name is required.";
     if (!form.email.trim()) e.email = "Email is required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email.";
+    if (!isEdit) {
+      if (!form.password || String(form.password).length < 8) {
+        e.password = "Temporary password must be at least 8 characters.";
+      }
+      if (form.password !== form.password_confirmation) {
+        e.password_confirmation = "Passwords do not match.";
+      }
+    }
     setErrs(e);
     return !Object.keys(e).length;
   };
@@ -54,10 +62,10 @@ function EmployeeModal({ employee, onClose, onSaved, dark, branches }) {
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    const { branch_id, ...profile } = form;
+    const { branch_id, password, password_confirmation, ...profile } = form;
     const res = isEdit
       ? await request(`admin/users/${employee.id}`, "put", profile)
-      : await request("admin/users", "post", { ...profile, password: "password" });
+      : await request("admin/users", "post", { ...profile, password });
     if (res?.errors) {
       setSaving(false);
       setErrs({ _: res.errors.message ?? "Failed to save." });
@@ -114,6 +122,39 @@ function EmployeeModal({ employee, onClose, onSaved, dark, branches }) {
             <label className={labelCls}>Phone</label>
             <input value={form.phone} onChange={set("phone")} className={inputCls("phone")} />
           </div>
+          {!isEdit && (
+            <>
+              <div>
+                <label className={labelCls}>
+                  Temporary password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={set("password")}
+                  className={inputCls("password")}
+                  autoComplete="new-password"
+                />
+                {errMsg("password")}
+                <p className={`mt-1 text-[11px] ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>
+                  Share this securely with the employee. Minimum 8 characters.
+                </p>
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Confirm password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={form.password_confirmation}
+                  onChange={set("password_confirmation")}
+                  className={inputCls("password_confirmation")}
+                  autoComplete="new-password"
+                />
+                {errMsg("password_confirmation")}
+              </div>
+            </>
+          )}
           <div>
             <label className={labelCls}>Status</label>
             <select value={form.status} onChange={set("status")} className={inputCls("status")}>

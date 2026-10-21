@@ -71,6 +71,12 @@ export const GeminiAssistantWidget = () => {
     }
   }, [messages, isOpen]);
 
+  useEffect(() => {
+    const openFromNavbar = () => setIsOpen(true);
+    window.addEventListener('solara:open-concierge', openFromNavbar);
+    return () => window.removeEventListener('solara:open-concierge', openFromNavbar);
+  }, []);
+
   const handleSend = async (textToSend) => {
     const query = (textToSend || input).trim();
     if (!query || isTyping) return;

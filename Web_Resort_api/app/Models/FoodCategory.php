@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class FoodCategory extends Model
 {
-    protected $fillable = ['resort_id', 'branch_id', 'name', 'description'];
+    protected $fillable = ['resort_id', 'branch_id', 'name', 'description', 'image', 'status'];
 
     public function resort()    { 
         return $this->belongsTo(Resort::class); 

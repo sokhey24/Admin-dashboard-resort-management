@@ -89,4 +89,12 @@ class Booking extends Model
     public function foodOrders() {
          return $this->hasMany(FoodOrder::class); 
         }
+    public function guestFolio() {
+        return $this->hasOne(GuestFolio::class);
+    }
+
+    public function dateChanges()
+    {
+        return $this->hasMany(BookingDateChange::class)->latest();
+    }
 }

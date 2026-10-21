@@ -21,12 +21,14 @@ import { request } from "../../util/request";
 import ActionButtons from "../../components/ActionButtons";
 import AdminMonthlyRevenueChart from "../Chart_Data/AdminMonthlyRevenueChart";
 import RevenueStatCard from "../../components/dashboard/RevenueStatCard";
+import StatCardsGroup from "../../components/dashboard/StatCardsGroup";
+import DashboardStatCard from "../../components/dashboard/DashboardStatCard";
+import RecentActivityFeed from "../../components/dashboard/RecentActivityFeed";
 import { useRevenuePeriodComparison } from "../../hooks/useRevenuePeriodComparison";
 import useRole from "../../util/useRole";
 import { buildQS, DateFilter, SearchBar } from "../FilterData/Filter_data";
 import PaymentTab from "../Payment/PaymentTab";
 import { fmtDateTime } from "../../util/fmtDateTime";
-import { useNotificationStore } from "../../store/NotificationStore";
 import { useBookingStore } from "../../store/BookingStore";
 import { useCatalogStore } from "../../store/CatalogStore";
 import { useBranchStore } from "../../store/useBranchStore";
@@ -44,52 +46,6 @@ import NotificationCard from "../ManagerSystem/NotificationCard";
 const { Option } = Select;
 
 // ── Shared UI helpers ──────────────────────────────────────────
-function StatCard({ title, value, icon, color, dark, loading, trend, trendUp }) {
-  return (
-    <div
-      className={`rounded-xl border p-4 transition-shadow hover:shadow-md ${
-        dark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80 shadow-sm"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <span
-          className={`text-xs font-semibold uppercase tracking-wide leading-relaxed ${
-            dark ? "text-slate-400" : "text-slate-500"
-          }`}
-        >
-          {title}
-        </span>
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg ${
-            dark ? "bg-slate-800" : "bg-slate-50"
-          }`}
-          style={{ color }}
-        >
-          {icon}
-        </span>
-      </div>
-      {loading ? (
-        <div className={`h-8 w-24 rounded-lg animate-pulse ${dark ? "bg-slate-800" : "bg-slate-100"}`} />
-      ) : (
-        <div className="flex items-end justify-between gap-2">
-          <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{value}</div>
-          {trend != null && (
-            <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                trendUp
-                  ? dark ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-100 text-emerald-700"
-                  : dark ? "bg-red-900/40 text-red-400" : "bg-red-100 text-red-700"
-              }`}
-            >
-              {trendUp ? "▲" : "▼"} {trend}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function Card({ title, children, dark, className = "" }) {
   return (
     <div
@@ -229,124 +185,6 @@ function DarkTooltip({ active, payload, label, dark }) {
 
 const PIE_COLORS = ["#1677ff", "#52c41a", "#faad14", "#ff4d4f", "#722ed1", "#13c2c2"];
 
-const PAGE_SIZE = 8;
-function RecentActivityTable({ activities, dark }) {
-  const [search, setSearch] = useState("");
-  const [actionFilter, setActionFilter] = useState(null);
-  const [page, setPage] = useState(1);
-
-  const actionOptions = useMemo(() => {
-    const unique = [...new Set(activities.map(a => a.action).filter(Boolean))];
-    return unique.map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
-  }, [activities]);
-
-  const filtered = useMemo(() => {
-    let list = activities;
-    if (actionFilter) list = list.filter(a => a.action === actionFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(a =>
-        a.user?.toLowerCase().includes(q) ||
-        a.action?.toLowerCase().includes(q) ||
-        a.description?.toLowerCase().includes(q) ||
-        a.model_type?.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [activities, search, actionFilter]);
-
-  useEffect(() => { setPage(1); }, [search, actionFilter]);
-
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const actionBadge = (action) => {
-    if (action === "created") return dark ? "bg-green-900/40 text-green-400" : "bg-green-100 text-green-700";
-    if (action === "deleted") return dark ? "bg-red-900/40 text-red-400"     : "bg-red-100 text-red-700";
-    if (action === "updated") return dark ? "bg-blue-900/40 text-blue-400"   : "bg-blue-100 text-blue-700";
-    return dark ? "bg-gray-700 text-gray-300" : "bg-[#F5F8FC] text-[#486581]";
-  };
-
-  const moduleIcon = (model_type) => {
-    const m = model_type?.toLowerCase() ?? "";
-    if (m.includes("booking"))  return { icon: "🏨", bg: dark ? "bg-blue-900/40"   : "bg-blue-100" };
-    if (m.includes("food") || m.includes("order")) return { icon: "🍽️", bg: dark ? "bg-orange-900/40" : "bg-orange-100" };
-    if (m.includes("room"))     return { icon: "🛏️", bg: dark ? "bg-purple-900/40" : "bg-purple-100" };
-    if (m.includes("user"))     return { icon: "👤", bg: dark ? "bg-gray-700"       : "bg-[#F5F8FC]" };
-    if (m.includes("menu"))     return { icon: "📋", bg: dark ? "bg-yellow-900/40" : "bg-yellow-100" };
-    return { icon: "🔔", bg: dark ? "bg-gray-700" : "bg-[#F5F8FC]" };
-  };
-
-  const card = dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC]";
-  const titleCls = dark ? "text-gray-100" : "text-[#102A43]";
-  const subCls = dark ? "text-gray-400" : "text-[#486581]";
-  const borderCls = dark ? "border-gray-700" : "border-[#D9E2EC]";
-
-  return (
-    <div className={`rounded-xl border shadow-sm overflow-hidden ${card}`}>
-      <div className={`px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${borderCls}`}>
-        <div>
-          <h3 className={`text-sm font-semibold ${titleCls}`}>Recent activity</h3>
-          <p className={`text-xs ${subCls}`}>From system audit log</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            className={`text-xs px-3 py-1.5 rounded-lg border min-w-[140px] ${dark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-[#D9E2EC]"}`}
-          />
-          <select
-            value={actionFilter ?? ""}
-            onChange={(e) => setActionFilter(e.target.value || null)}
-            className={`text-xs px-2 py-1.5 rounded-lg border ${dark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-[#D9E2EC]"}`}
-          >
-            <option value="">All actions</option>
-            {actionOptions.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {filtered.length === 0 ? (
-        <div className={`py-12 text-center text-sm ${subCls}`}>No activity records for this period.</div>
-      ) : (
-        <>
-          <ul className={`divide-y ${borderCls}`}>
-            {paged.map((a) => {
-              const mod = moduleIcon(a.model_type);
-              return (
-                <li key={a.id} className={`px-4 py-3 flex gap-3 ${dark ? "hover:bg-gray-700/40" : "hover:bg-[#F5F8FC]"}`}>
-                  <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${mod.bg}`}>{mod.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                      <span className={`text-sm font-medium ${titleCls}`}>{a.user ?? "System"}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${actionBadge(a.action)}`}>{a.action}</span>
-                    </div>
-                    <p className={`text-xs ${subCls} truncate`}>{a.description ?? a.model_type ?? "—"}</p>
-                  </div>
-                  <time className={`text-[10px] whitespace-nowrap ${subCls}`}>
-                    {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
-                  </time>
-                </li>
-              );
-            })}
-          </ul>
-          {filtered.length > PAGE_SIZE && (
-            <div className={`px-4 py-2 flex justify-between items-center text-xs ${subCls} border-t ${borderCls}`}>
-              <span>Page {page} of {Math.ceil(filtered.length / PAGE_SIZE)}</span>
-              <div className="flex gap-1">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
-                <button type="button" disabled={page >= Math.ceil(filtered.length / PAGE_SIZE)} onClick={() => setPage((p) => p + 1)} className="px-2 py-1 rounded border disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Overview Tab (real data) ───────────────────────────────────
 function OverviewTab({ dark }) {
   const [data,    setData]    = useState(null);
@@ -355,8 +193,6 @@ function OverviewTab({ dark }) {
   const [filter,  setFilter]  = useState({ date: null, month: null, year: null });
   const selectedBranchId = useBranchStore((s) => s.selectedBranchId);
   const { isAdmin } = useRole();
-  const { syncFromBookings } = useNotificationStore();
-
   const load = (f = filter) => {
     setLoading(true);
     const qs = buildQS({ ...f, branchId: selectedBranchId });
@@ -364,9 +200,6 @@ function OverviewTab({ dark }) {
       .then(res => {
         if (res?.success) {
           setData(res.data);
-          if (res.data?.recent_bookings?.length) {
-            syncFromBookings(res.data.recent_bookings);
-          }
         } else {
           setError(res?.errors?.message ?? "Failed to load dashboard data");
         }
@@ -399,31 +232,17 @@ function OverviewTab({ dark }) {
   return (
     <Spin spinning={loading}>
       <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
-      {/* Top stat cards row 1 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
-        <StatCard title="Total Resorts"    value={stats.total_resorts}    icon={<MdOutlineBeachAccess />} color="#722ed1" dark={dark} loading={loading} />
-        <StatCard title="Total Branches"   value={stats.total_branches}   icon={<FaHome />}               color="#13c2c2" dark={dark} loading={loading} />
-        <StatCard title="Total Rooms"      value={stats.total_rooms}      icon={<FaBed />}                color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Total Bookings"   value={stats.total_bookings}   icon={<FaCalendarAlt />}        color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Guests"           value={stats.total_guests ?? stats.total_users} icon={<FaUsers />}              color="#52c41a" dark={dark} loading={loading} />
-      </div>
-      {/* Top stat cards row 2 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <RevenueStatCard
-          revenue={currentRevenue}
-          dark={dark}
-          loading={loading}
-          comparison={comparison}
-          comparisonLoading={comparisonLoading}
-          comparisonError={comparisonError}
-          periodLabel={periodLabel}
-          canCompare={canCompare}
-        />
-        <StatCard title="Food Orders"      value={stats.restaurant_orders} icon={<FaConciergeBell />}   color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Occupancy"        value={`${Number(stats.occupancy_rate ?? 0)}%`} icon={<FaBed />} color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Current Stays"    value={stats.current_stays ?? 0} icon={<FaCalendarAlt />} color="#13c2c2" dark={dark} loading={loading} />
-        <StatCard title="Pending Payments" value={`$${Number(stats.pending_payments ?? 0).toLocaleString()}`}  icon={<FaClock />}           color="#faad14" dark={dark} loading={loading} />
-      </div>
+      <StatCardsGroup
+        stats={stats}
+        dark={dark}
+        loading={loading}
+        currentRevenue={currentRevenue}
+        comparison={comparison}
+        comparisonLoading={comparisonLoading}
+        comparisonError={comparisonError}
+        periodLabel={periodLabel}
+        canCompare={canCompare}
+      />
 
       {/* ── Resort Management Section ── */}
       <div className={`rounded-xl border mb-4 overflow-hidden ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
@@ -442,7 +261,7 @@ function OverviewTab({ dark }) {
       {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <ListCardRecently bookings={data?.recent_bookings} />
-          <RecentActivityTable activities={data?.recent_activities ?? []} dark={dark} />
+          <RecentActivityFeed activities={data?.recent_activities ?? []} dark={dark} />
         </div>
       )}
       
@@ -580,10 +399,10 @@ function ReservationTab({ dark }) {
     <Spin spinning={loading}>
       <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Reservations" value={stats.total}     icon={<FaCalendarAlt />}  color="#1677ff" dark={dark} />
-        <StatCard title="Confirmed"          value={stats.confirmed} icon={<FaCheckCircle />}  color="#52c41a" dark={dark} />
-        <StatCard title="Pending"            value={stats.pending}   icon={<FaClock />}        color="#faad14" dark={dark} />
-        <StatCard title="Cancelled"          value={stats.cancelled} icon={<FaTimesCircle />}  color="#ff4d4f" dark={dark} />
+        <DashboardStatCard title="Total Reservations" value={stats.total}     icon={<FaCalendarAlt />}  color="#1677ff" dark={dark} />
+        <DashboardStatCard title="Confirmed"          value={stats.confirmed} icon={<FaCheckCircle />}  color="#52c41a" dark={dark} />
+        <DashboardStatCard title="Pending"            value={stats.pending}   icon={<FaClock />}        color="#faad14" dark={dark} />
+        <DashboardStatCard title="Cancelled"          value={stats.cancelled} icon={<FaTimesCircle />}  color="#ff4d4f" dark={dark} />
       </div>
 
       <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
@@ -772,9 +591,9 @@ function GuestTab({ dark }) {
     <Spin spinning={loading}>
       <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Total Users"    value={users.length}                                     icon={<FaUsers />} color="#1677ff" dark={dark} />
-        <StatCard title="Active Users"   value={users.filter(u => u.status === "active").length}   icon={<FaUser />}  color="#52c41a" dark={dark} />
-        <StatCard title="Inactive Users" value={users.filter(u => u.status === "inactive").length} icon={<FaUser />}  color="#ff4d4f" dark={dark} />
+        <DashboardStatCard title="Total Users"    value={users.length}                                     icon={<FaUsers />} color="#1677ff" dark={dark} />
+        <DashboardStatCard title="Active Users"   value={users.filter(u => u.status === "active").length}   icon={<FaUser />}  color="#52c41a" dark={dark} />
+        <DashboardStatCard title="Inactive Users" value={users.filter(u => u.status === "inactive").length} icon={<FaUser />}  color="#ff4d4f" dark={dark} />
       </div>
       <Card title="User List" dark={dark}>
         <SimpleTable
@@ -825,9 +644,9 @@ function RevenueTab({ dark }) {
     <Spin spinning={loading}>
       <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Users"      value={stats.total_users}    icon={<FaUsers />}         color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Today Check-ins"  value={stats.today_checkins} icon={<FaCalendarAlt />}   color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Today Check-outs" value={stats.today_checkouts}icon={<FaCalendarAlt />}   color="#722ed1" dark={dark} loading={loading} />
+        <DashboardStatCard title="Total Users"      value={stats.total_users}    icon={<FaUsers />}         color="#fa8c16" dark={dark} loading={loading} />
+        <DashboardStatCard title="Today Check-ins"  value={stats.today_checkins} icon={<FaCalendarAlt />}   color="#1677ff" dark={dark} loading={loading} />
+        <DashboardStatCard title="Today Check-outs" value={stats.today_checkouts}icon={<FaCalendarAlt />}   color="#722ed1" dark={dark} loading={loading} />
         <RevenueStatCard
           revenue={currentRevenue}
           dark={dark}
@@ -864,19 +683,19 @@ function ResortTab({ dark }) {
   return (
     <Spin spinning={loading}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <StatCard title="Available Rooms" value={d.rooms_available   ?? 0} icon={<FaBed />}           color="#52c41a" dark={dark} loading={loading} />
-        <StatCard title="Occupied Rooms"  value={d.rooms_occupied    ?? 0} icon={<FaHome />}          color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Maintenance"     value={d.rooms_maintenance ?? 0} icon={<FaClock />}         color="#faad14" dark={dark} loading={loading} />
-        <StatCard title="Active Bookings" value={d.active_bookings   ?? 0} icon={<FaCalendarAlt />}   color="#722ed1" dark={dark} loading={loading} />
+        <DashboardStatCard title="Available Rooms" value={d.rooms_available   ?? 0} icon={<FaBed />}           color="#52c41a" dark={dark} loading={loading} />
+        <DashboardStatCard title="Occupied Rooms"  value={d.rooms_occupied    ?? 0} icon={<FaHome />}          color="#1677ff" dark={dark} loading={loading} />
+        <DashboardStatCard title="Maintenance"     value={d.rooms_maintenance ?? 0} icon={<FaClock />}         color="#faad14" dark={dark} loading={loading} />
+        <DashboardStatCard title="Active Bookings" value={d.active_bookings   ?? 0} icon={<FaCalendarAlt />}   color="#722ed1" dark={dark} loading={loading} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Check-in Today"  value={d.checkin_today     ?? 0} icon={<FaCheckCircle />}   color="#13c2c2" dark={dark} loading={loading} />
-        <StatCard title="Check-out Today" value={d.checkout_today    ?? 0} icon={<FaTimesCircle />}   color="#ff4d4f" dark={dark} loading={loading} />
-        <StatCard title="Today's Revenue" value={`$${Number(d.revenue_today ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
-        <StatCard title="Room Revenue"    value={`$${Number(d.revenue_total ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#1677ff" dark={dark} loading={loading} />
-        <StatCard title="Outstanding"     value={`$${Number(d.outstanding_balance ?? 0).toLocaleString()}`} icon={<FaClock />} color="#faad14" dark={dark} loading={loading} />
-        <StatCard title="Avg Rating"      value={d.average_rating ? Number(d.average_rating).toFixed(1) : "—"} icon={<FaChartBar />} color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Coupons Used"    value={d.coupon_used       ?? 0} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
+        <DashboardStatCard title="Check-in Today"  value={d.checkin_today     ?? 0} icon={<FaCheckCircle />}   color="#13c2c2" dark={dark} loading={loading} />
+        <DashboardStatCard title="Check-out Today" value={d.checkout_today    ?? 0} icon={<FaTimesCircle />}   color="#ff4d4f" dark={dark} loading={loading} />
+        <DashboardStatCard title="Today's Revenue" value={`$${Number(d.revenue_today ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
+        <DashboardStatCard title="Room Revenue"    value={`$${Number(d.revenue_total ?? 0).toLocaleString()}`} icon={<FaMoneyBillWave />} color="#1677ff" dark={dark} loading={loading} />
+        <DashboardStatCard title="Outstanding"     value={`$${Number(d.outstanding_balance ?? 0).toLocaleString()}`} icon={<FaClock />} color="#faad14" dark={dark} loading={loading} />
+        <DashboardStatCard title="Avg Rating"      value={d.average_rating ? Number(d.average_rating).toFixed(1) : "—"} icon={<FaChartBar />} color="#fa8c16" dark={dark} loading={loading} />
+        <DashboardStatCard title="Coupons Used"    value={d.coupon_used       ?? 0} icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
       </div>
       <div className="mb-4">
         <Chart_data_resort />
@@ -919,14 +738,14 @@ function RestaurantTab({ dark }) {
   return (
     <Spin spinning={loading}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <StatCard title="Orders Today"       value={d.orders_today       ?? 0} icon={<FaConciergeBell />}   color="#fa8c16" dark={dark} loading={loading} />
-        <StatCard title="Pending Orders"     value={d.pending_orders     ?? 0} icon={<FaClock />}           color="#faad14" dark={dark} loading={loading} />
-        <StatCard title="Tables Available"   value={d.tables_available   ?? 0} icon={<MdTableRestaurant />} color="#52c41a" dark={dark} loading={loading} />
-        <StatCard title="Tables Occupied"    value={d.tables_occupied    ?? 0} icon={<MdTableRestaurant />} color="#1677ff" dark={dark} loading={loading} />
+        <DashboardStatCard title="Orders Today"       value={d.orders_today       ?? 0} icon={<FaConciergeBell />}   color="#fa8c16" dark={dark} loading={loading} />
+        <DashboardStatCard title="Pending Orders"     value={d.pending_orders     ?? 0} icon={<FaClock />}           color="#faad14" dark={dark} loading={loading} />
+        <DashboardStatCard title="Tables Available"   value={d.tables_available   ?? 0} icon={<MdTableRestaurant />} color="#52c41a" dark={dark} loading={loading} />
+        <DashboardStatCard title="Tables Occupied"    value={d.tables_occupied    ?? 0} icon={<MdTableRestaurant />} color="#1677ff" dark={dark} loading={loading} />
       </div>
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <StatCard title="Reservations Today" value={d.reservations_today ?? 0} icon={<FaCalendarAlt />}    color="#722ed1" dark={dark} loading={loading} />
-        <StatCard title="Revenue Today"      value={`$${Number(d.revenue_today ?? 0).toLocaleString()}`}   icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
+        <DashboardStatCard title="Reservations Today" value={d.reservations_today ?? 0} icon={<FaCalendarAlt />}    color="#722ed1" dark={dark} loading={loading} />
+        <DashboardStatCard title="Revenue Today"      value={`$${Number(d.revenue_today ?? 0).toLocaleString()}`}   icon={<FaMoneyBillWave />} color="#52c41a" dark={dark} loading={loading} />
       </div>
 
       {/* Charts row */}

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class FoodOrderItem extends Model
 {
-    protected $fillable = ['food_order_id', 'menu_item_id', 'quantity', 'unit_price', 'subtotal'];
+    protected $fillable = ['food_order_id', 'menu_item_id', 'item_name', 'quantity', 'unit_price', 'subtotal'];
 
     public function foodOrder() {
          return $this->belongsTo(FoodOrder::class); 

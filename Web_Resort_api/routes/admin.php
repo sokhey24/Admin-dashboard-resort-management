@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Room\RoomImageController;
 use App\Http\Controllers\Api\Booking\BookingController;
 use App\Http\Controllers\Api\Booking\BookingRoomController;
 use App\Http\Controllers\Api\Booking\BookingStatusController;
+use App\Http\Controllers\Api\Booking\GuestFolioController;
 use App\Http\Controllers\Api\Payment\PaymentController;
 use App\Http\Controllers\Api\Payment\KhqrPaymentController;
 use App\Http\Controllers\Api\Payment\InvoiceController;
@@ -36,12 +37,20 @@ use App\Http\Controllers\Api\Resort\ResortDashboardController;
 use App\Http\Controllers\Api\Restaurant\RestaurantDashboardController;
 use App\Http\Controllers\Api\Website\WebsiteContentController;
 use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\ActivityBookingAdminController;
+use App\Http\Controllers\Api\Admin\ServiceInquiryAdminController;
+use App\Http\Controllers\Api\Admin\ContactInquiryAdminController;
+use App\Http\Controllers\Api\Notification\UserNotificationController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
     // Dashboard — admin role or admin.dashboard.view only
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->middleware('dashboard.access');
+
+    Route::get('notifications', [UserNotificationController::class, 'index']);
+    Route::patch('notifications/{notification}/read', [UserNotificationController::class, 'markRead']);
+    Route::post('notifications/read-all', [UserNotificationController::class, 'markAllRead']);
 
     // Reports — admin.reports.view
     Route::prefix('reports')->middleware('reports.access')->group(function () {
@@ -52,6 +61,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
         Route::get('/guests', [ReportController::class, 'guests']);
         Route::get('/daily', [ReportController::class, 'daily']);
         Route::get('/export', [ReportController::class, 'exportCsv']);
+        Route::get('/night-audits', [\App\Http\Controllers\Api\Admin\NightAuditController::class, 'index']);
+        Route::post('/night-audits/run', [\App\Http\Controllers\Api\Admin\NightAuditController::class, 'run'])
+            ->middleware('permission:admin.reports.view');
     });
 
     // Users — admin.users.*
@@ -175,6 +187,17 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('bookings/{booking}/status', [BookingStatusController::class, 'index']) ->middleware('permission:admin.resorts.view,resort.bookings.view');
     Route::put('bookings/{booking}/status', [BookingStatusController::class, 'update'])->middleware('permission:admin.resorts.update,resort.bookings.update,resort.checkin.manage,resort.checkout.manage');
 
+    Route::get('bookings/{booking}/folio', [GuestFolioController::class, 'show'])
+        ->middleware('permission:admin.resorts.view,resort.bookings.view,resort.checkin.manage,resort.checkout.manage');
+    Route::post('bookings/{booking}/folio/charges', [GuestFolioController::class, 'storeCharge'])
+        ->middleware('permission:admin.resorts.update,resort.bookings.update,resort.checkin.manage');
+    Route::post('bookings/{booking}/folio/settle', [GuestFolioController::class, 'settle'])
+        ->middleware('permission:admin.resorts.update,resort.bookings.update,resort.checkout.manage');
+    Route::get('bookings/{booking}/folio/pdf', [GuestFolioController::class, 'invoicePdf'])
+        ->middleware('permission:payments.pdf,resort.invoices.view,resort.bookings.view');
+    Route::post('folio-charges/{folio_charge}/void', [GuestFolioController::class, 'voidCharge'])
+        ->middleware('permission:admin.resorts.update,resort.bookings.update,resort.checkin.manage');
+
     // Payments — admin.reports.* + payments.*
     Route::get('payments',           [PaymentController::class, 'index'])  ->middleware('permission:payments.view,admin.reports.view,resort.payments.view,restaurant.billing.view');
     Route::post('payments',          [PaymentController::class, 'store'])  ->middleware('permission:payments.view,admin.reports.view,resort.payments.create');
@@ -198,6 +221,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('invoices',           [InvoiceController::class, 'index'])  ->middleware('permission:admin.reports.view,resort.invoices.view,resort.payments.view,payments.view');
     Route::post('invoices',          [InvoiceController::class, 'store'])  ->middleware('permission:admin.reports.view,resort.invoices.view,resort.payments.create');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])   ->middleware('permission:admin.reports.view,resort.invoices.view,resort.payments.view,payments.view');
+    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->middleware('permission:payments.pdf,resort.invoices.view');
     Route::put('invoices/{invoice}', [InvoiceController::class, 'update']) ->middleware('permission:admin.reports.view,resort.invoices.view');
     Route::delete('invoices/{invoice}',[InvoiceController::class,'destroy'])->middleware('permission:admin.reports.view');
 
@@ -270,6 +294,24 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::put('guests/{guest}',  [GuestController::class, 'update']) ->middleware('permission:admin.users.update,resort.guests.update');
     Route::patch('guests/{guest}',[GuestController::class, 'update']) ->middleware('permission:admin.users.update,resort.guests.update');
     Route::delete('guests/{guest}',[GuestController::class,'destroy'])->middleware('permission:admin.users.delete');
+
+    $guestInquiryView = 'permission:admin.resorts.view,resort.guests.view,resort.bookings.view';
+    $guestInquiryManage = 'permission:admin.resorts.update,resort.guests.update,resort.bookings.update';
+
+    Route::get('activity-bookings', [ActivityBookingAdminController::class, 'index'])->middleware($guestInquiryView);
+    Route::get('activity-bookings/{activity_booking}', [ActivityBookingAdminController::class, 'show'])->middleware($guestInquiryView);
+    Route::patch('activity-bookings/{activity_booking}', [ActivityBookingAdminController::class, 'update'])->middleware($guestInquiryManage);
+    Route::put('activity-bookings/{activity_booking}', [ActivityBookingAdminController::class, 'update'])->middleware($guestInquiryManage);
+
+    Route::get('service-inquiries', [ServiceInquiryAdminController::class, 'index'])->middleware($guestInquiryView);
+    Route::get('service-inquiries/{service_inquiry}', [ServiceInquiryAdminController::class, 'show'])->middleware($guestInquiryView);
+    Route::patch('service-inquiries/{service_inquiry}', [ServiceInquiryAdminController::class, 'update'])->middleware($guestInquiryManage);
+    Route::put('service-inquiries/{service_inquiry}', [ServiceInquiryAdminController::class, 'update'])->middleware($guestInquiryManage);
+
+    Route::get('contact-inquiries', [ContactInquiryAdminController::class, 'index'])->middleware($guestInquiryView);
+    Route::get('contact-inquiries/{contact_inquiry}', [ContactInquiryAdminController::class, 'show'])->middleware($guestInquiryView);
+    Route::patch('contact-inquiries/{contact_inquiry}', [ContactInquiryAdminController::class, 'update'])->middleware($guestInquiryManage);
+    Route::put('contact-inquiries/{contact_inquiry}', [ContactInquiryAdminController::class, 'update'])->middleware($guestInquiryManage);
 
     Route::get('reviews',           [ReviewController::class, 'index'])  ->middleware('permission:admin.resorts.view,resort.dashboard.view,resort.rooms.view');
     Route::post('reviews',          [ReviewController::class, 'store'])  ->middleware('permission:admin.resorts.create');

@@ -55,6 +55,7 @@ class PaymentController extends Controller
 
     public function show(Request $request, Payment $payment): JsonResponse
     {
+        $this->authorize('view', $payment);
         $this->payments->assertAccessible($payment, $request->user());
 
         $data = $this->receiptService->buildReceiptData($payment, $request->user()->name);
@@ -164,6 +165,9 @@ class PaymentController extends Controller
 
     public function update(Request $request, Payment $payment): JsonResponse
     {
+        $this->authorize('update', $payment);
+        $this->payments->assertAccessible($payment, $request->user());
+
         $validated = $request->validate([
             'status' => ['sometimes', 'in:pending,paid,failed,refunded'],
             'paid_at' => ['nullable', 'date'],
@@ -175,8 +179,11 @@ class PaymentController extends Controller
         return response()->json(['data' => $this->receiptService->buildReceiptData($payment)]);
     }
 
-    public function destroy(Payment $payment): JsonResponse
+    public function destroy(Request $request, Payment $payment): JsonResponse
     {
+        $this->authorize('delete', $payment);
+        $this->payments->assertAccessible($payment, $request->user());
+
         $payment->delete();
 
         return response()->json(['success' => true]);

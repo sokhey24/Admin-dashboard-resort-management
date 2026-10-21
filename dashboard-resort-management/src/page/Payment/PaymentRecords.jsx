@@ -18,39 +18,21 @@
  */
 
 import { useState, useEffect } from "react";
-import { Spin, Button, Select, message } from "antd";
-import {
-  FaDollarSign, FaClock, FaMoneyBillWave,
-} from "react-icons/fa";
-import { MdSearch, MdVisibility, MdDelete } from "react-icons/md";
-import ConfirmDialog from "../../components/ConfirmDialog";
+import { Spin, Button, message } from "antd";
+import { MdVisibility, MdDelete } from "react-icons/md";
 import { useDarkMode }   from "../../util/DarkModeContext";
 import { request }       from "../../util/request";
-import { DateFilter } from "../FilterData/Filter_data";
 import usePermission      from "../../util/usePermission";
 import useCatalogData from "../../hooks/useCatalogData";
 import { useCatalogStore } from "../../store/CatalogStore";
-import PaymentDetailModal, { ActionDropdown } from "./PaymentDetailModal";
+import { ActionDropdown } from "./PaymentDetailModal";
+import PaymentFiltersBar from "./PaymentFiltersBar";
+import PaymentActionModals from "./PaymentActionModals";
 import {
-  PAY_PAGE_SIZE, PAY_STATUSES, PAY_METHODS,
+  PAY_PAGE_SIZE,
   fmtAmt, methodLabel, roomSummary, bookingCode, orderCode, tableSummary, venueName, sourceLabel, buildPaymentQuery,
   asList, paginationFrom,
 } from "./paymentHelpers";
-
-function StatCard({ title, value, icon, color, dark, loading }) {
-  return (
-    <div className={`rounded-xl border p-4 ${dark ? "bg-gray-800 border-gray-700" : "bg-white border-[#D9E2EC] shadow-sm"}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-semibold uppercase tracking-wide ${dark ? "text-gray-400" : "text-[#829AB1]"}`}>{title}</span>
-        <span className="text-lg" style={{ color }}>{icon}</span>
-      </div>
-      {loading
-        ? <div className={`h-8 w-20 rounded animate-pulse ${dark ? "bg-gray-700" : "bg-[#F5F8FC]"}`} />
-        : <div className="text-xl font-bold" style={{ color }}>{value}</div>
-      }
-    </div>
-  );
-}
 
 const STATUS_MAP = {
   paid:       { light: "bg-green-100 text-green-700",    dark: "bg-green-900/40 text-green-400" },
@@ -184,12 +166,6 @@ export default function PaymentListPage({ source = "resort", title = "Payment", 
   const cellText  = dark ? "text-gray-300"                 : "text-[#486581]";
   const cellMuted = dark ? "text-[#829AB1]"                : "text-[#829AB1]";
   const divider   = dark ? "divide-gray-700"               : "divide-[#D9E2EC]";
-  const filterBg  = dark ? "bg-gray-700"                   : "bg-[#F5F8FC]";
-  const filterBtn = dark ? "text-gray-400 hover:text-gray-200" : "text-[#486581] hover:text-[#102A43]";
-  const filterAct = dark ? "bg-gray-600 text-gray-100 shadow"  : "bg-white text-[#102A43] shadow";
-  const searchCls = dark
-    ? "pl-9 pr-3 py-1.5 text-sm border border-gray-600 bg-gray-700 text-gray-100 placeholder-[#829AB1] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-52"
-    : "pl-9 pr-3 py-1.5 text-sm border border-[#D9E2EC] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 w-52 placeholder:text-[#829AB1]";
   const colCount = isAll ? 13 : 12;
   const emptyCopy = isRestaurant
     ? "No restaurant payment records found."
@@ -213,89 +189,25 @@ export default function PaymentListPage({ source = "resort", title = "Payment", 
   return (
     <div className={wrapCls} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       {!embedded && <h2 className={`text-[26px] font-bold mb-5 ${titleCls}`}>{title}</h2>}
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <StatCard
-          title="Total Collected"
-          value={fmtAmt(totalCollected)}
-          icon={<FaDollarSign />}
-          color="#52c41a"
-          dark={dark}
-          loading={loading}
-        />
-        <StatCard
-          title="Pending Amount"
-          value={fmtAmt(totalPending)}
-          icon={<FaClock />}
-          color="#faad14"
-          dark={dark}
-          loading={loading}
-        />
-        <StatCard
-          title="Total Refunded"
-          value={fmtAmt(totalRefunded)}
-          icon={<FaMoneyBillWave />}
-          color="#ff4d4f"
-          dark={dark}
-          loading={loading}
-        />
-      </div>
-
-      {/* ── Date Filter ── */}
-      <DateFilter filter={filter} onChange={handleFilter} dark={dark} />
-
-      {/* ── Payment Records Card ── */}
-      <div className={`rounded-xl shadow-sm border overflow-hidden ${card}`}>
-        {/* Table Header */}
-        <div className={`px-6 py-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${cardHdr}`}>
-          <div className="flex items-center gap-2">
-            <span className={`text-[18px] font-semibold ${titleCls}`}>{tableTitle}</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
-              dark ? "bg-blue-900/40 text-blue-400 ring-blue-700" : "bg-[#FF6B00]/10 text-[#102A43] ring-[#FF6B00]/20"
-            }`}>{meta.total} records</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select
-              allowClear
-              placeholder="Resort"
-              value={resortId}
-              onChange={(v) => { setResortId(v); setPage(1); }}
-              className="min-w-[160px]"
-              options={resorts.map((r) => ({ value: r.id, label: r.name }))}
-            />
-            <Select
-              placeholder="Method"
-              value={methodFilter || ""}
-              onChange={(v) => { setMethodFilter(v); setPage(1); }}
-              className="min-w-[150px]"
-              options={PAY_METHODS}
-            />
-            <div className={`flex gap-1 rounded-lg p-1 overflow-x-auto ${filterBg}`}>
-              {PAY_STATUSES.map(s => (
-                <Button
-                  key={s}
-                  onClick={() => { setStatusFilter(s); setPage(1); }}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                    statusFilter === s ? filterAct : filterBtn
-                  }`}
-                >
-                  {s === "all" ? "All" : s.replace(/\b\w/g, c => c.toUpperCase())}
-                </Button>
-              ))}
-            </div>
-            <div className="relative">
-              <MdSearch className={`absolute left-3 top-1/2 -translate-y-1/2 text-lg ${dark ? "text-gray-400" : "text-gray-400"}`} />
-              <input
-                value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
-                placeholder={searchPlaceholder}
-                className={searchCls}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Table */}
+      <PaymentFiltersBar
+        dark={dark}
+        loading={loading}
+        stats={{ collected: totalCollected, pending: totalPending, refunded: totalRefunded }}
+        filter={filter}
+        onFilterChange={handleFilter}
+        tableTitle={tableTitle}
+        metaTotal={meta.total}
+        resorts={resorts}
+        resortId={resortId}
+        onResortChange={(v) => { setResortId(v); setPage(1); }}
+        methodFilter={methodFilter}
+        onMethodChange={(v) => { setMethodFilter(v); setPage(1); }}
+        statusFilter={statusFilter}
+        onStatusChange={(s) => { setStatusFilter(s); setPage(1); }}
+        searchInput={searchInput}
+        onSearchInputChange={setSearchInput}
+        searchPlaceholder={searchPlaceholder}
+      >
         <div className="overflow-x-auto">
           <table className={`min-w-full divide-y ${divider}`}>
             <thead className={thead}>
@@ -464,34 +376,19 @@ export default function PaymentListPage({ source = "resort", title = "Payment", 
             </div>
           </div>
         )}
-      </div>
+      </PaymentFiltersBar>
 
-      {/* Payment Detail Modal */}
-      {detailId && (
-        <PaymentDetailModal
-          payment={detailData}
-          open={!!detailId}
-          onClose={closeView}
-          dark={dark}
-          autoPrint={autoPrint}
-          onUpdated={load}
-        />
-      )}
-
-      <ConfirmDialog
-        open={!!deleteTarget}
+      <PaymentActionModals
         dark={dark}
-        title="Delete payment"
-        message={
-          deleteTarget
-            ? `Delete ${deleteTarget.payment_id ?? `PAY-${deleteTarget.id}`}? This cannot be undone.`
-            : ""
-        }
-        sub="The payment record will be removed from the system."
-        confirmText="Delete"
-        loading={deleting}
-        onConfirm={confirmDelete}
-        onCancel={() => !deleting && setDeleteTarget(null)}
+        detailId={detailId}
+        detailData={detailData}
+        autoPrint={autoPrint}
+        onCloseDetail={closeView}
+        onPaymentUpdated={load}
+        deleteTarget={deleteTarget}
+        deleting={deleting}
+        onConfirmDelete={confirmDelete}
+        onCancelDelete={() => !deleting && setDeleteTarget(null)}
       />
     </div>
   );

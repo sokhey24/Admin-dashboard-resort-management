@@ -9,9 +9,11 @@ import {
   MdAddHomeWork, MdInventory2,
 } from "react-icons/md";
 import { ProfileStore } from "../../store/ProfileStore";
+import { clearAuth } from "../../util/auth";
 import { useBranchStore } from "../../store/useBranchStore";
 import { useCatalogStore } from "../../store/CatalogStore";
 import { useNotificationStore } from "../../store/NotificationStore";
+import { safeNotificationRoute } from "../../util/safeNotificationRoute";
 import { useTranslation } from "../../i18n";
 import { antdKhmerLocale } from "../../i18n/antdKhmerLocale";
 import logoResort from "../../assets/image/LogoResort.jpg";
@@ -66,6 +68,7 @@ function buildMenu(t, can, isAdmin, canViewReports, canViewDashboard, role) {
 
   if (can("resort.guests.view")) {
     menu.push(item(t("nav.userGuests", "User Guest"), "/resort/guests", <MdPeople size={14} />));
+    menu.push(item(t("nav.guestInbox", "Guest Inbox"), "/resort/guest-inbox", <MdPeople size={14} />));
   }
 
   // Resort sub-groups
@@ -155,14 +158,18 @@ export default function MainLayout() {
   const { can, canViewReports, canViewDashboard } = usePermission();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { notifications, markAllRead, clearAll } = useNotificationStore();
+  const notifications = useNotificationStore((s) => s.notifications);
+  const markAllRead = useNotificationStore((s) => s.markAllRead);
+  const markRead = useNotificationStore((s) => s.markRead);
+  const clearAll = useNotificationStore((s) => s.clearAll);
+  const fetchNotifications = useNotificationStore((s) => s.fetchNotifications);
   const branches = useCatalogStore((s) => s.branches);
   const selectedBranchId = useCatalogStore((s) => s.selectedBranchId);
   const branchScopeLocked = useCatalogStore((s) => s.branchScopeLocked);
   const setSelectedBranchId = useCatalogStore((s) => s.setSelectedBranchId);
   const initBranchScopeFromProfile = useCatalogStore((s) => s.initBranchScopeFromProfile);
   const canViewAllBranches = can("admin.dashboard.view") || can("admin.resorts.view") || isAdmin;
-  const unreadCount = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
   const [notifSearch,       setNotifSearch]       = useState("");
   const [notifActionFilter, setNotifActionFilter] = useState("all");
 
@@ -215,6 +222,29 @@ export default function MainLayout() {
     }
   }, [profile, canViewAllBranches, initBranchScopeFromProfile]);
 
+  useEffect(() => {
+    const onSessionExpired = () => {
+      useCatalogStore.getState().reset();
+    };
+    window.addEventListener("admin:session-expired", onSessionExpired);
+    return () => window.removeEventListener("admin:session-expired", onSessionExpired);
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    fetchNotifications({ silent: true });
+    const timer = window.setInterval(() => {
+      fetchNotifications({ silent: true });
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [profile, fetchNotifications]);
+
+  const handleNotificationClick = (n) => {
+    if (!n?.read) markRead(n.id);
+    const path = safeNotificationRoute(n.url);
+    if (path) navigate(path);
+  };
+
   if (!profile) return null;
 
   const handleLogout = () => {
@@ -227,6 +257,7 @@ export default function MainLayout() {
       onOk() {
         useCatalogStore.getState().reset();
         logout();
+        clearAuth();
         navigate("/login");
       },
     });
@@ -237,6 +268,7 @@ export default function MainLayout() {
       darkMode={darkMode}
       notifications={notifications}
       clearAll={clearAll}
+      onNotificationClick={handleNotificationClick}
       search={notifSearch}
       onSearchChange={setNotifSearch}
       actionFilter={notifActionFilter}

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Form, Input, Button, Spin, Divider } from "antd";
 import { UserOutlined, LockOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link, useSearchParams } from "react-router-dom";
 import { request } from "../../util/request";
 import { setAuth } from "../../util/auth";
 import { ProfileStore } from "../../store/ProfileStore";
@@ -28,6 +28,8 @@ const LoginPage = () => {
   const [otpForm] = Form.useForm();
   const navigate  = useNavigate();
   const location  = useLocation();
+  const [searchParams] = useSearchParams();
+  const sessionExpiredNotice = searchParams.get("session") === "expired";
   const resetEmail = typeof location.state?.email === "string" ? location.state.email : "";
   const verifyingRef = useRef(false);
 
@@ -131,6 +133,13 @@ const LoginPage = () => {
           </div>
 
           {/* Inline error banner */}
+          {sessionExpiredNotice && !errorMsg && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-[10px] bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <ExclamationCircleOutlined className="shrink-0 text-amber-600" />
+              <span>Your session has expired. Please sign in again.</span>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-[10px] bg-red-50 border border-red-200 text-red-600 text-sm">
               <ExclamationCircleOutlined className="shrink-0 text-red-500" />

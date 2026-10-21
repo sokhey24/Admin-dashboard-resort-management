@@ -1,68 +1,57 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  fetchAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+} from "../util/notificationApi";
 
-export const useNotificationStore = create()(
-  persist(
-    (set, get) => ({
-      notifications: [], // [{ id, booking_code, user_name, status, created_at, read }]
+export const useNotificationStore = create((set, get) => ({
+  notifications: [],
+  unreadCount: 0,
+  loading: false,
+  error: null,
 
-      addBookingNotification: (booking) => {
-        const exists = get().notifications.find(n => n.id === `booking-${booking.id}`);
-        if (exists) return;
-        set(state => ({
-          notifications: [
-            {
-              id:           `booking-${booking.id}`,
-              booking_code: booking.booking_code ?? `BK-${booking.id}`,
-              user_name:    booking.user?.name ?? "Guest",
-              status:       booking.status,
-              created_at:   booking.created_at,
-              read:         false,
-            },
-            ...state.notifications,
-          ].slice(0, 50),
-        }));
-      },
-
-      syncFromBookings: (bookings) => {
-        if (!Array.isArray(bookings)) return;
-        bookings.forEach(b => {
-          const exists = get().notifications.find(n => n.id === `booking-${b.id}`);
-          if (!exists) {
-            set(state => ({
-              notifications: [
-                {
-                  id:           `booking-${b.id}`,
-                  booking_code: b.booking_code ?? `BK-${b.id}`,
-                  user_name:    b.user?.name ?? "Guest",
-                  status:       b.status,
-                  created_at:   b.created_at,
-                  read:         false,
-                },
-                ...state.notifications,
-              ].slice(0, 50),
-            }));
-          }
-        });
-      },
-
-      markAllRead: () =>
-        set(state => ({
-          notifications: state.notifications.map(n => ({ ...n, read: true })),
-        })),
-
-      markRead: (id) =>
-        set(state => ({
-          notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n),
-        })),
-
-      clearAll: () => set({ notifications: [] }),
-
-      unreadCount: () => get().notifications.filter(n => !n.read).length,
-    }),
-    {
-      name:    "ResortNotifications",
-      storage: createJSONStorage(() => localStorage),
+  fetchNotifications: async (options = {}) => {
+    const silent = Boolean(options.silent);
+    if (!silent) set({ loading: true, error: null });
+    const res = await fetchAdminNotifications({ per_page: 50, unread: options.unreadOnly });
+    if (res?.status && res.status >= 400) {
+      set({
+        loading: false,
+        error: res.errors?.message ?? "Failed to load notifications",
+      });
+      return;
     }
-  )
-);
+    set({
+      notifications: Array.isArray(res?.data) ? res.data : [],
+      unreadCount: typeof res?.unread_count === "number" ? res.unread_count : 0,
+      loading: false,
+      error: null,
+    });
+  },
+
+  markRead: async (id) => {
+    const res = await markAdminNotificationRead(id);
+    if (res?.status && res.status >= 400) return;
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      ),
+      unreadCount:
+        typeof res?.unread_count === "number"
+          ? res.unread_count
+          : Math.max(0, state.unreadCount - 1),
+    }));
+  },
+
+  markAllRead: async () => {
+    const res = await markAllAdminNotificationsRead();
+    if (res?.status && res.status >= 400) return;
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+      unreadCount: 0,
+    }));
+  },
+
+  clearAll: () => get().markAllRead(),
+}));

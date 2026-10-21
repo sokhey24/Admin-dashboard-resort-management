@@ -26,6 +26,7 @@ export default function NotificationPanel({
   darkMode,
   notifications,
   clearAll,
+  onNotificationClick,
   search,
   onSearchChange,
   actionFilter,
@@ -168,7 +169,18 @@ export default function NotificationPanel({
             return (
               <div
                 key={n.id ?? `${tab}-${index}`}
+                role={onNotificationClick ? "button" : undefined}
+                tabIndex={onNotificationClick ? 0 : undefined}
+                onClick={() => onNotificationClick?.(n)}
+                onKeyDown={(e) => {
+                  if (onNotificationClick && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    onNotificationClick(n);
+                  }
+                }}
                 className={`px-4 py-3 flex gap-3 border-b transition-colors ${
+                  onNotificationClick ? "cursor-pointer" : ""
+                } ${
                   darkMode
                     ? "border-slate-800 hover:bg-slate-800/60"
                     : "border-slate-50 hover:bg-slate-50"

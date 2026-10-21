@@ -7,6 +7,8 @@ use App\Models\Invoice;
 use App\Services\PaymentReceiptService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
@@ -73,5 +75,28 @@ class InvoiceController extends Controller
     public function destroy(): JsonResponse
     {
         return response()->json(['errors' => ['message' => 'Invoices cannot be deleted.']], 422);
+    }
+
+    public function downloadPdf(Request $request, Invoice $invoice): StreamedResponse|JsonResponse
+    {
+        $invoice->load('booking');
+        $user = $request->user();
+        $booking = $invoice->booking;
+        if ($booking && $user && ! $user->canViewAllResortData()) {
+            app(\App\Services\ResortAccessService::class)->assertResortAccessible($user, (int) $booking->resort_id);
+        }
+
+        if (! $invoice->pdf_path) {
+            return response()->json(['errors' => ['message' => 'Invoice PDF is not available yet.']], 404);
+        }
+
+        $disk = $invoice->pdf_disk ?: 'local';
+        if (! Storage::disk($disk)->exists($invoice->pdf_path)) {
+            return response()->json(['errors' => ['message' => 'Invoice PDF file is missing.']], 404);
+        }
+
+        $filename = basename($invoice->pdf_path);
+
+        return Storage::disk($disk)->download($invoice->pdf_path, $filename);
     }
 }

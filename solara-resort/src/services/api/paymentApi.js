@@ -16,3 +16,15 @@ export async function verifyKhqrPayment(paymentId) {
   const { data } = await axiosClient.post(`customer/payments/${paymentId}/khqr/verify`);
   return data;
 }
+
+export async function createStripePaymentIntent(bookingId, clientRequestId) {
+  const { data } = await axiosClient.post(`customer/bookings/${bookingId}/stripe/payment-intent`, {
+    client_request_id: clientRequestId,
+  });
+  return data?.data ?? data;
+}
+
+export async function syncStripePayment(paymentId) {
+  const { data } = await axiosClient.post(`customer/payments/${paymentId}/stripe/sync`);
+  return data;
+}

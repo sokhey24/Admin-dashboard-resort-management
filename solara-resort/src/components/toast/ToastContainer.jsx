@@ -32,7 +32,6 @@ export const ToastContainer = () => {
           return (
             <motion.div
               key={toast.id}
-              layout
               initial={{ opacity: 0, x: enterX }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: exitX }}

@@ -47,6 +47,17 @@ return [
         'redirect'      => env('FACEBOOK_REDIRECT', env('APP_URL') . '/auth/facebook/callback'),
     ],
 
+    'resort' => [
+        'staff_inbox' => env('RESORT_STAFF_INBOX', env('MAIL_FROM_ADDRESS', '')),
+    ],
+
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'currency' => strtoupper((string) env('STRIPE_CURRENCY', 'USD')),
+    ],
+
     'bakong' => [
         'token' => env('BAKONG_TOKEN'),
         'account_id' => env('BAKONG_ACCOUNT_ID', 'sokhey_van@bkrt'),

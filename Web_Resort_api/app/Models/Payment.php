@@ -15,6 +15,7 @@ class Payment extends Model
         'paid_amount', 'balance', 'refund_amount',
         'status', 'paid_at', 'refunded_at', 'note',
         'khqr_md5', 'qr_payload', 'bakong_hash', 'expires_at',
+        'stripe_payment_intent_id', 'card_brand', 'client_request_id',
         'created_by', 'updated_by',
     ];
 

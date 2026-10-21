@@ -12,21 +12,29 @@ export const FavoriteButton = ({
   const {
     isFavoriteResort,
     isFavoriteRoom,
+    isFavoriteDish,
     toggleFavoriteResort,
     toggleFavoriteRoom,
+    toggleFavoriteDish,
     t,
   } = useApp();
 
   if (id == null || id === '') return null;
 
   const active =
-    kind === 'room' ? isFavoriteRoom(id) : isFavoriteResort(id);
+    kind === 'room'
+      ? isFavoriteRoom(id)
+      : kind === 'dish'
+        ? isFavoriteDish(id)
+        : isFavoriteResort(id);
 
   const handleClick = (event) => {
     event.preventDefault();
     event.stopPropagation();
     if (kind === 'room') {
       toggleFavoriteRoom(id);
+    } else if (kind === 'dish') {
+      toggleFavoriteDish(id);
     } else {
       toggleFavoriteResort(id);
     }
@@ -57,7 +65,7 @@ export const FavoriteButton = ({
       title={label}
       whileTap={reduced ? undefined : { scale: [1, 1.15, 1] }}
       transition={{ duration: 0.2 }}
-      className={`inline-flex items-center justify-center rounded-full border backdrop-blur-md transition-colors duration-200 shrink-0 ${sizeClasses} ${
+      className={`inline-flex items-center justify-center rounded-full border backdrop-blur-md transition-colors duration-200 shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${sizeClasses} ${
         active
           ? 'bg-gold/20 border-gold/60 text-gold shadow-sm'
           : 'bg-slate-950/75 border-white/15 text-white hover:border-gold/40 hover:text-gold-light'

@@ -9,6 +9,16 @@ import {
   clampGuestCount,
   validateBookingForm,
 } from './activityBookingUtils.js';
+import { submitActivityBooking } from '../../services/api/activityApi.js';
+import { getApiErrorMessage, getValidationFieldErrors } from '../../services/api/errors.js';
+
+const API_FIELD_TO_FORM = {
+  booking_date: 'bookingDate',
+  guest_count: 'guestCount',
+  guest_name: 'guestName',
+  guest_email: 'guestEmail',
+  guest_phone: 'guestPhone',
+};
 
 const fieldClass =
   'w-full bg-surface border text-text rounded-[var(--radius-input)] p-2.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus:border-gold';
@@ -31,6 +41,8 @@ export function ActivityBookingModal({
   const [guestPhone, setGuestPhone] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -41,6 +53,8 @@ export function ActivityBookingModal({
     setGuestPhone(user?.phone ?? '');
     setSpecialRequests('');
     setFieldErrors({});
+    setSubmitError('');
+    setIsSubmitting(false);
     setSuccess(false);
   }, [user]);
 
@@ -85,9 +99,9 @@ export function ActivityBookingModal({
     setFieldErrors((prev) => ({ ...prev, guestCount: undefined }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!activity) return;
+    if (!activity || isSubmitting) return;
 
     const errors = validateBookingForm({
       bookingDate,
@@ -100,7 +114,47 @@ export function ActivityBookingModal({
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    setSuccess(true);
+    const guests = clampGuestCount(guestCount);
+    const estimatedTotal = activity.pricePerPerson * guests;
+
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const result = await submitActivityBooking({
+        activity_title: display.title,
+        activity_id: activity.id ?? null,
+        booking_date: bookingDate,
+        guest_count: guests,
+        total_price: estimatedTotal,
+        guest_name: guestName.trim(),
+        guest_email: guestEmail.trim(),
+        guest_phone: guestPhone.trim(),
+        special_requests: specialRequests.trim() || null,
+      });
+
+      if (!result?.success) {
+        setSubmitError(t('activities.bookingFailed', 'Unable to submit your activity booking. Please try again.'));
+        return;
+      }
+
+      setSuccess(true);
+    } catch (err) {
+      const apiErrors = getValidationFieldErrors(err);
+      if (Object.keys(apiErrors).length > 0) {
+        const mapped = {};
+        Object.entries(apiErrors).forEach(([key, message]) => {
+          const formKey = API_FIELD_TO_FORM[key] ?? key;
+          mapped[formKey] = message;
+        });
+        setFieldErrors(mapped);
+      }
+      setSubmitError(
+        getApiErrorMessage(err, t('activities.bookingFailed', 'Unable to submit your activity booking. Please try again.'))
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!activity || !display) return null;
@@ -140,7 +194,7 @@ export function ActivityBookingModal({
           <p className="text-sm text-muted leading-relaxed max-w-md mx-auto">
             {t(
               'activities.reservationSuccessNote',
-              'Your request has been prepared successfully. This is a UI demonstration only—no booking was sent to the server.'
+              'Your request has been submitted. Our concierge team will confirm availability and contact you shortly.'
             )}
           </p>
           <Button variant="gold" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose}>
@@ -329,12 +383,27 @@ export function ActivityBookingModal({
             </div>
           </div>
 
+          {submitError && (
+            <p className="text-[11px] text-error" role="alert">
+              {submitError}
+            </p>
+          )}
+
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t border-border sticky bottom-0 bg-surface pb-1">
-            <Button variant="outline" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose}>
+            <Button variant="outline" size="sm" type="button" className="w-full sm:w-auto" onClick={handleClose} disabled={isSubmitting}>
               {t('common.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" variant="gold" size="sm" className="w-full sm:w-auto min-w-[140px]">
-              {t('activities.reserveExp', 'Reserve Experience')}
+            <Button
+              type="submit"
+              variant="gold"
+              size="sm"
+              className="w-full sm:w-auto min-w-[140px]"
+              isLoading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? t('activities.submitting', 'Submitting…')
+                : t('activities.reserveExp', 'Reserve Experience')}
             </Button>
           </div>
         </form>

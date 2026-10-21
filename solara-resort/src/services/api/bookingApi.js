@@ -1,7 +1,7 @@
 import axiosClient from './axiosClient.js';
 
-export async function fetchBookingQuote(payload) {
-  const { data } = await axiosClient.post('customer/booking/quote', payload);
+export async function fetchBookingQuote(payload, config = {}) {
+  const { data } = await axiosClient.post('customer/booking/quote', payload, config);
   return data?.data ?? data;
 }
 
@@ -22,5 +22,18 @@ export async function fetchMyBookings() {
 
 export async function updateBookingRequest(bookingId, payload) {
   const { data } = await axiosClient.put(`customer/bookings/${bookingId}`, payload);
+  return data?.data ?? data;
+}
+
+export async function fetchRescheduleQuote(bookingId, payload) {
+  const { data } = await axiosClient.post(
+    `customer/bookings/${bookingId}/reschedule/quote`,
+    payload
+  );
+  return data?.data ?? data;
+}
+
+export async function applyBookingReschedule(bookingId, payload) {
+  const { data } = await axiosClient.post(`customer/bookings/${bookingId}/reschedule`, payload);
   return data?.data ?? data;
 }

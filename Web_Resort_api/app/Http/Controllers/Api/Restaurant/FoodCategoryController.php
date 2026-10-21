@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api\Restaurant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Restaurant\StoreFoodCategoryRequest;
+use App\Http\Resources\FoodCategoryResource;
 use App\Models\Branch;
 use App\Models\FoodCategory;
 use App\Services\BranchAccessService;
 use App\Services\ResortAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class FoodCategoryController extends Controller
@@ -21,16 +23,19 @@ class FoodCategoryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = FoodCategory::query()->with('branch:id,name');
+        $query = FoodCategory::query()
+            ->with('branch:id,name')
+            ->withCount('menuItems');
 
-        $this->resortAccess->applyResortColumnScope(
-            $query,
-            $request->user(),
-            'resort_id',
-            $request->input('resort_id')
-        );
-
-        if (Schema::hasColumn('food_categories', 'branch_id')) {
+        if ($this->isCustomerCatalog($request)) {
+            $query->where('status', 'active');
+        } else {
+            $this->resortAccess->applyResortColumnScope(
+                $query,
+                $request->user(),
+                'resort_id',
+                $request->input('resort_id')
+            );
             $this->branchAccess->applyBranchColumnScope(
                 $query,
                 $request->user(),
@@ -39,48 +44,49 @@ class FoodCategoryController extends Controller
             );
         }
 
-        return response()->json($query->get());
+        $categories = $query->orderBy('name')->get();
+
+        return response()->json(FoodCategoryResource::collection($categories)->resolve());
     }
 
-    public function store(Request $request): JsonResponse
+    public function show(Request $request, FoodCategory $foodCategory): JsonResponse
     {
-        $rules = [
-            'resort_id'   => 'required|exists:resorts,id',
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ];
-
-        if (Schema::hasColumn('food_categories', 'branch_id')) {
-            $rules['branch_id'] = 'required|exists:branches,id';
+        if (! $this->isCustomerCatalog($request)) {
+            $this->assertCategoryAccessible($request, $foodCategory);
         }
 
-        $validated = $request->validate($rules);
+        return response()->json(
+            (new FoodCategoryResource($foodCategory->load('branch:id,name')->loadCount('menuItems')))->resolve()
+        );
+    }
+
+    public function store(StoreFoodCategoryRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        unset($validated['image']);
         $this->assertBranchForResort($validated);
 
         if (! empty($validated['branch_id'])) {
             $this->branchAccess->assertBranchAccessible($request->user(), (int) $validated['branch_id']);
         }
 
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('food-categories', 'public');
+        }
+
         $category = FoodCategory::create($validated);
 
-        return response()->json($category->load('branch:id,name'), 201);
+        return response()->json(
+            (new FoodCategoryResource($category->load('branch:id,name')->loadCount('menuItems')))->resolve(),
+            201
+        );
     }
 
     public function update(Request $request, FoodCategory $foodCategory): JsonResponse
     {
         $this->assertCategoryAccessible($request, $foodCategory);
 
-        $rules = [
-            'resort_id'   => 'sometimes|exists:resorts,id',
-            'name'        => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-        ];
-
-        if (Schema::hasColumn('food_categories', 'branch_id')) {
-            $rules['branch_id'] = 'sometimes|exists:branches,id';
-        }
-
-        $validated = $request->validate($rules);
+        $validated = $this->validatedPayload($request, true);
         $merged = array_merge($foodCategory->only(['resort_id', 'branch_id']), $validated);
         $this->assertBranchForResort($merged);
 
@@ -88,17 +94,56 @@ class FoodCategoryController extends Controller
             $this->branchAccess->assertBranchAccessible($request->user(), (int) $validated['branch_id']);
         }
 
+        if ($request->hasFile('image')) {
+            $this->deleteStoredImage($foodCategory->image);
+            $validated['image'] = $request->file('image')->store('food-categories', 'public');
+        }
+
         $foodCategory->update($validated);
 
-        return response()->json($foodCategory->fresh()->load('branch:id,name'));
+        return response()->json($foodCategory->fresh()->load('branch:id,name')->loadCount('menuItems'));
     }
 
     public function destroy(Request $request, FoodCategory $foodCategory): JsonResponse
     {
         $this->assertCategoryAccessible($request, $foodCategory);
+
+        if ($foodCategory->menuItems()->exists()) {
+            throw ValidationException::withMessages([
+                'food_category' => ['Cannot delete a category that still has menu items. Move or delete those items first.'],
+            ]);
+        }
+
+        $this->deleteStoredImage($foodCategory->image);
         $foodCategory->delete();
 
         return response()->json(null, 204);
+    }
+
+    protected function validatedPayload(Request $request, bool $isUpdate): array
+    {
+        $required = $isUpdate ? 'sometimes' : 'required';
+
+        $rules = [
+            'resort_id' => $required.'|exists:resorts,id',
+            'branch_id' => $required.'|exists:branches,id',
+            'name' => $required.'|string|max:255',
+            'status' => 'sometimes|in:active,inactive',
+        ];
+
+        if ($request->hasFile('image')) {
+            $rules['image'] = 'image|max:2048';
+        }
+
+        $validated = $request->validate($rules);
+        unset($validated['image']);
+
+        return $validated;
+    }
+
+    protected function isCustomerCatalog(Request $request): bool
+    {
+        return $request->is('api/customer/*') || $request->is('customer/*');
     }
 
     protected function assertCategoryAccessible(Request $request, FoodCategory $category): void
@@ -135,5 +180,14 @@ class FoodCategoryController extends Controller
                 'branch_id' => ['The selected branch does not belong to this resort.'],
             ]);
         }
+    }
+
+    protected function deleteStoredImage(?string $path): void
+    {
+        if (! $path || preg_match('#^https?://#i', $path)) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
     }
 }

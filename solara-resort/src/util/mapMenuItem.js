@@ -5,15 +5,26 @@ export function mapMenuItemFromApi(item) {
 
   const category = item.category || {};
 
+  const categoryId = item.food_category_id ?? category.id ?? null;
+  const description = item.description?.trim() || '';
+  const ratingValue = item.rating != null ? Number(item.rating) : null;
+
   return {
-    id: item.id,
+    id: String(item.id),
     name: item.name || '',
-    description: item.description?.trim() || '',
+    description,
+    longDescription: description,
     price: Number(item.price) || 0,
     image: menuItemImageUrl(item),
-    categoryId: item.food_category_id ?? category.id ?? null,
+    category: categoryId != null ? String(categoryId) : '',
+    categoryId,
     categoryName: category.name || '',
-    isAvailable: Boolean(item.is_available),
+    categoryLabel: category.name || '',
+    isAvailable: item.is_available !== false && item.status !== 'inactive',
+    rating: Number.isFinite(ratingValue) ? ratingValue : null,
+    ingredients: Array.isArray(item.ingredients) ? item.ingredients : [],
+    dietary: Array.isArray(item.dietary) ? item.dietary : [],
+    chefNote: item.chef_note || item.chefNote || '',
   };
 }
 

@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class FoodOrder extends Model
 {
-    protected $fillable = ['user_id', 'restaurant_table_id', 'branch_id', 'booking_id', 'order_code', 'subtotal', 'tax', 'total', 'status', 'note'];
+    protected $fillable = [
+        'user_id', 'restaurant_table_id', 'branch_id', 'booking_id', 'order_code', 'client_request_id',
+        'fulfillment_type', 'payment_method', 'subtotal', 'tax', 'service_charge', 'total', 'status', 'note',
+    ];
 
     public function restaurantTable() { return $this->belongsTo(RestaurantTable::class); }
 

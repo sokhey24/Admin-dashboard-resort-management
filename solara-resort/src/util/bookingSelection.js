@@ -32,10 +32,16 @@ export function parseBookingQuery(searchParams) {
   };
 }
 
-export function validateBookingStay({ roomId, checkIn, checkOut, adults }) {
+export function validateBookingStay({ roomId, roomIds, checkIn, checkOut, adults }) {
   const errors = [];
 
-  if (!roomId) {
+  const ids = Array.isArray(roomIds) && roomIds.length
+    ? roomIds
+    : roomId
+      ? [roomId]
+      : [];
+
+  if (!ids.length) {
     errors.push('Select an accommodation before continuing.');
   }
   if (!checkIn || !checkOut) {

@@ -2,6 +2,7 @@ import {
   fetchBranch,
   fetchBranchRooms,
   fetchBranches,
+  fetchGalleryPhotos,
   fetchResort,
   fetchResortGallery,
   fetchResorts,
@@ -12,6 +13,7 @@ import {
 import {
   mapBranchDetailFromApi,
   mapBranchFromApi,
+  mapGalleryPhotoFromApi,
   mapResortDetailFromApi,
   mapResortFromApi,
   mapRoomFromApi,
@@ -68,4 +70,9 @@ export async function queryRoomDetail(roomId) {
 export async function queryRoomTypes(params) {
   const payload = await fetchRoomTypes(params);
   return payload?.data ?? [];
+}
+
+export async function queryGalleryPhotos() {
+  const rows = await fetchGalleryPhotos();
+  return (Array.isArray(rows) ? rows : []).map(mapGalleryPhotoFromApi).filter(Boolean);
 }

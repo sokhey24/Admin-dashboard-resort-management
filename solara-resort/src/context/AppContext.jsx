@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { loadMyBookingsMapped } from '../hooks/useBooking.js';
 import { updateBookingRequest } from '../services/api/bookingApi.js';
 import { syncBookingNotifications } from '../util/bookingNotifications.js';
+import {
+  fetchCustomerNotifications,
+  markCustomerNotificationRead,
+} from '../services/api/notificationsApi.js';
+import { mapServerNotification } from '../util/mapServerNotification.js';
 import { getTranslation } from '../i18n/index.js';
 import {
   loginRequest,
@@ -24,6 +29,7 @@ import { setUnauthorizedHandler } from '../services/api/axiosClient.js';
 import { localize } from '../util/localize.js';
 import { loadPreferences, savePreferences } from '../store/preferenceStore.js';
 import { loadBookingDraft, saveBookingDraft } from '../store/bookingStore.js';
+import { normalizeRoomIds, syncDraftRoomFields } from '../util/roomIds.js';
 import { normalizeFavorites, toggleFavoriteId } from '../store/favoritesStore.js';
 
 const AppContext = createContext(undefined);
@@ -82,9 +88,10 @@ export const AppProvider = ({ children }) => {
     savePrefs({ theme });
   }, [theme]);
 
-  // Apply language to document
+  // Apply language to document (translate=no avoids browser auto-translate spinner on lang toggle)
   useEffect(() => {
     document.documentElement.setAttribute('lang', language);
+    document.documentElement.setAttribute('translate', 'no');
     savePrefs({ lang: language });
   }, [language]);
 
@@ -147,6 +154,11 @@ export const AppProvider = ({ children }) => {
     [favorites.rooms]
   );
 
+  const isFavoriteDish = useCallback(
+    (dishId) => favorites.dishes.includes(String(dishId)),
+    [favorites.dishes]
+  );
+
   const setTheme = (newTheme) => {
     setThemeState(newTheme);
   };
@@ -165,10 +177,24 @@ export const AppProvider = ({ children }) => {
     setCurrency(currency === 'USD' ? 'KHR' : 'USD');
   };
 
+  const LANG_SWITCH_TOAST_ID = 'toast-language-switch';
+
   const setLanguage = (lang) => {
+    if (lang !== 'en' && lang !== 'km') return;
+    if (lang === language) return;
     setLanguageState(lang);
-    savePrefs({ lang });
-    addToast(lang === 'km' ? 'ភាសាខ្មែរត្រូវបានជ្រើសរើស' : 'Language set to English', 'info');
+    const message = getTranslation(
+      lang,
+      'toast.langSwitched',
+      lang === 'km' ? 'ភាសាខ្មែរត្រូវបានជ្រើសរើស' : 'Language set to English'
+    );
+    setToasts((prev) => {
+      const withoutLang = prev.filter((toast) => toast.id !== LANG_SWITCH_TOAST_ID);
+      return [...withoutLang, { id: LANG_SWITCH_TOAST_ID, message, type: 'info' }];
+    });
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== LANG_SWITCH_TOAST_ID));
+    }, 3000);
   };
 
   const applySession = useCallback((apiUser, roles) => {
@@ -237,10 +263,39 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  const refreshNotifications = useCallback(async () => {
+    const gen = sessionGenRef.current;
+    if (!getAccessToken()) return;
+    try {
+      const payload = await fetchCustomerNotifications({ per_page: 50 });
+      if (gen !== sessionGenRef.current) return;
+      const server = (payload.data ?? []).map(mapServerNotification);
+      setNotifications((prev) => {
+        const merged = syncBookingNotifications(prev, bookings, language);
+        const paymentOnly = merged.filter((n) =>
+          String(n.id).startsWith('booking-alert-payment-')
+        );
+        const ephemeral = prev.filter(
+          (n) => !n.server && !String(n.id).startsWith('booking-alert-payment-')
+        );
+        return [...paymentOnly, ...server, ...ephemeral];
+      });
+    } catch {
+      setNotifications((prev) => syncBookingNotifications(prev, bookings, language));
+    }
+  }, [bookings, language]);
+
   useEffect(() => {
     if (!getAccessToken()) return;
     setNotifications((prev) => syncBookingNotifications(prev, bookings, language));
   }, [language, bookings]);
+
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    refreshNotifications();
+    const timer = window.setInterval(refreshNotifications, 90_000);
+    return () => window.clearInterval(timer);
+  }, [refreshNotifications]);
 
   const hydrateSession = useCallback(async () => {
     const token = getAccessToken();
@@ -267,19 +322,13 @@ export const AppProvider = ({ children }) => {
         return { ok: false, error: 'Session changed.' };
       }
       await refreshMyBookings();
+      await refreshNotifications();
       return { ok: true, user: mapped };
     } catch (error) {
       if (gen === sessionGenRef.current) clearSession();
       return { ok: false, error: getApiErrorMessage(error) };
     }
-  }, [applySessionWithFavorites, clearSession, refreshMyBookings]);
-
-  useEffect(() => {
-    setUnauthorizedHandler(() => {
-      clearSession();
-    });
-    return () => setUnauthorizedHandler(() => { });
-  }, [clearSession]);
+  }, [applySessionWithFavorites, clearSession, refreshMyBookings, refreshNotifications]);
 
   useEffect(() => {
     if (bootstrapRan.current) return;
@@ -513,38 +562,69 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  const setRoomForBooking = (resort, room) => {
-    const nextDraft = {
-      ...bookingDraft,
-      resortId: resort.id ?? room.resortId,
-      branchId: resort.catalogKind === 'branch' ? resort.id : (room.branchId ?? bookingDraft.branchId),
-      resortName: resort.name,
-      roomId: room.id,
-      roomName: room.name,
-      roomImage: room.featuredImage,
+  const setRoomForBooking = (resort, room, { append = false } = {}) => {
+    const prev = bookingDraft;
+    const roomIdNum = Number(room.id);
+    let roomIds = normalizeRoomIds(prev);
+    let roomSelections = Array.isArray(prev.roomSelections) ? [...prev.roomSelections] : [];
+
+    const selectionEntry = {
+      id: room.id,
+      name: room.name,
+      image: room.featuredImage,
+      resortName: room.resortName,
     };
+
+    if (append && roomIdNum > 0 && !roomIds.includes(roomIdNum)) {
+      roomIds = [...roomIds, roomIdNum];
+      roomSelections.push(selectionEntry);
+    } else if (!append) {
+      roomIds = roomIdNum > 0 ? [roomIdNum] : [];
+      roomSelections = roomIdNum > 0 ? [selectionEntry] : [];
+    }
+
+    const displayName =
+      roomSelections.length > 1
+        ? `${roomSelections.length} ${roomSelections.length === 1 ? 'room' : 'rooms'}`
+        : roomSelections[0]?.name || room.name;
+
+    const nextDraft = syncDraftRoomFields({
+      ...prev,
+      resortId: resort.id ?? room.resortId,
+      branchId: resort.catalogKind === 'branch' ? resort.id : (room.branchId ?? prev.branchId),
+      resortName: resort.name,
+      roomIds,
+      roomSelections,
+      roomName: displayName,
+      roomImage: roomSelections[0]?.image || room.featuredImage,
+    });
+    setBookingDraft(nextDraft);
+    saveBookingDraft(nextDraft);
+  };
+
+  const addRoomToStay = (resort, room) => setRoomForBooking(resort, room, { append: true });
+
+  const removeRoomFromStay = (targetRoomId) => {
+    const id = Number(targetRoomId);
+    const prev = bookingDraft;
+    const roomIds = normalizeRoomIds(prev).filter((rid) => rid !== id);
+    const roomSelections = (prev.roomSelections || []).filter((r) => Number(r.id) !== id);
+    const nextDraft = syncDraftRoomFields({
+      ...prev,
+      roomIds,
+      roomSelections,
+      roomName:
+        roomSelections.length > 1
+          ? `${roomSelections.length} rooms`
+          : roomSelections[0]?.name || '',
+      roomImage: roomSelections[0]?.image || '',
+    });
     setBookingDraft(nextDraft);
     saveBookingDraft(nextDraft);
   };
 
   const registerBooking = (booking) => {
     if (!booking) return;
-
-    const createdNotif = {
-      id: `notif-created-${booking.apiId}`,
-      title:
-        language === 'km'
-          ? `ការកក់ត្រូវបានរក្សាទុក (#${booking.id})`
-          : `Reservation saved (#${booking.id})`,
-      message:
-        language === 'km'
-          ? `${booking.roomName} · ${booking.resortName} (${booking.checkIn} – ${booking.checkOut})`
-          : `${booking.roomName} at ${booking.resortName} (${booking.checkIn} – ${booking.checkOut})`,
-      date: 'Just now',
-      read: false,
-      type: 'booking',
-      bookingApiId: booking.apiId,
-    };
 
     setBookings((prev) => {
       const exists = prev.some((b) => b.apiId === booking.apiId || b.id === booking.id);
@@ -555,7 +635,7 @@ export const AppProvider = ({ children }) => {
         : [booking, ...prev];
     });
 
-    setNotifications((nPrev) => [createdNotif, ...nPrev]);
+    refreshNotifications();
   };
 
   const cancelBooking = async (id) => {
@@ -579,7 +659,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const markNotificationRead = (id) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications((prev) => {
+      const row = prev.find((n) => n.id === id);
+      if (row?.server) {
+        markCustomerNotificationRead(id).catch(() => {});
+      }
+      return prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+    });
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -591,6 +677,19 @@ export const AppProvider = ({ children }) => {
       removeToast(id);
     }, 4000);
   };
+
+  useEffect(() => {
+    setUnauthorizedHandler((meta) => {
+      clearSession();
+      if (meta?.from === 'request') {
+        addToast(
+          t('auth.sessionExpired', 'Your session has expired. Please sign in again.'),
+          'info'
+        );
+      }
+    });
+    return () => setUnauthorizedHandler(() => {});
+  }, [clearSession, t]);
 
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -656,6 +755,36 @@ export const AppProvider = ({ children }) => {
     [persistFavoritesToServer, t]
   );
 
+  const toggleFavoriteDish = useCallback(
+    (dishId) => {
+      if (!getAccessToken() || favoritesUserIdRef.current == null) {
+        addToast(t('account.signInRequired', 'Sign in to save favorites'), 'info');
+        return;
+      }
+      const gen = sessionGenRef.current;
+      const key = String(dishId);
+      setFavoritesState((prev) => {
+        const next = normalizeFavorites({
+          ...prev,
+          dishes: toggleFavoriteId(prev.dishes, key),
+        });
+        const added = next.dishes.includes(key);
+        addToast(
+          added
+            ? t('favorites.addedDish', 'Dish saved to favorites')
+            : t('favorites.removedDish', 'Dish removed from favorites'),
+          'info'
+        );
+        if (favoritesSyncRef.current) clearTimeout(favoritesSyncRef.current);
+        favoritesSyncRef.current = setTimeout(() => {
+          persistFavoritesToServer(next, gen);
+        }, 400);
+        return next;
+      });
+    },
+    [persistFavoritesToServer, t]
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -684,6 +813,8 @@ export const AppProvider = ({ children }) => {
         bookingDraft,
         updateBookingDraft,
         setRoomForBooking,
+        addRoomToStay,
+        removeRoomFromStay,
         bookings,
         bookingsLoading,
         bookingsError,
@@ -699,8 +830,10 @@ export const AppProvider = ({ children }) => {
         favorites,
         isFavoriteResort,
         isFavoriteRoom,
+        isFavoriteDish,
         toggleFavoriteResort,
         toggleFavoriteRoom,
+        toggleFavoriteDish,
       }}
     >
       {children}

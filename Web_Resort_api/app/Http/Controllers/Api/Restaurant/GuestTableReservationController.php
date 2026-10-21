@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Restaurant;
 
+use App\Events\TableReservationRequested;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Restaurant\StoreGuestTableReservationRequest;
 use App\Models\TableReservation;
@@ -29,6 +30,8 @@ class GuestTableReservationController extends Controller
             'note' => $validated['note'] ?? null,
             'status' => 'pending',
         ]);
+
+        event(new TableReservationRequested($reservation->id));
 
         return response()->json([
             'success' => true,

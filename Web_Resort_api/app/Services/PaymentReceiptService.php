@@ -129,6 +129,8 @@ class PaymentReceiptService
             'gateway'           => $payment->gateway,
             'payment_reference' => $payment->payment_reference,
             'card_last4'        => $payment->card_last4, // already masked in model accessor
+            'card_brand'        => $payment->card_brand,
+            'stripe_payment_intent_id' => $payment->stripe_payment_intent_id,
             'paid_at'           => $payment->paid_at?->toIso8601String(),
             'refunded_at'       => $payment->refunded_at?->toIso8601String(),
             'notes'             => $payment->note,
@@ -342,6 +344,125 @@ class PaymentReceiptService
             'filename' => $filename,
             'url'      => Storage::url("receipts/{$filename}"),
         ];
+    }
+
+    /**
+     * Store an invoice PDF on the private local disk (not web-public).
+     */
+    public function generatePrivateInvoicePdf(Invoice $invoice, ?Payment $payment = null, ?string $generatedBy = null): Invoice
+    {
+        if ($invoice->pdf_path) {
+            return $invoice;
+        }
+
+        $invoice->loadMissing('booking.payments');
+        $booking = $invoice->booking;
+        if (! $booking) {
+            return $invoice;
+        }
+
+        $payment = $payment
+            ?? ($invoice->payment_id ? Payment::find($invoice->payment_id) : null)
+            ?? $booking->payments()->where('status', 'paid')->latest()->first();
+
+        if (! $payment) {
+            return $invoice;
+        }
+
+        $data = $this->buildReceiptData($payment, $generatedBy);
+        $doc = $this->buildPaymentInvoiceDocument($payment, $generatedBy);
+        $filename = preg_replace('/[^A-Za-z0-9._-]+/', '_', $invoice->invoice_number).'.pdf';
+        $path = "invoices/{$invoice->id}/{$filename}";
+
+        $pdf = Pdf::loadView('receipts.payment', compact('data', 'doc'))
+            ->setPaper([0, 0, 340, 720], 'portrait');
+
+        Storage::disk('local')->put($path, $pdf->output());
+
+        $invoice->update([
+            'pdf_disk' => 'local',
+            'pdf_path' => $path,
+            'pdf_generated_at' => now(),
+        ]);
+
+        return $invoice->fresh();
+    }
+
+    /**
+     * Consolidated folio invoice (lodging + incidentals) on the private disk.
+     *
+     * @param  array<string, mixed>  $folioSummary
+     */
+    public function generateFolioConsolidatedPdf(Invoice $invoice, Booking $booking, array $folioSummary): Invoice
+    {
+        $booking->loadMissing(['user', 'resort', 'rooms.roomType', 'payments']);
+        $totals = $folioSummary['totals'] ?? [];
+        $lines = array_merge(
+            $folioSummary['room_charges'] ?? [],
+            array_map(fn ($row) => [
+                'type' => $row['charge_type'] ?? 'incidental',
+                'description' => $row['description'] ?? '',
+                'quantity' => $row['quantity'] ?? 1,
+                'unit_price' => $row['unit_price'] ?? 0,
+                'amount' => $row['amount'] ?? 0,
+            ], $folioSummary['incidental_charges'] ?? [])
+        );
+
+        $payment = $booking->payments()->where('status', 'paid')->latest()->first();
+        $data = $payment
+            ? $this->buildReceiptData($payment)
+            : [
+                'payment_id' => $invoice->invoice_number,
+                'source' => 'resort',
+                'status' => $invoice->status,
+                'amount' => $totals['charges_total'] ?? 0,
+                'guest' => ['name' => $booking->user?->name, 'email' => $booking->user?->email],
+            ];
+
+        $doc = [
+            'invoice' => [
+                'invoice_number' => $invoice->invoice_number,
+                'status' => $invoice->status,
+                'issued_at' => ($invoice->issued_at ?? now())->toIso8601String(),
+            ],
+            'booking' => [
+                'booking_code' => $booking->booking_code,
+                'status' => $booking->status,
+                'resort' => ['name' => $booking->resort?->name],
+            ],
+            'guest' => $data['guest'] ?? null,
+            'stay' => [
+                'check_in' => $booking->check_in?->toIso8601String(),
+                'check_out' => $booking->check_out?->toIso8601String(),
+            ],
+            'line_items' => $lines,
+            'breakdown' => [
+                'subtotal' => $totals['lodging_subtotal'] ?? 0,
+                'discount' => $totals['lodging_discount'] ?? 0,
+                'tax' => ($totals['lodging_tax'] ?? 0),
+                'service_charge' => ($totals['lodging_service'] ?? 0),
+                'incidentals' => $totals['incidentals_total'] ?? 0,
+                'total' => $totals['charges_total'] ?? 0,
+                'paid' => $totals['net_paid'] ?? 0,
+                'balance' => $totals['balance_due'] ?? 0,
+            ],
+        ];
+
+        $filename = preg_replace('/[^A-Za-z0-9._-]+/', '_', $invoice->invoice_number).'.pdf';
+        $path = "invoices/{$invoice->id}/{$filename}";
+
+        $pdf = Pdf::loadView('receipts.payment', compact('data', 'doc'))
+            ->setPaper([0, 0, 340, 720], 'portrait');
+
+        Storage::disk('local')->put($path, $pdf->output());
+
+        $invoice->update([
+            'pdf_disk' => 'local',
+            'pdf_path' => $path,
+            'pdf_generated_at' => now(),
+        ]);
+
+        return $invoice->fresh();
     }
 
     /**

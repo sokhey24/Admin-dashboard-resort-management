@@ -28,6 +28,8 @@ class UpdatePreferencesRequest extends FormRequest
             'favorites.resorts.*' => 'string|max:64',
             'favorites.rooms' => 'sometimes|array|max:200',
             'favorites.rooms.*' => 'string|max:64',
+            'favorites.dishes' => 'sometimes|array|max:200',
+            'favorites.dishes.*' => 'string|max:64',
         ];
     }
 

@@ -285,15 +285,31 @@ class ReviewService
         $review->delete();
     }
 
-    public function assertAccessible(Review $review, User $user): void
+    public function assertAccessible(Review $review, ?User $user): void
     {
+        if (! $user) {
+            abort(403, 'You cannot access this review.');
+        }
+
+        if ($user->isGuestAccount()) {
+            if ((int) $review->user_id !== (int) $user->id) {
+                abort(403, 'You cannot access this review.');
+            }
+
+            return;
+        }
+
         if ($user->roles()->where('name', 'admin')->exists()) {
             return;
         }
 
         $assigned = $user->resorts()->pluck('resorts.id');
         if ($assigned->isEmpty()) {
-            return;
+            if ($user->canViewAllResortData()) {
+                return;
+            }
+
+            abort(403, 'You cannot access reviews for this resort.');
         }
 
         if (! $assigned->contains((int) $review->resort_id)) {

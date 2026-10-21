@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Empty, message, Pagination } from 'antd';
 import {
   FiCalendar,
@@ -44,7 +44,12 @@ function NotificationCard() {
     markRead,
     markAllRead,
     clearAll,
+    fetchNotifications,
   } = useNotificationStore();
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const [activeTab, setActiveTab] = useState('today');
   const [contentTab, setContentTab] = useState('booking');

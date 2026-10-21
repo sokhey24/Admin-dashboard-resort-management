@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Activity;
 
+use App\Events\ActivityBookingCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Activity\StoreActivityBookingRequest;
 use App\Models\ActivityBooking;
@@ -26,6 +27,8 @@ class ActivityBookingController extends Controller
             'special_requests' => $validated['special_requests'] ?? null,
             'status' => 'pending',
         ]);
+
+        event(new ActivityBookingCreated($booking->id));
 
         return response()->json([
             'success' => true,
