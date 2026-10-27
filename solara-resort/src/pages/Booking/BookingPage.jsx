@@ -28,7 +28,12 @@ import {
   parseBookingQuery,
   validateBookingStay,
 } from '../../util/bookingSelection.js';
-import { normalizeRoomIds, roomIdsFromSortKey, roomIdsSortKey } from '../../util/roomIds.js';
+import {
+  normalizeRoomIds,
+  reconcileRoomSelections,
+  roomIdsFromSortKey,
+  roomIdsSortKey,
+} from '../../util/roomIds.js';
 import { MultiRoomCart } from '../../components/booking/MultiRoomCart.jsx';
 
 export const BookingPage = () => {
@@ -71,10 +76,22 @@ export const BookingPage = () => {
     [roomIdsKey]
   );
 
-  const roomSelections =
-    Array.isArray(bookingDraft.roomSelections) && bookingDraft.roomSelections.length
+  const roomSelections = useMemo(() => {
+    const ids = selectedRoomIds;
+    if (!ids.length) return [];
+    const existing = Array.isArray(bookingDraft.roomSelections)
       ? bookingDraft.roomSelections
       : [];
+    const byId = new Map(
+      existing
+        .map((row) => {
+          const id = Number(row?.id);
+          return id > 0 ? [id, row] : null;
+        })
+        .filter(Boolean)
+    );
+    return ids.map((id) => byId.get(id) || { id, name: '', image: '', resortName: '' });
+  }, [selectedRoomIds, bookingDraft.roomSelections]);
 
   const { room: currentRoom } = useRoomDetail(selectedRoomIds[0] ?? bookingDraft.roomId);
 
@@ -83,6 +100,12 @@ export const BookingPage = () => {
       const updates = {};
       if (!bookingDraft.branchId && currentRoom.branchId) {
         updates.branchId = currentRoom.branchId;
+      }
+      if (!bookingDraft.branchName && currentRoom.resortName) {
+        updates.branchName = currentRoom.resortName;
+      }
+      if (!bookingDraft.roomTypeId && currentRoom.roomTypeId) {
+        updates.roomTypeId = currentRoom.roomTypeId;
       }
       if (!bookingDraft.roomName && currentRoom.name) {
         updates.roomName = currentRoom.name;
@@ -100,21 +123,48 @@ export const BookingPage = () => {
   }, [currentRoom, bookingDraft.branchId, bookingDraft.roomName, bookingDraft.resortName, bookingDraft.roomImage, updateBookingDraft]);
 
   useEffect(() => {
-    if (!currentRoom || roomSelections.length) return;
     const ids = roomIdsFromSortKey(roomIdsKey);
-    if (ids.length === 1 && ids[0] === Number(currentRoom.id)) {
-      updateBookingDraft({
-        roomSelections: [
-          {
-            id: currentRoom.id,
-            name: currentRoom.name,
-            image: currentRoom.featuredImage,
-            resortName: currentRoom.resortName,
-          },
-        ],
-      });
+    if (!ids.length) return;
+    const existing = Array.isArray(bookingDraft.roomSelections)
+      ? bookingDraft.roomSelections
+      : [];
+    const byId = new Map(
+      existing
+        .map((row) => {
+          const id = Number(row?.id);
+          return id > 0 ? [id, row] : null;
+        })
+        .filter(Boolean)
+    );
+    const needsStructureSync =
+      ids.length !== existing.length || ids.some((id) => !byId.has(id));
+    const currentId = currentRoom ? Number(currentRoom.id) : null;
+    const currentRow = currentId ? byId.get(currentId) : null;
+    const needsCurrentRoomMeta =
+      currentId != null && ids.includes(currentId) && !currentRow?.name;
+
+    if (!needsStructureSync && !needsCurrentRoomMeta) return;
+
+    let nextSelections = reconcileRoomSelections({
+      roomIds: ids,
+      roomSelections: existing,
+    }).roomSelections;
+
+    if (currentRoom && currentId != null && ids.includes(currentId)) {
+      nextSelections = nextSelections.map((row) =>
+        Number(row.id) === currentId
+          ? {
+              id: currentRoom.id,
+              name: currentRoom.name,
+              image: currentRoom.featuredImage,
+              resortName: currentRoom.resortName,
+            }
+          : row
+      );
     }
-  }, [currentRoom, roomSelections.length, roomIdsKey, updateBookingDraft]);
+
+    updateBookingDraft({ roomSelections: nextSelections });
+  }, [currentRoom, roomIdsKey, bookingDraft.roomSelections, updateBookingDraft]);
 
   const activeBranchId = bookingDraft.branchId || currentRoom?.branchId;
 

@@ -29,7 +29,11 @@ import { setUnauthorizedHandler } from '../services/api/axiosClient.js';
 import { localize } from '../util/localize.js';
 import { loadPreferences, savePreferences } from '../store/preferenceStore.js';
 import { loadBookingDraft, saveBookingDraft } from '../store/bookingStore.js';
-import { normalizeRoomIds, syncDraftRoomFields } from '../util/roomIds.js';
+import {
+  normalizeRoomIds,
+  reconcileRoomSelections,
+  syncDraftRoomFields,
+} from '../util/roomIds.js';
 import { normalizeFavorites, toggleFavoriteId } from '../store/favoritesStore.js';
 
 const AppContext = createContext(undefined);
@@ -556,71 +560,97 @@ export const AppProvider = ({ children }) => {
 
   const updateBookingDraft = (updates) => {
     setBookingDraft((prev) => {
-      const next = { ...prev, ...updates };
+      let next = syncDraftRoomFields({ ...prev, ...updates });
+      const roomIds = normalizeRoomIds(next);
+      const selections = Array.isArray(next.roomSelections) ? next.roomSelections : [];
+      const selectionIds = new Set(
+        selections.map((row) => Number(row?.id)).filter((rid) => rid > 0)
+      );
+      const idsMismatch =
+        roomIds.length !== selections.length ||
+        roomIds.some((rid) => !selectionIds.has(rid));
+      if (idsMismatch) {
+        next = reconcileRoomSelections(next);
+      }
       saveBookingDraft(next);
       return next;
     });
   };
 
-  const setRoomForBooking = (resort, room, { append = false } = {}) => {
-    const prev = bookingDraft;
-    const roomIdNum = Number(room.id);
-    let roomIds = normalizeRoomIds(prev);
-    let roomSelections = Array.isArray(prev.roomSelections) ? [...prev.roomSelections] : [];
+  const setRoomForBooking = (resort, room, { append = false, draftUpdates } = {}) => {
+    setBookingDraft((prev) => {
+      const base = draftUpdates ? { ...prev, ...draftUpdates } : prev;
+      const roomIdNum = Number(room.id);
+      let roomIds = normalizeRoomIds(base);
+      let roomSelections = Array.isArray(base.roomSelections) ? [...base.roomSelections] : [];
 
-    const selectionEntry = {
-      id: room.id,
-      name: room.name,
-      image: room.featuredImage,
-      resortName: room.resortName,
-    };
+      const selectionEntry = {
+        id: room.id,
+        name: room.name,
+        image: room.featuredImage,
+        resortName: room.resortName,
+      };
 
-    if (append && roomIdNum > 0 && !roomIds.includes(roomIdNum)) {
-      roomIds = [...roomIds, roomIdNum];
-      roomSelections.push(selectionEntry);
-    } else if (!append) {
-      roomIds = roomIdNum > 0 ? [roomIdNum] : [];
-      roomSelections = roomIdNum > 0 ? [selectionEntry] : [];
-    }
+      if (append && roomIdNum > 0 && !roomIds.includes(roomIdNum)) {
+        roomIds = [...roomIds, roomIdNum];
+        roomSelections.push(selectionEntry);
+      } else if (!append) {
+        roomIds = roomIdNum > 0 ? [roomIdNum] : [];
+        roomSelections = roomIdNum > 0 ? [selectionEntry] : [];
+      }
 
-    const displayName =
-      roomSelections.length > 1
-        ? `${roomSelections.length} ${roomSelections.length === 1 ? 'room' : 'rooms'}`
-        : roomSelections[0]?.name || room.name;
+      const displayName =
+        roomSelections.length > 1
+          ? `${roomSelections.length} ${roomSelections.length === 1 ? 'room' : 'rooms'}`
+          : roomSelections[0]?.name || room.name;
 
-    const nextDraft = syncDraftRoomFields({
-      ...prev,
-      resortId: resort.id ?? room.resortId,
-      branchId: resort.catalogKind === 'branch' ? resort.id : (room.branchId ?? prev.branchId),
-      resortName: resort.name,
-      roomIds,
-      roomSelections,
-      roomName: displayName,
-      roomImage: roomSelections[0]?.image || room.featuredImage,
+      const branchIdFromResort =
+        resort.catalogKind === 'branch' ? resort.id : (room.branchId ?? base.branchId);
+      const branchNameFromResort =
+        resort.catalogKind === 'branch' ? resort.name : base.branchName || '';
+      const roomTypeId =
+        room.roomTypeId != null && Number(room.roomTypeId) > 0
+          ? Number(room.roomTypeId)
+          : base.roomTypeId ?? null;
+
+      const nextDraft = syncDraftRoomFields({
+        ...base,
+        resortId: resort.resortId ?? resort.id ?? room.resortId,
+        branchId: branchIdFromResort != null ? Number(branchIdFromResort) : base.branchId,
+        branchName: base.branchName || branchNameFromResort || '',
+        roomTypeId,
+        resortName: resort.catalogKind === 'branch' ? resort.name : resort.name,
+        roomIds,
+        roomSelections,
+        roomName: displayName,
+        roomImage: roomSelections[0]?.image || room.featuredImage,
+      });
+      saveBookingDraft(nextDraft);
+      return nextDraft;
     });
-    setBookingDraft(nextDraft);
-    saveBookingDraft(nextDraft);
   };
 
-  const addRoomToStay = (resort, room) => setRoomForBooking(resort, room, { append: true });
+  const addRoomToStay = (resort, room, options) =>
+    setRoomForBooking(resort, room, { append: true, ...options });
 
   const removeRoomFromStay = (targetRoomId) => {
     const id = Number(targetRoomId);
-    const prev = bookingDraft;
-    const roomIds = normalizeRoomIds(prev).filter((rid) => rid !== id);
-    const roomSelections = (prev.roomSelections || []).filter((r) => Number(r.id) !== id);
-    const nextDraft = syncDraftRoomFields({
-      ...prev,
-      roomIds,
-      roomSelections,
-      roomName:
-        roomSelections.length > 1
-          ? `${roomSelections.length} rooms`
-          : roomSelections[0]?.name || '',
-      roomImage: roomSelections[0]?.image || '',
+    setBookingDraft((prev) => {
+      const roomIds = normalizeRoomIds(prev).filter((rid) => rid !== id);
+      const roomSelections = (prev.roomSelections || []).filter((r) => Number(r.id) !== id);
+      const nextDraft = syncDraftRoomFields({
+        ...prev,
+        roomIds,
+        roomSelections,
+        roomName:
+          roomSelections.length > 1
+            ? `${roomSelections.length} rooms`
+            : roomSelections[0]?.name || '',
+        roomImage: roomSelections[0]?.image || '',
+      });
+      saveBookingDraft(nextDraft);
+      return nextDraft;
     });
-    setBookingDraft(nextDraft);
-    saveBookingDraft(nextDraft);
   };
 
   const registerBooking = (booking) => {

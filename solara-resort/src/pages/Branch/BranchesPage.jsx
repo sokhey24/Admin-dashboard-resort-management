@@ -19,20 +19,22 @@ import { Pagination } from '../../components/common/Pagination.jsx';
 import { usePaginationMeta } from '../../hooks/useCatalog.js';
 import {
   applyDestinationRegionParams,
+  applySanctuaryTypeParams,
   sanctuaryRegionFromCriteria,
   sanctuaryRegionMatches,
 } from '../../util/searchParams.js';
+import {
+  SANCTUARY_TYPE_PILLS,
+  resolveActiveSanctuaryType,
+  isSanctuaryTypePillActive,
+} from '../../util/sanctuaryTypes.js';
 import heroImage from '../../assets/images/hero_solara_resort_1790692958491.jpg';
 import { StaggerItem } from '../../components/motion/StaggerItem.jsx';
 import { RevealOnScroll } from '../../components/motion/RevealOnScroll.jsx';
-
-const SIGNATURE_LOCATIONS = [
-  { key: '', label: 'All Locations', desc: 'Across Cambodia' },
-  { key: 'Kampot', label: 'Kampot', desc: 'Riverside & Bokor' },
-  { key: 'Kep', label: 'Kep', desc: 'Coastal Sanctuaries' },
-  { key: 'Siem Reap', label: 'Siem Reap', desc: 'Ancient Temples' },
-  { key: 'Koh Rong', label: 'Koh Rong', desc: 'Pristine Island' },
-];
+import {
+  BRANCH_LIST_GRID_CLASS,
+  BRANCH_LIST_SKELETON_IMAGE_CLASS,
+} from '../../constants/branchCardLayout.js';
 
 export const BranchesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,7 +69,10 @@ export const BranchesPage = () => {
     [criteria, branchOptions]
   );
 
-  const showingAllBranches = !criteria.branchId && !criteria.destination;
+  const activeSanctuaryType = useMemo(() => resolveActiveSanctuaryType(criteria), [criteria]);
+
+  const showingAllBranches =
+    !criteria.branchId && !criteria.destination && !criteria.region;
 
   const destinationOptions = useMemo(
     () => [
@@ -122,6 +127,7 @@ export const BranchesPage = () => {
     maxPriceParam,
     ratingParam,
     criteria.destination,
+    criteria.region,
     criteria.branchId,
     criteria.checkIn,
     criteria.checkOut,
@@ -147,7 +153,16 @@ export const BranchesPage = () => {
 
   const syncDestinationFilter = (destination) => {
     setPage(1);
-    setSearchParams(applyDestinationRegionParams(searchParams, destination || ''));
+    const next = applyDestinationRegionParams(searchParams, destination || '');
+    if (destination) {
+      next.delete('region');
+    }
+    setSearchParams(next);
+  };
+
+  const syncSanctuaryTypeFilter = (typeId) => {
+    setPage(1);
+    setSearchParams(applySanctuaryTypeParams(searchParams, typeId || ''));
   };
 
   const isSidebarOptionActive = (opt) => {
@@ -181,38 +196,47 @@ export const BranchesPage = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="bg-surface/80 backdrop-blur-md border border-border rounded-[var(--radius-card)] p-3 sm:p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-2 px-1 text-xs font-semibold text-gold uppercase tracking-wider">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>{t('branches.heroSelectorTitle', 'Select a Solara Sanctuary Location')}</span>
+        <div className="bg-surface/80 backdrop-blur-md border border-border rounded-[var(--radius-card)] p-4 sm:p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3 px-0.5 text-xs font-semibold text-gold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{t('branches.sanctuaryTypeTitle', 'Sanctuary Type / Region')}</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {SIGNATURE_LOCATIONS.map((loc) => {
-              const isSelected = sanctuaryRegionMatches(loc.key, activeRegion);
-
+          <div
+            className="flex flex-wrap gap-2"
+            role="tablist"
+            aria-label={t('branches.sanctuaryTypeTitle', 'Sanctuary Type / Region')}
+          >
+            {SANCTUARY_TYPE_PILLS.map((pill) => {
+              const isSelected = isSanctuaryTypePillActive(pill.id, criteria);
               return (
                 <button
-                  key={loc.label}
+                  key={pill.id || 'all'}
                   type="button"
-                  onClick={() => syncDestinationFilter(loc.key)}
-                  className={`flex flex-col text-left p-3 rounded-[var(--radius-button)] transition-all duration-300 border cursor-pointer ${
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => syncSanctuaryTypeFilter(pill.id)}
+                  className={`px-4 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider border transition-all duration-300 cursor-pointer ${
                     isSelected
-                      ? 'bg-gold/15 border-gold shadow-md text-text font-semibold'
-                      : 'bg-surface border-border hover:border-gold/40 text-muted hover:text-text'
+                      ? 'bg-gold/15 border-gold text-gold shadow-sm'
+                      : 'bg-surface border-border text-muted hover:border-gold/40 hover:text-text'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-serif font-bold text-text truncate">
-                      {loc.label}
-                    </span>
-                    {isSelected && <Sparkles className="w-3.5 h-3.5 text-gold shrink-0" />}
-                  </div>
-                  <span className="text-[11px] text-muted truncate mt-0.5">{loc.desc}</span>
+                  {t(pill.labelKey, pill.defaultLabel)}
                 </button>
               );
             })}
           </div>
+
+          {activeRegion && (
+            <p className="mt-3 text-[11px] text-muted flex items-center gap-1.5 px-0.5">
+              <MapPin className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>
+                {t('branches.filteredByDestination', 'Filtered by location')}:{' '}
+                <span className="text-text font-medium">{activeRegion}</span>
+              </span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -225,8 +249,15 @@ export const BranchesPage = () => {
               {criteria.branchId
                 ? t('branches.filteredBranch', 'Selected branch')
                 : activeRegion
-                  ? `Sanctuaries in ${activeRegion}`
-                  : 'All Solara Resort Branches'}
+                  ? `${t('branches.titleInRegionPrefix', 'Sanctuaries in')} ${activeRegion}`
+                  : activeSanctuaryType
+                    ? t(
+                        SANCTUARY_TYPE_PILLS.find((p) => p.id === activeSanctuaryType)?.labelKey ||
+                          'branches.sanctuaryTypeAll',
+                        SANCTUARY_TYPE_PILLS.find((p) => p.id === activeSanctuaryType)?.defaultLabel ||
+                          'All Sanctuaries'
+                      )
+                    : t('branches.allBranchesTitle', 'All Solara Resort Branches')}
             </h2>
             <p className="text-xs text-muted mt-0.5">{resultsSummary}</p>
           </div>
@@ -269,9 +300,9 @@ export const BranchesPage = () => {
         )}
 
         {status === 'loading' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={BRANCH_LIST_GRID_CLASS}>
             {Array.from({ length: BRANCHES_PAGE_SIZE }, (_, i) => (
-              <ResortCardSkeleton key={i} />
+              <ResortCardSkeleton key={i} imageClassName={BRANCH_LIST_SKELETON_IMAGE_CLASS} />
             ))}
           </div>
         )}
@@ -386,10 +417,10 @@ export const BranchesPage = () => {
                   onAction={handleClearFilters}
                 />
               ) : (
-                <RevealOnScroll className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch auto-rows-fr">
+                <RevealOnScroll className={BRANCH_LIST_GRID_CLASS}>
                   {filteredBranches.map((branch, index) => (
                     <StaggerItem key={branch.id} index={index}>
-                      <BranchCard branch={branch} />
+                      <BranchCard branch={branch} variant="list" />
                     </StaggerItem>
                   ))}
                 </RevealOnScroll>

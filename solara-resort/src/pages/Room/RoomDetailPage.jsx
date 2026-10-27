@@ -30,7 +30,6 @@ export const RoomDetailPage = () => {
     setRoomForBooking,
     addRoomToStay,
     bookingDraft,
-    updateBookingDraft,
     addToast,
     t,
     language,
@@ -90,12 +89,9 @@ export const RoomDetailPage = () => {
       return;
     }
 
-    updateBookingDraft({
-      checkIn,
-      checkOut,
-      adults: guestsCount,
+    setRoomForBooking(parentResort, room, {
+      draftUpdates: { checkIn, checkOut, adults: guestsCount },
     });
-    setRoomForBooking(parentResort, room);
     addToast(`${t('toast.roomSelected', 'Selected for reservation')}: ${room.name}`, 'success');
     navigate(
       buildBookingPath({
@@ -120,8 +116,9 @@ export const RoomDetailPage = () => {
       addToast(validation.message, 'error');
       return;
     }
-    updateBookingDraft({ checkIn, checkOut, adults: guestsCount });
-    addRoomToStay(parentResort, room);
+    addRoomToStay(parentResort, room, {
+      draftUpdates: { checkIn, checkOut, adults: guestsCount },
+    });
     addToast(
       t('booking.addedToStay', 'Added to your stay') + `: ${room.name}`,
       'success'

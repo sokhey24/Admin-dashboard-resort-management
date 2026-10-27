@@ -34,3 +34,25 @@ export function syncDraftRoomFields(draft) {
     roomsCount: roomIds.length || 1,
   };
 }
+
+/** Keep roomSelections aligned with roomIds; preserve known selection metadata. */
+export function reconcileRoomSelections(draft) {
+  const roomIds = normalizeRoomIds(draft);
+  const existing = Array.isArray(draft?.roomSelections) ? draft.roomSelections : [];
+  const byId = new Map(
+    existing
+      .map((row) => {
+        const id = Number(row?.id);
+        return id > 0 ? [id, row] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const roomSelections = roomIds.map((id) => {
+    const known = byId.get(id);
+    if (known) return known;
+    return { id, name: '', image: '', resortName: '' };
+  });
+
+  return { ...draft, roomIds, roomSelections };
+}

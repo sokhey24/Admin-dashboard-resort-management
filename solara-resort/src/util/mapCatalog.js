@@ -91,12 +91,14 @@ export function mapBranchFromApi(row) {
     id: row.id,
     branchId: row.id,
     catalogKind: 'branch',
-    detailPath: `/branches/${row.slug || row.id}`,
+    detailPath: `/branches/${row.slug ?? row.id}`,
     slug: row.slug,
     name: row.name,
+    name_km: row.name_km || '',
     description: row.description || row.tagline || brand.tagline || brand.description || '',
     description_km: row.description_km || '',
     tagline: row.tagline || brand.tagline || row.city || '',
+    tagline_km: row.tagline_km || '',
     destination: row.city || '',
     city: row.city || '',
     province: row.province || row.city || '',
@@ -289,10 +291,13 @@ export function mapRoomFromApi(room) {
   const sizeSqm = Number(type.size_sqm ?? 0);
   const maxOccupancy = Number(type.max_occupancy ?? 2);
 
+  const roomTypeId = type.id ?? room.room_type_id ?? null;
+
   const mapped = {
     id: room.id,
     branchId: room.branch_id ?? room.branch?.id ?? null,
     resortId: room.resort_id ?? resort.id,
+    roomTypeId: roomTypeId != null ? Number(roomTypeId) : null,
     resortName: resort.name || '',
     name: roomDisplayName(room),
     type: type.name || 'Room',

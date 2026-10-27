@@ -12,22 +12,41 @@ import { paginateItems } from '../../util/paginateList.js';
 /** Default page size for client-side room card grids (e.g. branch detail). */
 export const ROOM_CARD_GRID_PAGE_SIZE = 6;
 
-export const RoomCard = ({ room }) => {
+export const RoomCard = ({ room, reserveLabel, onReserve, stay }) => {
   const navigate = useNavigate();
   const { currency, setRoomForBooking, addToast, t, localize, bookingDraft } = useApp();
   const item = localize ? localize(room) : room;
 
   const handleBookNow = () => {
+    if (onReserve) {
+      onReserve(item);
+      return;
+    }
+
     const parentResort = item.resortSnapshot || { id: item.resortId, name: item.resortName };
-    setRoomForBooking(parentResort, item);
+    const checkIn = stay?.checkIn ?? bookingDraft.checkIn;
+    const checkOut = stay?.checkOut ?? bookingDraft.checkOut;
+    const adults = stay?.adults ?? bookingDraft.adults;
+    const children = stay?.children ?? bookingDraft.children;
+
+    setRoomForBooking(parentResort, item, {
+      draftUpdates: {
+        checkIn,
+        checkOut,
+        adults,
+        children,
+        roomTypeId: item.roomTypeId ?? null,
+        branchId: item.branchId ?? bookingDraft.branchId,
+      },
+    });
     addToast(`${t('toast.roomSelected', 'Selected for reservation')}: ${item.name}`, 'success');
     navigate(
       buildBookingPath({
         roomId: item.id,
-        checkIn: bookingDraft.checkIn,
-        checkOut: bookingDraft.checkOut,
-        adults: bookingDraft.adults,
-        children: bookingDraft.children,
+        checkIn,
+        checkOut,
+        adults,
+        children,
         couponCode: bookingDraft.couponCode,
       })
     );
@@ -133,7 +152,7 @@ export const RoomCard = ({ room }) => {
               size="sm"
               onClick={handleBookNow}
             >
-              {t('common.reserve', 'Reserve')}
+              {reserveLabel || t('common.reserve', 'Reserve')}
             </Button>
           </div>
         </div>

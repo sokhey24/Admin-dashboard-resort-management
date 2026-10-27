@@ -12,6 +12,7 @@ import {
   parseSearchCriteria,
 } from '../util/searchParams.js';
 import { buildBranchFilterOptions, mapSortToApi, sortResortsClient } from '../util/mapCatalog.js';
+import { branchMatchesSanctuaryType } from '../util/sanctuaryTypes.js';
 
 /**
  * Resolved criteria: URL wins; dates/guests fall back to booking draft on marketing pages.
@@ -26,6 +27,7 @@ export function useSearchCriteria() {
       // Location filters: URL only (draft must not keep a branch after "All Locations").
       branchId: fromUrl.branchId || '',
       destination: fromUrl.destination || '',
+      region: fromUrl.region || '',
       checkIn: fromUrl.checkIn || bookingDraft.checkIn || '',
       checkOut: fromUrl.checkOut || bookingDraft.checkOut || '',
       adults: fromUrl.adults || bookingDraft.adults || 2,
@@ -114,6 +116,12 @@ export function useSearch() {
           : partial.destination !== undefined
             ? partial.destination
             : criteria.destination,
+        region:
+          partial.region !== undefined
+            ? partial.region
+            : clearingBranch
+              ? ''
+              : criteria.region,
         checkIn: partial.checkIn ?? criteria.checkIn,
         checkOut: partial.checkOut ?? criteria.checkOut,
         adults: partial.adults ?? partial.guests ?? criteria.adults,
@@ -162,17 +170,20 @@ export function useResortSearchResults({
 }) {
   const criteria = useSearchCriteria();
 
+  const useWideFetch =
+    Boolean(criteria.region) && !criteria.destination && !criteria.branchId;
+
   const apiParams = useMemo(
     () => ({
       page,
-      per_page: perPage,
+      per_page: useWideFetch ? 50 : perPage,
       ...(criteria.branchId ? { branch_id: criteria.branchId } : {}),
       ...(criteria.destination
         ? { city: criteria.destination, destination: criteria.destination }
         : {}),
       sort: mapSortToApi(sort),
     }),
-    [page, criteria.branchId, criteria.destination, sort]
+    [page, criteria.branchId, criteria.destination, sort, useWideFetch, perPage]
   );
 
   const { branches, meta, loading, error, reload, isFetching } = useBranches(apiParams);
@@ -180,12 +191,15 @@ export function useResortSearchResults({
 
   const filteredResorts = useMemo(() => {
     const list = branches.filter((r) => {
+      if (criteria.region && !branchMatchesSanctuaryType(r, criteria.region)) {
+        return false;
+      }
       if (r.startingPrice > maxPrice) return false;
       if (minRating > 0 && (r.rating ?? 0) < minRating) return false;
       return true;
     });
     return sortResortsClient(list, sort);
-  }, [branches, maxPrice, minRating, sort]);
+  }, [branches, criteria.region, maxPrice, minRating, sort]);
 
   const status = useMemo(() => {
     if (loading) return 'loading';

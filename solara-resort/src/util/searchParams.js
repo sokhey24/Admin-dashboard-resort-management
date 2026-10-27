@@ -21,6 +21,7 @@ export function parseSearchCriteria(searchParams) {
   return {
     branchId: branchRaw ? Number(branchRaw) || '' : '',
     destination: searchParams.get('destination') || '',
+    region: searchParams.get('region') || '',
     checkIn: searchParams.get('checkIn') || '',
     checkOut: searchParams.get('checkOut') || '',
     adults,
@@ -42,6 +43,7 @@ export function applySearchCriteria(baseParams, criteria) {
 
   setOrDelete('branchId', criteria.branchId);
   setOrDelete('destination', criteria.destination);
+  setOrDelete('region', criteria.region);
   setOrDelete('checkIn', criteria.checkIn);
   setOrDelete('checkOut', criteria.checkOut);
   setOrDelete('adults', criteria.adults);
@@ -121,6 +123,20 @@ export function applyDestinationRegionParams(baseParams, destination) {
   } else {
     next.delete('destination');
   }
+  next.delete('branchId');
+  next.delete('branch_id');
+  return next;
+}
+
+/** Sanctuary type pill bar — sets `region` and clears branch-specific filters. */
+export function applySanctuaryTypeParams(baseParams, regionId) {
+  const next = new URLSearchParams(baseParams);
+  if (regionId) {
+    next.set('region', regionId);
+  } else {
+    next.delete('region');
+  }
+  next.delete('destination');
   next.delete('branchId');
   next.delete('branch_id');
   return next;

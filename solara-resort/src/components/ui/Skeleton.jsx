@@ -8,10 +8,10 @@ export const Skeleton = ({ className = '' }) => {
   );
 };
 
-export const ResortCardSkeleton = () => {
+export const ResortCardSkeleton = ({ imageClassName = 'w-full aspect-[16/10]' }) => {
   return (
-    <div className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden shadow-sm">
-      <Skeleton className="w-full aspect-[16/10]" />
+    <div className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden shadow-sm h-full">
+      <Skeleton className={imageClassName} />
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <Skeleton className="h-4 w-28" />

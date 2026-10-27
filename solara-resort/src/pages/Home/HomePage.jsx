@@ -11,12 +11,9 @@ import {
 import { HeroSection } from '../../components/ui/HeroSection.jsx';
 import { SearchWidget } from '../../features/search/components/SearchWidget.jsx';
 import { BranchCard } from '../../components/branch/BranchCard.jsx';
-import { RoomCard, RoomCardGrid } from '../../components/room/RoomCard.jsx';
 import { Button } from '../../components/ui/Button.jsx';
-import { formatCurrency } from '../../util/currency.js';
 import { useApp } from '../../context/AppContext.jsx';
-import { useBranches, useRoomsList } from '../../hooks/useCatalog.js';
-import { buildDestinationTiles } from '../../util/mapCatalog.js';
+import { useBranches, useBranchDetail } from '../../hooks/useCatalog.js';
 import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
 import { MARKETING_IMAGES } from '../../constants/marketingImages.js';
 import { ErrorState } from '../../components/ui/ErrorState.jsx';
@@ -27,7 +24,6 @@ import { StarRatingDisplay } from '../../components/reviews/StarRating.jsx';
 import heroImage from '../../assets/images/hero_solara_resort_1790692958491.jpg';
 import { RevealOnScroll } from '../../components/motion/RevealOnScroll.jsx';
 import { StaggerItem } from '../../components/motion/StaggerItem.jsx';
-import { Pagination } from '../../components/common/Pagination.jsx';
 import { ROUTES } from '../../config/routes.js';
 import { PopularDishes } from '../../components/dining/PopularDishes.jsx';
 import {
@@ -40,8 +36,45 @@ import Activity_home from '../../Feature_Activity_home/Activity_home.jsx';
 import { CardlistSummaryOrder } from '../Dining/CardlistSummaryOrder.jsx';
 import { useDiningCart } from '../Dining/useDiningCart.js';
 
-/** Destination tiles per page (Explore Destinations — matches lg:grid-cols-4). */
-const HOME_DESTINATIONS_PAGE_SIZE = 4;
+/** Sanctuary regions for homepage grouping (Part A). */
+const SANCTUARY_REGIONS = [
+  {
+    key: 'siem-reap',
+    labelKey: 'home.sanctuaries.regionSiemReap',
+    defaultLabel: 'Siem Reap',
+    match: (haystack) => /siem|angkor/i.test(haystack),
+  },
+  {
+    key: 'kampot',
+    labelKey: 'home.sanctuaries.regionKampot',
+    defaultLabel: 'Kampot',
+    match: (haystack) => /kampot|bokor/i.test(haystack),
+  },
+  {
+    key: 'kep',
+    labelKey: 'home.sanctuaries.regionKep',
+    defaultLabel: 'Kep',
+    match: (haystack) => /\bkep\b/i.test(haystack),
+  },
+  {
+    key: 'koh-rong',
+    labelKey: 'home.sanctuaries.regionKohRong',
+    defaultLabel: 'Koh Rong',
+    match: (haystack) => /rong|sihanouk|island|beach/i.test(haystack),
+  },
+];
+
+function branchRegionHaystack(branch) {
+  return [branch?.destination, branch?.city, branch?.province, branch?.name, branch?.address]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function resolveBranchRegionKey(branch) {
+  const haystack = branchRegionHaystack(branch);
+  const region = SANCTUARY_REGIONS.find((r) => r.match(haystack));
+  return region?.key ?? null;
+}
 
 export const HomePage = () => {
   const navigate = useNavigate();
@@ -98,13 +131,6 @@ export const HomePage = () => {
   } = useBranches({ per_page: 50 });
 
   const {
-    rooms: catalogRooms,
-    loading: roomsLoading,
-    error: roomsError,
-    reload: reloadRooms,
-  } = useRoomsList({ per_page: 6 });
-
-  const {
     activities: cmsActivities,
     services: cmsServices,
     diningVenues: cmsDining,
@@ -112,43 +138,57 @@ export const HomePage = () => {
     error: cmsContentError,
   } = useWebsiteContent();
 
-  const destinations = useMemo(
-    () => buildDestinationTiles(catalogBranches),
-    [catalogBranches]
-  );
-  const [destinationsPage, setDestinationsPage] = useState(1);
+  const branchesByRegion = useMemo(() => {
+    const map = new Map(SANCTUARY_REGIONS.map((r) => [r.key, []]));
+    const unassigned = [];
+    catalogBranches.forEach((branch) => {
+      const key = resolveBranchRegionKey(branch);
+      if (key) map.get(key).push(branch);
+      else unassigned.push(branch);
+    });
+    return { map, unassigned };
+  }, [catalogBranches]);
 
-  const destinationsTotalPages = Math.max(
-    1,
-    Math.ceil(destinations.length / HOME_DESTINATIONS_PAGE_SIZE)
+  const activeRegions = useMemo(
+    () => SANCTUARY_REGIONS.filter((r) => (branchesByRegion.map.get(r.key)?.length ?? 0) > 0),
+    [branchesByRegion]
   );
 
-  const paginatedDestinations = useMemo(() => {
-    const start = (destinationsPage - 1) * HOME_DESTINATIONS_PAGE_SIZE;
-    return destinations.slice(start, start + HOME_DESTINATIONS_PAGE_SIZE);
-  }, [destinations, destinationsPage]);
+  const [sanctuaryRegionKey, setSanctuaryRegionKey] = useState(SANCTUARY_REGIONS[0].key);
 
   useEffect(() => {
-    setDestinationsPage(1);
-  }, [destinations.length]);
-
-  useEffect(() => {
-    if (destinationsPage > destinationsTotalPages) {
-      setDestinationsPage(destinationsTotalPages);
+    if (activeRegions.length === 0) return;
+    const stillValid = activeRegions.some((r) => r.key === sanctuaryRegionKey);
+    if (!stillValid) {
+      setSanctuaryRegionKey(activeRegions[0].key);
     }
-  }, [destinationsPage, destinationsTotalPages]);
+  }, [activeRegions, sanctuaryRegionKey]);
 
-  const destinationsSummary = useMemo(() => {
-    if (branchesLoading || destinations.length === 0) return null;
-    const start = (destinationsPage - 1) * HOME_DESTINATIONS_PAGE_SIZE + 1;
-    const end = Math.min(destinationsPage * HOME_DESTINATIONS_PAGE_SIZE, destinations.length);
-    if (language === 'km') {
-      return `បង្ហាញ ${start}–${end} នៃ ${destinations.length} ទីតាំង`;
-    }
-    return `Showing ${start}–${end} of ${destinations.length} destinations`;
-  }, [branchesLoading, destinations.length, destinationsPage, language]);
+  const regionBranches = useMemo(() => {
+    const inRegion = branchesByRegion.map.get(sanctuaryRegionKey) ?? [];
+    if (inRegion.length > 0) return inRegion;
+    return branchesByRegion.unassigned;
+  }, [branchesByRegion, sanctuaryRegionKey]);
 
-  const featuredBranches = catalogBranches.slice(0, 4);
+  const flagshipCandidate = useMemo(() => {
+    if (!catalogBranches.length) return null;
+    const featured = catalogBranches.find(
+      (b) => b.raw?.featured || b.raw?.is_flagship || b.badge === 'Featured'
+    );
+    return featured ?? catalogBranches[0];
+  }, [catalogBranches]);
+
+  const {
+    resort: flagshipDetail,
+    rooms: flagshipRooms,
+    loading: flagshipDetailLoading,
+    error: flagshipDetailError,
+    reload: reloadFlagshipDetail,
+  } = useBranchDetail(flagshipCandidate?.id);
+
+  const flagshipBranch = flagshipDetail ?? flagshipCandidate;
+  const flagshipLoading =
+    branchesLoading || (Boolean(flagshipCandidate?.id) && flagshipDetailLoading);
   const activities = cmsActivities.map((a) => (localize ? localize(a) : a));
   const services = cmsServices.map((s) => (localize ? localize(s) : s));
   const diningVenues = cmsDining.map((dv) => (localize ? localize(dv) : dv));
@@ -284,20 +324,23 @@ export const HomePage = () => {
         </div>
       </RevealOnScroll>
 
-      {/* 3. POPULAR DESTINATIONS */}
-      <RevealOnScroll as="section" className="py-20 bg-bg">
+      {/* 3. DESTINATIONS & SANCTUARIES (unified) */}
+      <RevealOnScroll as="section" className="py-20 bg-bg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
               <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
-                {t('home.destinationsTag', 'Idyllic Locales')}
+                {t('home.sanctuaries.tag', 'Idyllic Locales')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
-                {t('home.destinationsTitle', 'Explore Destinations')}
+                {t('home.sanctuaries.title', 'Solara Destinations & Sanctuaries')}
               </h2>
-              {destinationsSummary && (
-                <p className="text-xs text-muted mt-2">{destinationsSummary}</p>
-              )}
+              <p className="text-sm text-muted mt-3 max-w-2xl leading-relaxed">
+                {t(
+                  'home.sanctuaries.subtitle',
+                  'Discover our collection by region — each sanctuary reflects its landscape with live rates and amenities from the catalog.'
+                )}
+              </p>
             </div>
             <Button
               variant="outline"
@@ -309,173 +352,95 @@ export const HomePage = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {branchesError && (
-              <div className="col-span-full">
-                <ErrorState message={branchesError} onRetry={reloadBranches} />
+          {/* Part A — regional sanctuaries */}
+          <div className="mb-6">
+            <h3 className="text-lg font-serif font-semibold text-text mb-4">
+              {t('home.sanctuaries.byRegion', 'Explore by destination')}
+            </h3>
+            {activeRegions.length > 0 && (
+              <div
+                className="flex flex-wrap gap-2 mb-8"
+                role="tablist"
+                aria-label={t('home.sanctuaries.regionTabs', 'Destination regions')}
+              >
+                {activeRegions.map((region) => {
+                  const isActive = sanctuaryRegionKey === region.key;
+                  const count = branchesByRegion.map.get(region.key)?.length ?? 0;
+                  const label = t(region.labelKey, region.defaultLabel);
+                  return (
+                    <button
+                      key={region.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setSanctuaryRegionKey(region.key)}
+                      className={`px-4 py-2 rounded-[var(--radius-button)] text-xs font-semibold uppercase tracking-wider border transition-colors ${
+                        isActive
+                          ? 'bg-gold/15 border-gold text-gold'
+                          : 'bg-surface border-border text-muted hover:border-gold/40 hover:text-text'
+                      }`}
+                    >
+                      {label}
+                      <span className="ml-1.5 text-[10px] opacity-80">({count})</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
-            {!branchesError && branchesLoading && (
-              <>
-                {Array.from({ length: HOME_DESTINATIONS_PAGE_SIZE }, (_, i) => (
-                  <ResortCardSkeleton key={i} />
-                ))}
-              </>
+
+            {branchesError && (
+              <ErrorState message={branchesError} onRetry={reloadBranches} />
             )}
-            {!branchesError && !branchesLoading && destinations.length === 0 && (
-              <p className="col-span-full text-center text-xs text-muted py-8">
-                {t('home.noDestinations', 'Destinations will appear when branches are published.')}
+
+            {!branchesError && branchesLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <ResortCardSkeleton />
+                <ResortCardSkeleton />
+              </div>
+            )}
+
+            {!branchesError && !branchesLoading && catalogBranches.length === 0 && (
+              <p className="text-center text-sm text-muted py-8">
+                {t('home.sanctuaries.empty', 'Sanctuaries will appear when branches are published.')}
               </p>
             )}
-            {!branchesError &&
-              !branchesLoading &&
-              paginatedDestinations.map((dest, index) => (
-                <StaggerItem
-                  key={dest.name}
-                  index={index}
-                  className="group relative h-96 rounded-[var(--radius-card)] overflow-hidden cursor-pointer border border-border/80 shadow-md hover:shadow-2xl transition-all duration-300"
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/branches?destination=${encodeURIComponent(dest.name)}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        navigate(`/branches?destination=${encodeURIComponent(dest.name)}`);
-                      }
-                    }}
-                    className="group relative h-full min-h-96 rounded-[var(--radius-card)] overflow-hidden cursor-pointer"
-                  >
-                    <img
-                      src={dest.image}
-                      alt={dest.name}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                    <div className="absolute inset-0 p-6 flex flex-col justify-end text-white">
-                      <div className="flex items-center justify-between text-xs text-gold-light mb-1">
-                        <span>{dest.resortsCount} {dest.resortsCount === 1 ? t('common.sanctuary', 'Sanctuary') : t('common.sanctuaries', 'Sanctuaries')}</span>
-                        <span>{t('common.from', 'From')} {formatCurrency(dest.startingPrice, currency)}</span>
-                      </div>
-                      <h3 className="text-2xl font-serif font-bold group-hover:text-gold transition-colors mb-2">
-                        {dest.name}
-                      </h3>
-                      <p className="text-xs text-slate-300/80 line-clamp-2 leading-relaxed">
-                        {dest.subtitle}
-                      </p>
-                    </div>
-                  </div>
-                </StaggerItem>
-              ))}
+
+            {!branchesError && !branchesLoading && regionBranches.length > 0 && (
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch auto-rows-fr"
+                role="tabpanel"
+              >
+                {regionBranches.map((branch, idx) => (
+                  <StaggerItem key={branch.id} index={idx}>
+                    <BranchCard branch={branch} featured={false} />
+                  </StaggerItem>
+                ))}
+              </div>
+            )}
+
+            {!branchesError && !branchesLoading && catalogBranches.length > 0 && regionBranches.length === 0 && (
+              <p className="text-center text-sm text-muted py-8">
+                {t('home.sanctuaries.noRegionMatch', 'No sanctuaries in this region yet.')}
+              </p>
+            )}
           </div>
 
-          {!branchesError && !branchesLoading && destinationsTotalPages > 1 && (
-            <Pagination
-              className="mt-10 pt-8 border-t border-border"
-              page={destinationsPage}
-              totalPages={destinationsTotalPages}
-              onPageChange={setDestinationsPage}
-            />
-          )}
+          {/* Part B — flagship spotlight */}
+          <MainsolaraResort
+            embedded
+            branch={flagshipBranch}
+            rooms={flagshipRooms}
+            loading={flagshipLoading}
+            error={branchesError ? null : flagshipDetailError}
+            onRetry={() => {
+              if (branchesError) reloadBranches();
+              else reloadFlagshipDetail();
+            }}
+          />
         </div>
       </RevealOnScroll>
 
-      {/* 3. Detail about Solara Main Branch */}
-      <MainsolaraResort />
-
-      {/* 4. POPULAR BRANCHES */}
-      <RevealOnScroll as="section" className="py-20 bg-surface/30 border-y border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-            <div>
-              <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
-                {t('brand.name', 'Solara Resort & Spa')}
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
-                {t('home.resortsTitle', 'Our Signature Sanctuaries')}
-              </h2>
-            </div>
-            <p className="text-sm text-muted max-w-md">
-              {t('home.resortsSubtitle', 'Each Solara retreat is an architectural reflection of its landscape, honoring native materials, heritage craft, and understated luxury.')}
-            </p>
-          </div>
-
-          {branchesError ? (
-            <ErrorState message={branchesError} onRetry={reloadBranches} />
-          ) : branchesLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-              <ResortCardSkeleton />
-              <ResortCardSkeleton />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch auto-rows-fr">
-              {featuredBranches.map((branch, idx) => (
-                <StaggerItem key={branch.id} index={idx}>
-                  <BranchCard branch={branch} featured={false} />
-                </StaggerItem>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-12 text-center">
-            <Button
-              variant="outline"
-              size="md"
-              onClick={() => navigate('/branches')}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
-            >
-              {t('home.viewAllResorts', 'View All Solara Sanctuaries')}
-            </Button>
-          </div>
-        </div>
-      </RevealOnScroll>
-
-      {/* 5. FEATURED ROOMS & VILLAS */}
-      <RevealOnScroll as="section" className="py-20 bg-bg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-            <div>
-              <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
-                {t('home.roomsTag', 'Private Quarters')}
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-text tracking-tight">
-                {t('home.roomsTitle', 'Featured Accommodations')}
-              </h2>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/rooms')}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
-            >
-              {t('home.exploreAllRooms', 'Explore All Rooms')}
-            </Button>
-          </div>
-
-          {roomsError ? (
-            <ErrorState message={roomsError} onRetry={reloadRooms} />
-          ) : roomsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <RoomCardSkeleton />
-              <RoomCardSkeleton />
-              <RoomCardSkeleton />
-            </div>
-          ) : (
-            <RoomCardGrid
-              rooms={catalogRooms}
-              pageSize={3}
-              renderItem={(room, index) => (
-                <StaggerItem key={room.id} index={index}>
-                  <RoomCard room={room} />
-                </StaggerItem>
-              )}
-            />
-          )}
-        </div>
-      </RevealOnScroll>
-
-      {/* 6. ACTIVITIES PREVIEW */}
+      {/* 4. ACTIVITIES PREVIEW */}
       {activities.length > 0 && (
         <RevealOnScroll as="section" className="py-20 bg-surface/40 border-t border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -1,26 +1,77 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, MapPin, ArrowRight, Clock, BedDouble, CheckCircle2 } from 'lucide-react';
+import { Star, MapPin, ArrowRight, Clock, BedDouble, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { CatalogNightlyPrice } from '../catalog/CatalogNightlyPrice.jsx';
 import { FavoriteButton } from '../catalog/FavoriteButton.jsx';
+import { formatCurrency } from '../../util/currency.js';
+import { BRANCH_LIST_CARD_IMAGE_CLASS } from '../../constants/branchCardLayout.js';
 
-export const BranchCard = ({ branch, featured = false }) => {
+function branchDetailPath(branch) {
+  const slug = branch?.slug ?? branch?.id;
+  return slug ? `/branches/${slug}` : '/branches';
+}
+
+/** @param {'default' | 'list'} variant — `list` = larger Our Resorts grid (see branchCardLayout.js). */
+export const BranchCard = ({ branch, featured = false, variant = 'default' }) => {
+  const isList = variant === 'list' && !featured;
   const navigate = useNavigate();
   const { currency, t, localize, language } = useApp();
   const item = localize ? localize(branch) : branch;
 
-  const detailPath = item.detailPath || `/branches/${item.slug || item.id}`;
+  const detailPath = branchDetailPath(item);
+  const cityLabel = item.city || item.destination || '';
+  const checkIn = item.checkinTime || '14:00';
+  const checkOut = item.checkoutTime || '12:00';
+  const totalRooms = Number(item.roomsCount ?? 0);
+  const availableRooms = Number(item.availableRoomsCount ?? 0);
+  const discountPercent = Number(item.startingPriceDiscountPercent ?? 0);
+  const hasDiscount =
+    Boolean(item.hasStartingDiscount) || (discountPercent > 0 && item.startingPrice > 0);
+  const displayDiscountPercent =
+    discountPercent > 0
+      ? Math.round(discountPercent)
+      : item.hasStartingDiscount && item.startingPriceOriginal > item.startingPrice
+        ? Math.round(
+            ((item.startingPriceOriginal - item.startingPrice) / item.startingPriceOriginal) * 100
+          )
+        : 0;
+
+  const specialOfferLabel =
+    displayDiscountPercent > 0
+      ? t('branches.specialOfferUpTo', 'Special Offer · Up to {percent}% OFF').replace(
+          '{percent}',
+          String(displayDiscountPercent)
+        )
+      : '';
+
+  const roomsLine =
+    availableRooms > 0
+      ? language === 'km'
+        ? `${availableRooms} បន្ទប់ទំនេរពី ${totalRooms || availableRooms}`
+        : `${availableRooms} available · ${totalRooms || availableRooms} quarters`
+      : totalRooms > 0
+        ? language === 'km'
+          ? `${totalRooms} បន្ទប់ស្នាក់នៅ`
+          : `${totalRooms} villas & quarters`
+        : '';
 
   return (
     <div
-      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full w-full ${featured ? 'lg:col-span-2 md:flex-row' : ''
-        }`}
+      className={`group bg-surface border border-border hover:border-gold/60 rounded-[var(--radius-card)] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full w-full ${
+        featured ? 'lg:col-span-2 md:flex-row' : ''
+      }`}
     >
-      <div
-        className={`relative overflow-hidden bg-slate-900 shrink-0 ${featured ? 'md:w-1/2 aspect-[16/10] md:aspect-auto' : 'aspect-[16/10] w-full'
-          }`}
+      <Link
+        to={detailPath}
+        className={`relative overflow-hidden bg-slate-900 shrink-0 block ${
+          featured
+            ? 'md:w-1/2 aspect-[16/10] md:aspect-auto md:min-h-[240px]'
+            : isList
+              ? BRANCH_LIST_CARD_IMAGE_CLASS
+              : 'aspect-[16/10] w-full'
+        }`}
       >
         {item.featuredImage ? (
           <img
@@ -30,22 +81,37 @@ export const BranchCard = ({ branch, featured = false }) => {
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[11px] text-muted px-4 text-center">
+          <div className="w-full h-full min-h-[10rem] flex items-center justify-center text-[11px] text-muted px-4 text-center">
             {t('catalog.noImage', 'Image not provided')}
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-black/20 pointer-events-none" />
 
-        {/* Location / City Badge */}
-        <div className="absolute top-3.5 left-3.5 bg-slate-950/80 backdrop-blur-md text-gold-light border border-gold/40 text-[10px] font-semibold tracking-widest uppercase px-2.5 py-1 rounded">
-          {item.city || item.destination || 'Solara Location'}
-        </div>
+        {cityLabel && (
+          <div className="absolute top-3.5 left-3.5 bg-slate-950/80 backdrop-blur-md text-gold-light border border-gold/40 text-[10px] font-semibold tracking-widest uppercase px-2.5 py-1 rounded">
+            {cityLabel}
+          </div>
+        )}
 
-        <div className="absolute top-3.5 right-3.5 z-10">
+        <div className="absolute top-3.5 right-3.5 z-10 pointer-events-auto">
           <FavoriteButton kind="resort" id={item.id} size="sm" />
         </div>
 
-        {/* Guest Rating Badge */}
+        {hasDiscount && displayDiscountPercent > 0 && specialOfferLabel && (
+          <div
+            className={`absolute z-[5] max-w-[calc(100%-2rem)] pointer-events-none ${
+              cityLabel ? 'top-12 left-3.5 sm:top-3.5 sm:left-auto sm:right-14' : 'top-3.5 right-14'
+            }`}
+          >
+            <span
+              className="inline-flex items-center gap-1 bg-emerald-500/90 text-white backdrop-blur-md px-2.5 py-1 rounded font-semibold text-[10px] tracking-wider uppercase shadow-lg border border-emerald-400/40"
+            >
+              <Sparkles className="w-3 h-3 shrink-0" aria-hidden />
+              <span className="leading-tight">{specialOfferLabel}</span>
+            </span>
+          </div>
+        )}
+
         {(item.rating ?? 0) > 0 && (
           <div className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded text-xs text-white border border-white/10">
             <Star className="w-3.5 h-3.5 fill-gold text-gold" />
@@ -54,31 +120,47 @@ export const BranchCard = ({ branch, featured = false }) => {
           </div>
         )}
 
-        {/* Operating Hours Tag */}
         <div className="absolute bottom-3.5 right-3.5 hidden sm:flex items-center gap-1 bg-slate-950/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] text-slate-300 border border-white/10">
           <Clock className="w-3 h-3 text-gold" />
-          <span>In {item.checkinTime || '14:00'} · Out {item.checkoutTime || '12:00'}</span>
+          <span>
+            {t('catalog.checkIn', 'Check-in')} {checkIn} · {t('catalog.checkOut', 'Check-out')} {checkOut}
+          </span>
         </div>
-      </div>
+      </Link>
 
-      <div className={`p-6 flex flex-col flex-1 min-h-0 ${featured ? 'md:w-1/2' : ''}`}>
+      <div
+        className={`flex flex-col flex-1 min-h-0 ${isList ? 'p-7 sm:p-8' : 'p-6'} ${featured ? 'md:w-1/2' : ''}`}
+      >
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-1.5 text-xs text-muted mb-2 min-h-[1.125rem]">
-            <MapPin className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span className="truncate">{item.location || item.address || '\u00a0'}</span>
+          <div className="flex items-start gap-1.5 text-xs text-muted mb-2">
+            <MapPin className="w-3.5 h-3.5 text-gold shrink-0 mt-0.5" />
+            <span className={isList ? 'line-clamp-2 leading-relaxed' : 'truncate'}>
+              {item.location || item.address || '\u00a0'}
+            </span>
           </div>
 
-          <h3 className="text-xl font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight line-clamp-1 mb-2 min-h-[1.75rem]">
+          <h3
+            className={`font-semibold font-serif text-text group-hover:text-gold transition-colors tracking-tight mb-2 ${
+              isList ? 'text-2xl line-clamp-2' : 'text-xl line-clamp-1 min-h-[1.75rem]'
+            }`}
+          >
             <Link to={detailPath}>{item.name}</Link>
           </h3>
 
-          <p className="text-xs text-muted line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">
+          <p
+            className={`text-muted leading-relaxed mb-4 ${
+              isList ? 'text-sm line-clamp-4' : 'text-xs line-clamp-2 min-h-[2.5rem]'
+            }`}
+          >
             {item.description || '\u00a0'}
           </p>
 
-          {/* Key Amenities — fixed block height so cards align in the grid */}
-          <div className="flex flex-wrap items-start content-start gap-x-2 gap-y-1.5 text-[11px] text-text-secondary mb-4 min-h-[3.75rem]">
-            {(item.amenities || []).slice(0, 4).map((amenity) => (
+          <div
+            className={`flex flex-wrap items-start content-start gap-x-2 gap-y-1.5 text-text-secondary mb-4 ${
+              isList ? 'text-xs' : 'text-[11px] min-h-[3.75rem]'
+            }`}
+          >
+            {(item.amenities || []).slice(0, isList ? 6 : 4).map((amenity) => (
               <span
                 key={amenity}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-elevated/70 border border-border/80 text-[10px]"
@@ -89,18 +171,22 @@ export const BranchCard = ({ branch, featured = false }) => {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-4 min-h-[1.25rem]">
-            {(item.roomsCount ?? 0) > 0 ? (
+          <div
+            className={`flex items-start gap-1.5 text-slate-400 mb-4 ${isList ? 'text-xs' : 'text-[11px] min-h-[1.25rem]'}`}
+          >
+            {roomsLine && (
               <>
-                <BedDouble className="w-3.5 h-3.5 text-gold shrink-0" />
-                <span>
-                  {item.roomsCount} {language === 'km' ? 'បន្ទប់ស្នាក់នៅ' : 'villas & quarters at this branch'}
+                <BedDouble className="w-3.5 h-3.5 text-gold shrink-0 mt-0.5" />
+                <span className="leading-relaxed">
+                  {roomsLine}
+                  {hasDiscount && (
+                    <span className="text-emerald-400/90">
+                      {' · '}
+                      {t('branches.promoRatesAvailable', 'Promotional rates available')}
+                    </span>
+                  )}
                 </span>
               </>
-            ) : (
-              <span className="invisible select-none" aria-hidden>
-                —
-              </span>
             )}
           </div>
         </div>
@@ -112,13 +198,24 @@ export const BranchCard = ({ branch, featured = false }) => {
                 <span className="block text-[10px] uppercase tracking-wider text-muted font-medium mb-0.5">
                   {t('common.from', 'From')}
                 </span>
-                <CatalogNightlyPrice
-                  salePrice={item.startingPrice}
-                  listPrice={item.startingPriceOriginal}
-                  discountPercent={item.startingPriceDiscountPercent}
-                  currency={currency}
-                  size="sm"
-                />
+                {hasDiscount ? (
+                  <CatalogNightlyPrice
+                    salePrice={item.startingPrice}
+                    listPrice={item.startingPriceOriginal}
+                    discountPercent={displayDiscountPercent}
+                    currency={currency}
+                    size={isList ? 'md' : 'sm'}
+                  />
+                ) : (
+                  <p
+                    className={`font-serif font-bold text-gold ${isList ? 'text-2xl' : 'text-lg'}`}
+                  >
+                    {formatCurrency(item.startingPrice, currency)}
+                    <span className="text-[11px] font-normal text-muted ml-1">
+                      {t('common.perNight', '/ night')}
+                    </span>
+                  </p>
+                )}
               </div>
             ) : (
               <span className="text-xs text-muted">{t('catalog.ratesOnRequest', 'Rates on request')}</span>
@@ -127,10 +224,12 @@ export const BranchCard = ({ branch, featured = false }) => {
 
           <Button
             variant="gold"
-            size="sm"
+            size={isList ? 'md' : 'sm'}
             onClick={() => navigate(detailPath)}
             rightIcon={<ArrowRight className="w-3.5 h-3.5 shrink-0" />}
-            className="w-full sm:w-auto sm:max-w-[11.5rem] font-medium text-xs shadow-sm hover:shadow-md whitespace-normal sm:whitespace-nowrap text-center"
+            className={`w-full sm:w-auto font-medium shadow-sm hover:shadow-md whitespace-normal sm:whitespace-nowrap text-center ${
+              isList ? 'sm:max-w-[14rem] text-sm' : 'sm:max-w-[11.5rem] text-xs'
+            }`}
           >
             {t('branches.exploreRoomsAtBranch', 'Explore Rooms at this Branch')}
           </Button>
