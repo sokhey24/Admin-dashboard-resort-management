@@ -15,7 +15,7 @@ import { useDiningCart } from './useDiningCart.js';
 import { useDiningMenu } from '../../hooks/useDiningMenu.js';
 import { useDiningCheckout } from '../../hooks/useDiningCheckout.js';
 
-const MENU_LIST_PAGE_SIZE = 8;
+const MENU_LIST_PAGE_SIZE = 9;
 
 /** Full Menu — `/dining/menu` */
 export const MenuListPage = () => {
@@ -207,7 +207,7 @@ export const MenuListPage = () => {
           />
         ) : (
           <div id="menu-list-grid">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
               {menuPagination.items.map((dish) => (
                 <DishCard
                   key={dish.id}

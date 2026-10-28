@@ -18,9 +18,21 @@ import {
   Mail,
   Clock,
   MessageCircle,
+  Utensils,
+  Wine,
+  Sparkles,
+  Compass,
+  Camera,
+  ShoppingBag,
 } from 'lucide-react';
 import { SITE_CONTACT } from '../../constants/siteContact.js';
 import { useApp } from '../../context/AppContext.jsx';
+import { useDiningCart } from '../../pages/Dining/useDiningCart.js';
+import {
+  DINING_CART_OPEN_EVENT,
+  DINING_CART_OPEN_FLAG,
+  isDiningCartSurfacePath,
+} from '../../pages/Dining/CardlistSummaryOrder.jsx';
 import { Button } from '../ui/Button.jsx';
 import { BrandLogo } from '../brand/BrandLogo.jsx';
 import { SignOutConfirmDialog } from '../auth/SignOutConfirmDialog.jsx';
@@ -38,23 +50,331 @@ function matchPathPrefix(pathname, base) {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-/** Precise active-route matching (avoids /resorts matching /resort-only prefix bugs). */
-function isNavLinkActive(path, pathname) {
-  if (path === '/branches') {
-    return (
-      matchPathPrefix(pathname, '/branches') ||
-      pathname === '/branch' ||
-      pathname.startsWith('/branch/') ||
-      matchPathPrefix(pathname, '/locations') ||
-      matchPathPrefix(pathname, '/resorts') ||
-      pathname === '/resort' ||
-      pathname.startsWith('/resort/')
-    );
+function isHomeNavActive(pathname) {
+  return pathname === '/';
+}
+
+function isRoomNavActive(pathname) {
+  return (
+    matchPathPrefix(pathname, '/rooms') ||
+    pathname === '/room' ||
+    pathname.startsWith('/room/')
+  );
+}
+
+/** Branch / sanctuary listing and detail routes (legacy aliases included). */
+function isFacilitiesNavActive(pathname) {
+  return (
+    matchPathPrefix(pathname, '/branches') ||
+    pathname === '/branch' ||
+    pathname.startsWith('/branch/') ||
+    matchPathPrefix(pathname, '/locations') ||
+    matchPathPrefix(pathname, '/resorts') ||
+    pathname === '/resort' ||
+    pathname.startsWith('/resort/')
+  );
+}
+
+function isServiceGroupActive(pathname) {
+  return (
+    matchPathPrefix(pathname, '/dining') ||
+    matchPathPrefix(pathname, '/services') ||
+    matchPathPrefix(pathname, '/activities') ||
+    matchPathPrefix(pathname, '/gallery')
+  );
+}
+
+function isAboutNavActive(pathname) {
+  return matchPathPrefix(pathname, '/about');
+}
+
+function isContactNavActive(pathname) {
+  return matchPathPrefix(pathname, '/contact');
+}
+
+/** Avoid /dining highlighting when on /dining/menu. */
+function isDropdownItemActive(path, pathname) {
+  if (path === '/dining') {
+    if (pathname === '/dining') return true;
+    if (pathname.startsWith('/dining/') && !pathname.startsWith('/dining/menu')) return true;
+    return false;
   }
-  if (path === '/rooms') {
-    return matchPathPrefix(pathname, '/rooms') || pathname === '/room' || pathname.startsWith('/room/');
+  if (path === '/dining/menu') {
+    return pathname === '/dining/menu' || pathname.startsWith('/dining/menu/');
+  }
+  if (path === '/services') {
+    return matchPathPrefix(pathname, '/services');
+  }
+  if (path === '/activities') {
+    return matchPathPrefix(pathname, '/activities');
+  }
+  if (path === '/gallery') {
+    return matchPathPrefix(pathname, '/gallery');
   }
   return matchPathPrefix(pathname, path);
+}
+
+function NavUnderline({ active }) {
+  return (
+    <span
+      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gold rounded-full origin-center transition-all duration-200 ${
+        active ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-75'
+      }`}
+      aria-hidden
+    />
+  );
+}
+
+function PrimaryNavLink({ to, active, headerBarSolid, children, onNavigate }) {
+  return (
+    <Link
+      to={to}
+      onClick={onNavigate}
+      className={primaryNavLinkClass(active, headerBarSolid)}
+      aria-current={active ? 'page' : undefined}
+    >
+      {children}
+      <NavUnderline active={active} />
+    </Link>
+  );
+}
+
+function primaryNavLinkClass(active, headerBarSolid) {
+  return `relative text-xs font-medium tracking-wider uppercase transition-colors duration-200 py-1.5 px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 rounded-sm ${
+    active ? 'text-gold' : navBarForegroundMuted(headerBarSolid)
+  }`;
+}
+
+function NavDropdown({ label, items, groupActive, isItemActive, headerBarSolid }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const containerRef = useRef(null);
+  const closeTimerRef = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = setTimeout(() => setOpen(false), 280);
+  }, [clearCloseTimer]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => () => clearCloseTimer(), [clearCloseTimer]);
+
+  const openMenu = () => {
+    clearCloseTimer();
+    setOpen(true);
+  };
+
+  const toggleMenu = () => {
+    clearCloseTimer();
+    setOpen((prev) => !prev);
+  };
+
+  const goToItem = (path) => (e) => {
+    e.preventDefault();
+    clearCloseTimer();
+    setOpen(false);
+    navigate(path);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative"
+      onPointerEnter={openMenu}
+      onPointerLeave={scheduleClose}
+    >
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 ${primaryNavLinkClass(groupActive, headerBarSolid)}`}
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={toggleMenu}
+        onFocus={openMenu}
+        onBlur={(e) => {
+          if (!containerRef.current?.contains(e.relatedTarget)) {
+            scheduleClose();
+          }
+        }}
+      >
+        <span>{label}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''} ${
+            groupActive ? 'text-gold' : ''
+          }`}
+          aria-hidden
+        />
+        <span
+          className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gold rounded-full origin-center transition-all duration-200 ${
+            groupActive ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-75'
+          }`}
+          aria-hidden
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 top-full z-[60] min-w-[280px]"
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onPointerEnter={clearCloseTimer}
+            onPointerLeave={scheduleClose}
+          >
+            {/* Invisible bridge so pointer does not leave the hover zone between trigger and panel */}
+            <div className="h-2.5" aria-hidden />
+            <div
+              className="bg-surface/95 backdrop-blur-xl border border-border/80 shadow-2xl rounded-2xl p-3 min-w-[280px]"
+              role="menu"
+            >
+              <ul className="flex flex-col gap-0.5">
+                {items.map((item) => {
+                  const active = isItemActive(item.path);
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.path} role="none">
+                      <Link
+                        to={item.path}
+                        role="menuitem"
+                        onClick={goToItem(item.path)}
+                        className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          active
+                            ? 'bg-gold/10 text-gold'
+                            : 'text-text hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <Icon className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden />
+                        <span className="min-w-0 text-left">
+                          <span className="block text-sm font-medium leading-snug">{item.label}</span>
+                          <span className="block text-[11px] text-muted leading-snug mt-0.5">{item.sub}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MobileNavAccordion({
+  label,
+  items,
+  groupActive,
+  isItemActive,
+  onLinkClick,
+  t,
+  sectionId,
+}) {
+  const location = useLocation();
+  const [expanded, setExpanded] = useState(false);
+  const panelId = `${sectionId}-panel`;
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [location.pathname]);
+
+  return (
+    <div className="rounded-[var(--radius-button)] border border-border/80 bg-surface/40 overflow-hidden">
+      <button
+        type="button"
+        id={`${sectionId}-trigger`}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-label={
+          expanded
+            ? t('nav.collapseSection', 'Collapse section')
+            : t('nav.expandSection', 'Expand section')
+        }
+        className={`w-full flex items-center justify-between gap-3 min-h-[48px] px-3 text-sm font-medium tracking-wider uppercase transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+          groupActive ? 'text-gold bg-gold/10' : 'text-text hover:bg-surface-hover'
+        }`}
+      >
+        <span>{label}</span>
+        <ChevronDown
+          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            id={panelId}
+            role="region"
+            aria-labelledby={`${sectionId}-trigger`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="overflow-hidden border-t border-border/60"
+          >
+            <ul className="flex flex-col gap-1 p-2 pb-3">
+              {items.map((item) => {
+                const active = isItemActive(item.path);
+                const Icon = item.icon;
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      onClick={onLinkClick}
+                      className={`flex items-start gap-3 min-h-[44px] rounded-xl px-3 py-2.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                        active
+                          ? 'bg-gold/15 text-gold border border-gold/30'
+                          : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                      }`}
+                      aria-current={active ? 'page' : undefined}
+                    >
+                      <Icon className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden />
+                      <span className="min-w-0 text-left normal-case tracking-normal">
+                        <span className="block text-sm font-medium">{item.label}</span>
+                        <span className="block text-[11px] text-muted mt-0.5">{item.sub}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function navSegmentTrackClass(isScrolled) {
@@ -126,6 +446,7 @@ export const Navbar = () => {
     logout,
     unreadCount,
   } = useApp();
+  const { totalCount: diningCartCount } = useDiningCart();
 
   const headerRef = useRef(null);
   const userMenuRef = useRef(null);
@@ -143,11 +464,11 @@ export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isWideNav, setIsWideNav] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1280px)').matches : false
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : false
   );
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1280px)');
+    const mq = window.matchMedia('(min-width: 1024px)');
     const update = () => setIsWideNav(mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -234,6 +555,19 @@ export const Navbar = () => {
     });
   }, []);
 
+  const openDiningCart = useCallback(() => {
+    setMobileMenuOpen(false);
+    setUserMenuOpen(false);
+
+    if (isDiningCartSurfacePath(location.pathname)) {
+      window.dispatchEvent(new CustomEvent(DINING_CART_OPEN_EVENT));
+      return;
+    }
+
+    sessionStorage.setItem(DINING_CART_OPEN_FLAG, '1');
+    navigate('/dining/menu');
+  }, [location.pathname, navigate]);
+
   const chooseLanguage = useCallback(
     (lang) => {
       if (lang === language) return;
@@ -242,21 +576,53 @@ export const Navbar = () => {
     [language, setLanguage]
   );
 
-  const navLinks = useMemo(
+  const serviceItems = useMemo(
     () => [
-      { label: t('nav.branches', 'Our Resorts'), path: '/branches' },
-      { label: t('nav.rooms', 'Rooms'), path: '/rooms' },
-      { label: t('nav.activities', 'Activities'), path: '/activities' },
-      { label: t('nav.services', 'Services'), path: '/services' },
-      { label: t('nav.dining', 'Dining'), path: '/dining' },
-      { label: t('nav.gallery', 'Gallery'), path: '/gallery' },
-      { label: t('nav.about', 'About'), path: '/about' },
-      { label: t('nav.contact', 'Contact'), path: '/contact' },
+      {
+        path: '/dining',
+        label: t('nav.diningLounges', 'Dining & Lounges'),
+        sub: t('nav.diningLoungesSub', 'Signature culinary journeys'),
+        icon: Utensils,
+      },
+      {
+        path: '/dining/menu',
+        label: t('nav.foodMenus', 'Food Menus'),
+        sub: t('nav.foodMenusSub', 'A la carte dishes & drinks'),
+        icon: Wine,
+      },
+      {
+        path: '/services',
+        label: t('nav.spaWellness', 'Spa & Wellness'),
+        sub: t('nav.wellnessSpaSub', 'Holistic treatments & butler care'),
+        icon: Sparkles,
+      },
+      {
+        path: '/activities',
+        label: t('nav.activitiesTours', 'Activities & Tours'),
+        sub: t('nav.curatedActivitiesSub', 'Excursions, cruises & adventures'),
+        icon: Compass,
+      },
+      {
+        path: '/gallery',
+        label: t('nav.resortGallery', 'Resort Gallery'),
+        sub: t('nav.visualGallerySub', 'Sanctuary architecture in pictures'),
+        icon: Camera,
+      },
     ],
     [t]
   );
 
-  const isActive = useCallback((path) => isNavLinkActive(path, location.pathname), [location.pathname]);
+  const pathname = location.pathname;
+  const isDropdownActive = useCallback(
+    (path) => isDropdownItemActive(path, pathname),
+    [pathname]
+  );
+  const homeActive = isHomeNavActive(pathname);
+  const roomActive = isRoomNavActive(pathname);
+  const facilitiesActive = isFacilitiesNavActive(pathname);
+  const serviceActive = isServiceGroupActive(pathname);
+  const aboutActive = isAboutNavActive(pathname);
+  const contactActive = isContactNavActive(pathname);
 
   const themeToggleLabel =
     theme === 'dark'
@@ -359,37 +725,38 @@ export const Navbar = () => {
           />
 
           <nav
-            className="hidden xl:flex items-center gap-4 2xl:gap-6 min-w-0"
+            className="hidden lg:flex items-center gap-4 xl:gap-6 min-w-0 flex-wrap justify-center"
             aria-label={t('nav.primaryNavigation', 'Primary navigation')}
           >
-            {navLinks.map((link) => {
-              const active = isActive(link.path);
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`text-xs font-medium tracking-wider uppercase transition-colors duration-200 relative py-1.5 px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 rounded-sm ${
-                    active ? 'text-gold' : navBarForegroundMuted(headerBarSolid)
-                  }`}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {link.label}
-                  <span
-                    className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gold rounded-full origin-center transition-all duration-200 ${
-                      active ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-75'
-                    }`}
-                    aria-hidden
-                  />
-                </Link>
-              );
-            })}
+            <PrimaryNavLink to="/" active={homeActive} headerBarSolid={headerBarSolid}>
+              {t('nav.home', 'Home')}
+            </PrimaryNavLink>
+            <PrimaryNavLink to="/rooms" active={roomActive} headerBarSolid={headerBarSolid}>
+              {t('nav.room', 'Room')}
+            </PrimaryNavLink>
+            <PrimaryNavLink to="/branches" active={facilitiesActive} headerBarSolid={headerBarSolid}>
+              {t('nav.facilities', 'Facilities')}
+            </PrimaryNavLink>
+            <NavDropdown
+              label={t('nav.service', 'Service')}
+              items={serviceItems}
+              groupActive={serviceActive}
+              isItemActive={isDropdownActive}
+              headerBarSolid={headerBarSolid}
+            />
+            <PrimaryNavLink to="/about" active={aboutActive} headerBarSolid={headerBarSolid}>
+              {t('nav.aboutUs', 'About Us')}
+            </PrimaryNavLink>
+            <PrimaryNavLink to="/contact" active={contactActive} headerBarSolid={headerBarSolid}>
+              {t('nav.contact', 'Contact')}
+            </PrimaryNavLink>
           </nav>
 
           <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5 md:gap-2 lg:gap-2.5 shrink-0">
             <div
               role="group"
               aria-label={t('nav.translate', 'Language')}
-              className={`notranslate ${navSegmentTrackClass(headerBarSolid)} hidden xl:inline-flex gap-1 pl-1.5 pr-0.5`}
+              className={`notranslate ${navSegmentTrackClass(headerBarSolid)} hidden lg:inline-flex gap-1 pl-1.5 pr-0.5`}
             >
               <Globe className="w-3.5 h-3.5 text-gold shrink-0 self-center ml-0.5" aria-hidden />
               <button
@@ -415,7 +782,7 @@ export const Navbar = () => {
             <button
               type="button"
               onClick={toggleTheme}
-              className={`hidden xl:inline-flex hover:bg-surface/50 ${iconBtnClass}`}
+              className={`hidden lg:inline-flex hover:bg-surface/50 ${iconBtnClass}`}
               title={themeToggleLabel}
               aria-label={themeToggleLabel}
             >
@@ -425,6 +792,24 @@ export const Navbar = () => {
                 <Moon className={`w-4 h-4 shrink-0 ${headerBarSolid ? 'text-text' : 'text-slate-200'}`} aria-hidden />
               )}
             </button>
+
+            {diningCartCount > 0 && (
+              <button
+                type="button"
+                onClick={openDiningCart}
+                className={`relative inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-[var(--radius-button)] hover:bg-surface/50 ${iconBtnClass}`}
+                title={t('nav.diningCart', 'View dining order')}
+                aria-label={`${t('nav.diningCart', 'View dining order')} (${diningCartCount})`}
+              >
+                <ShoppingBag className="w-4 h-4 text-gold shrink-0" aria-hidden />
+                <span
+                  className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-gold text-slate-950 text-[10px] font-bold flex items-center justify-center tabular-nums leading-none border border-slate-950/10"
+                  aria-hidden
+                >
+                  {diningCartCount > 99 ? '99+' : diningCartCount}
+                </span>
+              </button>
+            )}
 
             {user ? (
               <div className="relative" ref={userMenuRef}>
@@ -556,7 +941,7 @@ export const Navbar = () => {
                 setUserMenuOpen(false);
                 setMobileMenuOpen((open) => !open);
               }}
-              className={`xl:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] hover:bg-surface/50 ${iconBtnClass}`}
+              className={`lg:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] hover:bg-surface/50 ${iconBtnClass}`}
               aria-expanded={mobileMenuOpen}
               aria-controls={MOBILE_NAV_PANEL_ID}
               aria-label={
@@ -577,7 +962,7 @@ export const Navbar = () => {
             {mobileMenuOpen && (
               <>
                 <motion.div
-                  className="xl:hidden fixed inset-x-0 bg-black/45 backdrop-blur-[2px] z-[100]"
+                  className="lg:hidden fixed inset-x-0 bg-black/45 backdrop-blur-[2px] z-[100]"
                   style={{ top: menuTopPx, bottom: 0 }}
                   {...fade()}
                   transition={transition(duration.button)}
@@ -589,7 +974,7 @@ export const Navbar = () => {
                   role="dialog"
                   aria-modal="true"
                   aria-label={t('nav.menu', 'Menu ')}
-                  className="xl:hidden fixed inset-x-0 z-[105] flex flex-col bg-bg border-b border-border shadow-2xl overflow-hidden"
+                  className="lg:hidden fixed inset-x-0 z-[105] flex flex-col bg-bg border-b border-border shadow-2xl overflow-hidden"
                   style={{ top: menuTopPx, maxHeight: mobileMenuMaxHeight }}
                   initial={{ opacity: 0, y: reduced ? 0 : -16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -618,25 +1003,76 @@ export const Navbar = () => {
                       className="px-4 sm:px-6 pt-4 pb-2 flex flex-col gap-2"
                       aria-label={t('nav.primaryNavigation', 'Primary navigation')}
                     >
-                      {navLinks.map((link, index) => {
-                        const active = isActive(link.path);
-                        return (
-                          <Link
-                            key={link.path}
-                            ref={index === 0 ? mobileNavFirstLinkRef : undefined}
-                            to={link.path}
-                            onClick={closeMobileMenu}
-                            className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
-                              active
-                                ? 'bg-gold/15 text-gold border border-gold/30'
-                                : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
-                            }`}
-                            aria-current={active ? 'page' : undefined}
-                          >
-                            {link.label}
-                          </Link>
-                        );
-                      })}
+                      <Link
+                        ref={mobileNavFirstLinkRef}
+                        to="/"
+                        onClick={closeMobileMenu}
+                        className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          homeActive
+                            ? 'bg-gold/15 text-gold border border-gold/30'
+                            : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={homeActive ? 'page' : undefined}
+                      >
+                        {t('nav.home', 'Home')}
+                      </Link>
+                      <Link
+                        to="/rooms"
+                        onClick={closeMobileMenu}
+                        className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          roomActive
+                            ? 'bg-gold/15 text-gold border border-gold/30'
+                            : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={roomActive ? 'page' : undefined}
+                      >
+                        {t('nav.room', 'Room')}
+                      </Link>
+                      <Link
+                        to="/branches"
+                        onClick={closeMobileMenu}
+                        className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          facilitiesActive
+                            ? 'bg-gold/15 text-gold border border-gold/30'
+                            : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={facilitiesActive ? 'page' : undefined}
+                      >
+                        {t('nav.facilities', 'Facilities')}
+                      </Link>
+                      <MobileNavAccordion
+                        sectionId="mobile-nav-service"
+                        label={t('nav.service', 'Service')}
+                        items={serviceItems}
+                        groupActive={serviceActive}
+                        isItemActive={isDropdownActive}
+                        onLinkClick={closeMobileMenu}
+                        t={t}
+                      />
+                      <Link
+                        to="/about"
+                        onClick={closeMobileMenu}
+                        className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          aboutActive
+                            ? 'bg-gold/15 text-gold border border-gold/30'
+                            : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={aboutActive ? 'page' : undefined}
+                      >
+                        {t('nav.aboutUs', 'About Us')}
+                      </Link>
+                      <Link
+                        to="/contact"
+                        onClick={closeMobileMenu}
+                        className={`text-sm font-medium tracking-wider uppercase min-h-[44px] flex items-center px-3 rounded-[var(--radius-button)] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${
+                          contactActive
+                            ? 'bg-gold/15 text-gold border border-gold/30'
+                            : 'text-text border border-transparent hover:bg-surface-hover hover:text-gold'
+                        }`}
+                        aria-current={contactActive ? 'page' : undefined}
+                      >
+                        {t('nav.contact', 'Contact')}
+                      </Link>
                     </nav>
 
                     <div className="border-t border-border px-4 sm:px-6 py-5 flex flex-col gap-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">

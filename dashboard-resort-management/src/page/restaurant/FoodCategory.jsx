@@ -246,7 +246,7 @@ export default function FoodCategory() {
   return (
     <div className={`min-h-full rounded-xl p-4 transition-colors duration-200 ${dark ? "bg-gray-900" : "bg-[#F5F8FC]"}`} style={{ fontFamily: "Inter, Poppins, sans-serif" }}>
       <div className="flex justify-between items-center mb-5">
-        <h2 className={`text-[26px] font-bold ${titleCls}`}>Food Categories</h2>
+        <h2 className={`text-[26px] font-bold ${titleCls}`}>Categories Menu</h2>
         <Button onClick={() => { setEditing(null); setModal(true); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[8px] bg-[#FF6B00] text-white hover:bg-[#e05e00]">
           <MdAdd size={14} /> Add Category
         </Button>

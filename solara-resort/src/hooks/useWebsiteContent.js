@@ -37,5 +37,7 @@ export function useWebsiteContent() {
     loading,
     error,
     reload: load,
+    /** Alias for pages that destructure lists explicitly */
+    dining: lists.diningVenues,
   };
 }

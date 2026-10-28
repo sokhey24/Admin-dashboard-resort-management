@@ -1,7 +1,10 @@
 export const ROUTES = {
   home: '/',
+  branches: '/branches',
+  branchDetail: (idOrSlug) => `/branches/${idOrSlug}`,
   resorts: '/resorts',
   resortDetail: (id) => `/resort/${id}`,
+  locations: '/locations',
   rooms: '/rooms',
   roomDetail: (id) => `/room/${id}`,
   about: '/about',
@@ -25,6 +28,7 @@ export const ROUTES = {
   accountNotifications: '/account/notifications',
   accountSettings: '/account/settings',
   accountFavorites: '/account/favorites',
+  accountOrders: '/account/orders',
 };
 
 export default ROUTES;

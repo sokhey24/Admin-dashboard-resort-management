@@ -67,5 +67,8 @@ class DatabaseSeeder extends Seeder
         // 6. Seed loyalty and bookings
         $this->call(CustomerLoyaltySeeder::class);
         $this->call(CustomerBookingSeeder::class);
+
+        // 7. Default Solara guest-website CMS content
+        $this->call(WebsiteContentSeeder::class);
     }
 }

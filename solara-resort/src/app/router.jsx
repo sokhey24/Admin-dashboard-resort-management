@@ -78,6 +78,7 @@ export function AppRouter() {
               <Route path="account/notifications" element={<AccountPage />} />
               <Route path="account/settings" element={<AccountPage />} />
               <Route path="account/favorites" element={<AccountPage />} />
+              <Route path="account/orders" element={<AccountPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>

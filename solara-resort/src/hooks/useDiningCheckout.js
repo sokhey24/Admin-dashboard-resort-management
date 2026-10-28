@@ -2,6 +2,10 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../config/routes.js';
 import { submitDiningCheckout } from '../util/diningCheckout.js';
+import {
+  appendDiningOrderHistory,
+  DINING_ORDER_PLACED_EVENT,
+} from '../util/diningOrderHistory.js';
 
 export function useDiningCheckout({ cartItems, clearCart, addToast, t, user, bookings }) {
   const navigate = useNavigate();
@@ -45,6 +49,11 @@ export function useDiningCheckout({ cartItems, clearCart, addToast, t, user, boo
       }
 
       const code = result.order?.order_code ?? result.order?.id;
+
+      appendDiningOrderHistory(result.order, cartItems);
+      window.dispatchEvent(
+        new CustomEvent(DINING_ORDER_PLACED_EVENT, { detail: { order: result.order } })
+      );
 
       if (paymentMethod === 'khqr' && result.khqr) {
         addToast?.(

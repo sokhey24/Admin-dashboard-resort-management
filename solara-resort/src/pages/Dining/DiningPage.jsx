@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../config/routes.js';
 import { DINING_PAGE_IMAGES, DINING_SPACE_GALLERY } from '../../constants/diningPageImages.js';
@@ -19,10 +19,14 @@ import { ReservationCTA } from '../../components/dining/ReservationCTA.jsx';
 import { CardlistSummaryOrder } from './CardlistSummaryOrder.jsx';
 import { useDiningCart } from './useDiningCart.js';
 import { useDiningCheckout } from '../../hooks/useDiningCheckout.js';
+import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
+import { pickMarketingList } from '../../util/marketingContent.js';
+import { resolveActivityImage } from '../../util/media.js';
 
 export const DiningPage = () => {
   const navigate = useNavigate();
-  const { addToast, t, currency, user, bookings } = useApp();
+  const { addToast, t, currency, user, bookings, localize } = useApp();
+  const { diningVenues: cmsVenues, loading: cmsLoading } = useWebsiteContent();
 
   const {
     items: cartItems,
@@ -35,7 +39,37 @@ export const DiningPage = () => {
     totalCount,
   } = useDiningCart();
 
+  const cmsVenueList = useMemo(
+    () => pickMarketingList(cmsVenues, cmsLoading, []),
+    [cmsVenues, cmsLoading]
+  );
+
+  const venueCatalog = useMemo(() => {
+    const cms = cmsVenueList;
+    if (cms.length > 0) {
+      return cms.map((v) => {
+        const item = localize ? localize(v) : v;
+        return {
+          id: v.id,
+          label: item.name || v.name,
+          image: resolveActivityImage(v.image) || v.image,
+          cuisine: item.cuisine,
+          description: item.description,
+          hours: item.hours,
+          priceLevel: v.priceLevel,
+        };
+      });
+    }
+    return DINING_RESTAURANTS.map((r) => ({ ...r, image: null, cuisine: '', description: '', hours: '', priceLevel: '' }));
+  }, [cmsVenueList, localize]);
+
   const [restaurantId, setRestaurantId] = useState(DINING_RESTAURANTS[0].id);
+
+  useEffect(() => {
+    if (venueCatalog.length > 0 && !venueCatalog.some((v) => v.id === restaurantId)) {
+      setRestaurantId(venueCatalog[0].id);
+    }
+  }, [venueCatalog, restaurantId]);
   const [lunchTime, setLunchTime] = useState('12:00');
   const [dinnerTime, setDinnerTime] = useState('19:30');
 
@@ -104,8 +138,57 @@ export const DiningPage = () => {
         onViewMenu={() => navigate(ROUTES.menuList)}
       />
 
+      {cmsVenueList.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-b border-border">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <span className="text-xs uppercase tracking-[0.2em] text-gold font-medium block mb-2">
+              {t('home.diningTag', 'Epicurean Artistry')}
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-text">
+              {t('home.diningVenuesTitle', 'Our Restaurants & Lounges')}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {venueCatalog.map((venue) => (
+              <article
+                key={venue.id}
+                className="group bg-surface border border-border hover:border-gold/40 rounded-[var(--radius-card)] overflow-hidden flex flex-col"
+              >
+                {venue.image && (
+                  <div className="relative aspect-[4/3] overflow-hidden bg-slate-900">
+                    <img
+                      src={venue.image}
+                      alt={venue.label}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      loading="lazy"
+                    />
+                    {venue.cuisine && (
+                      <span className="absolute top-3 left-3 text-[10px] uppercase tracking-wider text-gold-light bg-slate-950/80 px-2 py-1 rounded">
+                        {venue.cuisine}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="p-4 flex-1 flex flex-col gap-2">
+                  <h3 className="font-serif font-semibold text-text group-hover:text-gold transition-colors">
+                    {venue.label}
+                  </h3>
+                  {venue.description && (
+                    <p className="text-[11px] text-muted line-clamp-3 leading-relaxed">{venue.description}</p>
+                  )}
+                  <div className="mt-auto pt-2 flex justify-between text-[11px] text-muted border-t border-border">
+                    <span>{venue.hours}</span>
+                    {venue.priceLevel && <span className="text-gold font-semibold">{venue.priceLevel}</span>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       <DiningQuickFilters
-        restaurants={DINING_RESTAURANTS}
+        restaurants={venueCatalog.map((v) => ({ id: v.id, label: v.label }))}
         restaurantId={restaurantId}
         lunchTime={lunchTime}
         dinnerTime={dinnerTime}

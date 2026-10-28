@@ -1,21 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ArrowRight,
-  Sparkles,
-  Waves,
-  Shield,
-  Clock,
-  Award
-} from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { HeroSection } from '../../components/ui/HeroSection.jsx';
 import { SearchWidget } from '../../features/search/components/SearchWidget.jsx';
 import { BranchCard } from '../../components/branch/BranchCard.jsx';
 import { Button } from '../../components/ui/Button.jsx';
+import { formatCurrency } from '../../util/currency.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { useBranches, useBranchDetail } from '../../hooks/useCatalog.js';
 import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
 import { MARKETING_IMAGES } from '../../constants/marketingImages.js';
+import {
+  cmsText,
+  getCmsMediaUrl,
+  resolvePromoContent,
+  resolveTrustPillars,
+} from '../../util/marketingContent.js';
 import { ErrorState } from '../../components/ui/ErrorState.jsx';
 import { ResortCardSkeleton, RoomCardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { useGuestReviews } from '../../hooks/useGuestReviews.js';
@@ -131,12 +131,55 @@ export const HomePage = () => {
   } = useBranches({ per_page: 50 });
 
   const {
+    grouped: cmsGrouped,
     activities: cmsActivities,
     services: cmsServices,
     diningVenues: cmsDining,
     reviews: cmsReviews,
     error: cmsContentError,
   } = useWebsiteContent();
+
+  const heroBadge = cmsText(
+    cmsGrouped,
+    'hero',
+    'badge',
+    'badge_km',
+    language,
+    t('brand.sub', 'Sanctuary of Mindful Luxury')
+  );
+  const heroTitle = cmsText(
+    cmsGrouped,
+    'hero',
+    'title',
+    'title_km',
+    language,
+    t('home.heroTitle', 'Find Your Sanctuary in Southeast Asia')
+  );
+  const heroSubtitle = cmsText(
+    cmsGrouped,
+    'hero',
+    'subtitle',
+    'subtitle_km',
+    language,
+    t(
+      'home.heroSubtitle',
+      "Immerse yourself in world-class coastal villas, ancient forest pavilions, and tailored hospitality across Cambodia's most pristine horizons."
+    )
+  );
+  const heroBackgroundImage =
+    getCmsMediaUrl(cmsGrouped, 'hero', 'background_image') ||
+    getCmsMediaUrl(cmsGrouped, 'hero', 'image') ||
+    heroImage;
+
+  const trustPillars = useMemo(
+    () => resolveTrustPillars(cmsGrouped, { t, localize, language }),
+    [cmsGrouped, t, localize, language]
+  );
+
+  const promo = useMemo(
+    () => resolvePromoContent(cmsGrouped, { t, language }),
+    [cmsGrouped, t, language]
+  );
 
   const branchesByRegion = useMemo(() => {
     const map = new Map(SANCTUARY_REGIONS.map((r) => [r.key, []]));
@@ -280,10 +323,10 @@ export const HomePage = () => {
 
       {/* 1. HERO SECTION WITH SEARCH BAR */}
       <HeroSection
-        image={heroImage}
-        badge={t('brand.sub', 'Sanctuary of Mindful Luxury')}
-        title={t('home.heroTitle', 'Find Your Sanctuary in Southeast Asia')}
-        subtitle={t('home.heroSubtitle', 'Immerse yourself in world-class coastal villas, ancient forest pavilions, and tailored hospitality across Cambodia\'s most pristine horizons.')}
+        image={heroBackgroundImage}
+        badge={heroBadge}
+        title={heroTitle}
+        subtitle={heroSubtitle}
       >
         <SearchWidget />
       </HeroSection>
@@ -292,34 +335,18 @@ export const HomePage = () => {
       <RevealOnScroll as="section" className="border-b border-border bg-surface/60 py-6" y={16}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="flex flex-col items-center gap-1.5">
-              <Award className="w-5 h-5 text-gold shrink-0" />
-              <span className="text-xs font-semibold text-text uppercase tracking-wider">
-                {t('trust.awardTitle', 'World Luxury Award Winner')}
-              </span>
-              <span className="text-[11px] text-muted">{t('trust.awardDesc', 'Excellence in hospitality 2026')}</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <Shield className="w-5 h-5 text-gold shrink-0" />
-              <span className="text-xs font-semibold text-text uppercase tracking-wider">
-                {t('trust.rateTitle', 'Best Rate Guaranteed')}
-              </span>
-              <span className="text-[11px] text-muted">{t('trust.rateDesc', 'Exclusive direct booking perks')}</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <Clock className="w-5 h-5 text-gold shrink-0" />
-              <span className="text-xs font-semibold text-text uppercase tracking-wider">
-                {t('trust.butlerTitle', '24/7 Dedicated Butler')}
-              </span>
-              <span className="text-[11px] text-muted">{t('trust.butlerDesc', 'Personalized concierge guild')}</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <Waves className="w-5 h-5 text-gold shrink-0" />
-              <span className="text-xs font-semibold text-text uppercase tracking-wider">
-                {t('trust.boatTitle', 'Private Island Speedboat')}
-              </span>
-              <span className="text-[11px] text-muted">{t('trust.boatDesc', 'VIP maritime & fleet transfers')}</span>
-            </div>
+            {trustPillars.map((pillar) => {
+              const Icon = pillar.icon;
+              return (
+                <div key={pillar.title} className="flex flex-col items-center gap-1.5">
+                  <Icon className="w-5 h-5 text-gold shrink-0" aria-hidden />
+                  <span className="text-xs font-semibold text-text uppercase tracking-wider">
+                    {pillar.title}
+                  </span>
+                  <span className="text-[11px] text-muted">{pillar.description}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </RevealOnScroll>
@@ -646,30 +673,30 @@ export const HomePage = () => {
           <div className="relative rounded-[var(--radius-modal)] overflow-hidden border border-gold/40 p-8 sm:p-12 bg-gradient-to-r from-slate-950 via-surface to-slate-950 text-white shadow-2xl">
             <div className="relative z-10 max-w-2xl space-y-4 text-left">
               <span className="text-xs uppercase tracking-[0.25em] text-gold font-bold inline-block">
-                {t('home.promoTag', 'Seasonal Resident Privileges')}
+                {promo.tag}
               </span>
               <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
-                {t('home.promoTitle', 'Stay Four Nights, Savor the Fourth with Our Compliments')}
+                {promo.title}
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-light">
-                {t('home.promoDesc', 'Reserve any private pool villa or overwater bungalow for four consecutive nights and receive your fourth night complimentary, alongside daily Champagne breakfast, roundtrip speedboat transfers, and a 60-minute couples massage.')}
+                {promo.description}
               </p>
               <div className="pt-4 flex flex-wrap gap-4 items-center">
                 <Button
                   variant="gold"
                   size="md"
-                  onClick={() => navigate('/booking')}
+                  onClick={() => navigate(promo.ctaPath || '/booking')}
                 >
-                  {t('home.promoCta', 'Reserve Privileged Stay')}
+                  {promo.ctaLabel}
                 </Button>
                 <span className="text-xs text-slate-400">
-                  {t('home.promoValid', 'Valid for stays through December 2026.')}
+                  {promo.validUntil}
                 </span>
               </div>
             </div>
             <div className="absolute right-0 bottom-0 top-0 w-1/3 opacity-20 pointer-events-none hidden lg:block">
               <img
-                src={MARKETING_IMAGES.hero}
+                src={promo.imageUrl || MARKETING_IMAGES.hero}
                 alt="Solara promotion"
                 className="w-full h-full object-cover"
               />

@@ -115,7 +115,7 @@ function buildMenu(t, can, isAdmin, canViewReports, canViewDashboard, role) {
 
   const restaurantItems = [];
   if (can("restaurant.menu.view"))          restaurantItems.push(item(t("nav.menu", "Menu"),              "/restaurant/menu"));
-  if (can("restaurant.categories.view"))    restaurantItems.push(item(t("nav.foodCategory", "Food Category"),     "/restaurant/category"));
+  if (can("restaurant.categories.view"))    restaurantItems.push(item(t("nav.foodCategory", "Categories Menu"),     "/restaurant/category"));
   if (can("restaurant.tables.view"))        restaurantItems.push(item(t("nav.tableReservation", "Table Reservation"), "/restaurant/table"));
   if (can("restaurant.orders.view"))        restaurantItems.push(item(t("nav.foodOrder", "Food Order"),        "/restaurant/order"));
   if (can("restaurant.billing.view"))       restaurantItems.push(item(t("nav.billing", "Billing"),           "/restaurant/billing"));

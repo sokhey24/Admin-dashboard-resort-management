@@ -12,14 +12,22 @@ import { normalizeCategory } from '../../components/activities/activityBookingUt
 import { paginateItems } from '../../util/paginateList.js';
 import { ListPagination } from '../../components/ui/ListPagination.jsx';
 import { Sparkles } from 'lucide-react';
+import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
+import { pickMarketingList } from '../../util/marketingContent.js';
 
 const ACTIVITIES_PAGE_SIZE = 6;
 
 export const ActivitiesPage = () => {
   const { currency, t, localize, language, user } = useApp();
+  const { activities: cmsActivities, loading: cmsLoading } = useWebsiteContent();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [listPage, setListPage] = useState(1);
   const [selectedActivity, setSelectedActivity] = useState(null);
+
+  const catalog = useMemo(
+    () => pickMarketingList(cmsActivities, cmsLoading, ACTIVITIES_FIXTURE),
+    [cmsActivities, cmsLoading]
+  );
 
   const categories = useMemo(
     () =>
@@ -56,10 +64,10 @@ export const ActivitiesPage = () => {
   );
 
   const filteredActivities = useMemo(() => {
-    if (selectedCategory === 'All') return ACTIVITIES_FIXTURE;
+    if (selectedCategory === 'All') return catalog;
     const target = normalizeCategory(selectedCategory);
-    return ACTIVITIES_FIXTURE.filter((a) => normalizeCategory(a.category) === target);
-  }, [selectedCategory]);
+    return catalog.filter((a) => normalizeCategory(a.category) === target);
+  }, [selectedCategory, catalog]);
 
   useEffect(() => {
     setListPage(1);

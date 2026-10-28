@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { MARKETING_IMAGES } from '../../constants/marketingImages.js';
+import { resolveActivityImage } from '../../util/media.js';
 
 function resolveLocalImage(src) {
   if (!src) return null;
-  const str = String(src);
-  if (str.startsWith('http') || str.startsWith('/') || str.includes('/assets/')) {
-    return src;
-  }
-  return src;
+  return resolveActivityImage(src) || src;
 }
 
 export function ActivityCardImage({ src, alt, fallbackLabel }) {

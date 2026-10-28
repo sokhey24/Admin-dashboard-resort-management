@@ -6,6 +6,8 @@ import { MARKETING_IMAGES } from '../../constants/marketingImages.js';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { SERVICES_FIXTURE, SANCTUARY_FIXTURE } from '../../data/servicesData.js';
+import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
+import { pickMarketingList } from '../../util/marketingContent.js';
 import { ServiceList } from '../../components/services/ServiceList.jsx';
 import { ServiceInquiryModal } from '../../components/services/ServiceInquiryModal.jsx';
 import ROUTES from '../../config/routes.js';
@@ -15,8 +17,12 @@ export const ServicesPage = () => {
   const { t, localize, user, currency } = useApp();
 
   const [selectedService, setSelectedService] = useState(null);
+  const { services: cmsServices, loading: cmsLoading } = useWebsiteContent();
 
-  const services = SERVICES_FIXTURE;
+  const services = useMemo(
+    () => pickMarketingList(cmsServices, cmsLoading, SERVICES_FIXTURE),
+    [cmsServices, cmsLoading]
+  );
   const showEmpty = services.length === 0;
 
   const localizedSanctuaries = useMemo(

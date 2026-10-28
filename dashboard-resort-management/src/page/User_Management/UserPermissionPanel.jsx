@@ -36,7 +36,7 @@ const RESOURCE_LABELS = {
   "restaurant.dashboard":   "Dashboard",
   "restaurant.staff":       "Staff",
   "restaurant.menu":        "Menu",
-  "restaurant.categories":  "Food Categories",
+  "restaurant.categories":  "Categories Menu",
   "restaurant.tables":      "Tables",
   "restaurant.reservations":"Table Reservations",
   "restaurant.orders":      "Orders",

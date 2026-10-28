@@ -42,7 +42,7 @@ export const km = {
     restaurantDashboard: "ផ្ទាំងភោជនីយដ្ឋាន",
     restaurantStaff: "បុគ្គលិកភោជនីយដ្ឋាន",
     menu: "បញ្ជីម្ហូប & ភេសជ្ជៈ",
-    foodCategory: "ប្រភេទមុខម្ហូប",
+    foodCategory: "ម៉ឺនុយប្រភេទ",
     tableReservation: "ការកក់តុ",
     foodOrder: "ការកម្ម៉ង់ម្ហូប",
     billing: "វិក្កយបត្រម្ហូប",

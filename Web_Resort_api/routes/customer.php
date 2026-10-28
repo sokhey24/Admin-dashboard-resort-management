@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Review\ReviewController;
 use App\Http\Controllers\Api\Activity\ActivityBookingController;
 use App\Http\Controllers\Api\Service\ServiceInquiryController;
 use App\Http\Controllers\Api\Customer\ContactInquiryController;
+use App\Http\Controllers\Api\Customer\AIChatController;
 use App\Http\Controllers\Api\Notification\UserNotificationController;
 
 // Public browsing routes (no auth required)
@@ -63,6 +64,12 @@ Route::prefix('customer')->group(function () {
 
     Route::post('/table-reservation-requests', [GuestTableReservationController::class, 'store'])
         ->middleware(['optional.sanctum', 'throttle:30,1']);
+
+    Route::post('/ai/chat', [AIChatController::class, 'store'])
+        ->middleware('throttle:20,1');
+
+    Route::post('/ai/chat/stream', [AIChatController::class, 'stream'])
+        ->middleware('throttle:20,1');
 });
 
 // Authenticated customer routes

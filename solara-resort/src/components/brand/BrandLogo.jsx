@@ -14,11 +14,12 @@ export function BrandLogo({
   name = 'SOLARA',
   tagline = 'Resort & Spa',
   asLink = true,
+  imageSrc,
 }) {
   const content = (
     <span className={`inline-flex items-center gap-2.5 group tracking-tight ${className}`}>
       <img
-        src={logoUrl}
+        src={imageSrc || logoUrl}
         alt="Solara Resort & Spa"
         className={`shrink-0 group-hover:scale-[1.02] transition-transform ${imgClassName}`}
         width={160}

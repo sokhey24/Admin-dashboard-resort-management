@@ -1,18 +1,30 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { BrandLogo } from '../brand/BrandLogo.jsx';
 import { useApp } from '../../context/AppContext.jsx';
+import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
+import { resolveContactDetails } from '../../util/marketingContent.js';
+import { SITE_CONTACT } from '../../constants/siteContact.js';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
-  const { t } = useApp();
+  const { t, language } = useApp();
+  const { grouped } = useWebsiteContent();
+
+  const contact = useMemo(
+    () => resolveContactDetails(grouped, { t, language, siteContact: SITE_CONTACT }),
+    [grouped, t, language]
+  );
+
+  const copyrightLine =
+    contact.copyright ||
+    `© ${currentYear} ${t('brand.name', 'Solara')} Resort & Spa Group. ${t('footer.rights', 'All rights reserved.')}`;
 
   return (
     <footer className="w-full bg-bg-secondary border-t border-border text-text-secondary pt-16 pb-12 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-12">
-          {/* Column 1: Brand & Legacy */}
           <div className="lg:col-span-2 space-y-4">
             <BrandLogo
               to="/"
@@ -22,17 +34,26 @@ export const Footer = () => {
               titleClassName="text-xl font-bold font-serif tracking-[0.2em] text-text"
               taglineClassName="text-[9px] uppercase tracking-[0.25em] text-gold -mt-1 font-sans"
               imgClassName="h-10 w-auto max-w-[52px] object-contain object-left"
+              imageSrc={contact.logoUrl}
             />
             <p className="text-xs text-muted leading-relaxed max-w-sm">
-              {t('home.heroSubtitle', 'An architectural celebration of barefoot luxury, mindful heritage, and pristine Southeast Asian sanctuaries across Koh Rong, Siem Reap, Bokor Highlands, and Kep Bay.')}
+              {t(
+                'home.heroSubtitle',
+                'An architectural celebration of barefoot luxury, mindful heritage, and pristine Southeast Asian sanctuaries across Koh Rong, Siem Reap, Bokor Highlands, and Kep Bay.'
+              )}
             </p>
+            {(contact.checkIn || contact.checkOut) && (
+              <p className="text-[11px] text-muted">
+                {t('footer.checkIn', 'Check-in')}: {contact.checkIn} · {t('footer.checkOut', 'Check-out')}:{' '}
+                {contact.checkOut}
+              </p>
+            )}
             <div className="flex items-center gap-2 text-xs text-gold font-medium pt-2">
               <Sparkles className="w-4 h-4" />
               <span>{t('brand.winner', 'World Luxury Hotel Awards 2026 Winner')}</span>
             </div>
           </div>
 
-          {/* Column 2: Quick Links */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
               {t('nav.branches', 'Our Locations')} & {t('nav.rooms', 'Rooms')}
@@ -66,7 +87,6 @@ export const Footer = () => {
             </ul>
           </div>
 
-          {/* Column 3: Guest Experiences */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
               {t('nav.activities', 'Experience')}
@@ -100,7 +120,6 @@ export const Footer = () => {
             </ul>
           </div>
 
-          {/* Column 4: Contact & Concierge */}
           <div className="space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
               {t('nav.contact', 'Concierge')}
@@ -112,6 +131,55 @@ export const Footer = () => {
                   'Reach our guest concierge team for reservations, transfers, and bespoke experiences.'
                 )}
               </p>
+              <p>
+                <a href={contact.phoneHref} className="hover:text-gold transition-colors block">
+                  {contact.phonePrimary}
+                </a>
+                {contact.phoneSecondary && (
+                  <span className="block text-[11px] mt-0.5">{contact.phoneSecondary}</span>
+                )}
+              </p>
+              <p>
+                <a href={contact.emailHref} className="hover:text-gold transition-colors">
+                  {contact.emailPrimary}
+                </a>
+                {contact.emailSecondary && (
+                  <span className="block text-[11px] mt-0.5">{contact.emailSecondary}</span>
+                )}
+              </p>
+              {contact.address && <p className="text-[11px]">{contact.address}</p>}
+              <div className="flex flex-wrap gap-3 pt-1">
+                {contact.facebookUrl && (
+                  <a
+                    href={contact.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold hover:underline"
+                  >
+                    Facebook
+                  </a>
+                )}
+                {contact.telegramUrl && (
+                  <a
+                    href={contact.telegramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold hover:underline"
+                  >
+                    Telegram
+                  </a>
+                )}
+                {contact.instagramUrl && (
+                  <a
+                    href={contact.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold hover:underline"
+                  >
+                    Instagram
+                  </a>
+                )}
+              </div>
               <Link
                 to="/contact"
                 className="inline-flex items-center gap-2 text-gold hover:underline text-xs font-medium pt-1"
@@ -123,7 +191,6 @@ export const Footer = () => {
           </div>
         </div>
 
-        {/* Payment Methods & Verification */}
         <div className="py-6 border-t border-border flex flex-wrap items-center justify-between gap-4 text-xs text-muted">
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-medium text-text-secondary">
@@ -150,9 +217,8 @@ export const Footer = () => {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Legal */}
         <div className="pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-muted">
-          <p>© {currentYear} {t('brand.name', 'Solara')} Resort & Spa Group. {t('footer.rights', 'All rights reserved.')}</p>
+          <p>{copyrightLine}</p>
           <div className="flex items-center gap-4">
             <Link to="/about" className="hover:text-gold transition-colors">
               {t('footer.privacy', 'Privacy Policy')}

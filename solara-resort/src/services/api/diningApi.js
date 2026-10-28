@@ -32,3 +32,10 @@ export async function createGuestFoodOrder(payload) {
   const { data } = await axiosClient.post('customer/food-orders', payload);
   return data;
 }
+
+export async function fetchGuestFoodOrders() {
+  const { data } = await axiosClient.get('customer/food-orders');
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+}

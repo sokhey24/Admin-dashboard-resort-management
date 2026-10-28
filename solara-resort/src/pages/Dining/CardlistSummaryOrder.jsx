@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Banknote, BedDouble, Minus, Plus, QrCode, ShoppingBag, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
-import { Pagination } from '../../components/common/Pagination.jsx';
-import { paginateItems } from '../../util/paginateList.js';
 import { formatCurrency } from '../../util/currency.js';
 import { formatKhqrAmount, mountKhqrQr, normalizeKhqrPayment } from '../../util/khqr.js';
 import { verifyKhqrByMd5 } from '../../services/api/paymentApi.js';
@@ -10,9 +8,57 @@ import { verifyKhqrByMd5 } from '../../services/api/paymentApi.js';
 const PAYMENT_CASH = 'cash';
 const PAYMENT_KHQR = 'khqr';
 const PAYMENT_ROOM = 'charge_to_room';
-const CART_PANEL_PAGE_SIZE = 3;
-const CONFIRM_MODAL_PAGE_SIZE = 5;
+/** Space between site header and top of floating cart (px). */
+const CART_GAP_BELOW_HEADER_PX = 16;
+const CART_VIEWPORT_BOTTOM_PX = 16;
 
+function useCartTopOffsetPx() {
+  const [topPx, setTopPx] = useState(148);
+
+  useEffect(() => {
+    const measure = () => {
+      const header = document.querySelector('header');
+      if (!header) return;
+      setTopPx(Math.ceil(header.getBoundingClientRect().height) + CART_GAP_BELOW_HEADER_PX);
+    };
+
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener('scroll', measure, { passive: true });
+
+    const header = document.querySelector('header');
+    if (!header || typeof ResizeObserver === 'undefined') {
+      return () => {
+        window.removeEventListener('resize', measure);
+        window.removeEventListener('scroll', measure);
+      };
+    }
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
+      observer.disconnect();
+    };
+  }, []);
+
+  return topPx;
+}
+export const DINING_CART_OPEN_FLAG = 'solara-open-dining-cart';
+export const DINING_CART_OPEN_EVENT = 'solara:dining-cart-open';
+
+/** Routes where `CardlistSummaryOrder` is mounted (navbar cart can open in place). */
+export function isDiningCartSurfacePath(pathname) {
+  return (
+    pathname === '/' ||
+    pathname === '/dining' ||
+    pathname === '/dining/menu' ||
+    pathname.startsWith('/dining/menu/') ||
+    pathname === '/account' ||
+    pathname.startsWith('/account/')
+  );
+}
 export function CardlistSummaryOrder({
   items,
   currency,
@@ -31,27 +77,15 @@ export function CardlistSummaryOrder({
   const [collapsed, setCollapsed] = useState(false);
   const [cartFocused, setCartFocused] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_CASH);
-  const [cartPage, setCartPage] = useState(1);
-  const [confirmListPage, setConfirmListPage] = useState(1);
   const [khqrPayment, setKhqrPayment] = useState(null);
   const [orderCode, setOrderCode] = useState('');
   const [verifyLoading, setVerifyLoading] = useState(false);
   const qrHostRef = useRef(null);
-
-  const cartPagination = useMemo(
-    () => paginateItems(items, cartPage, CART_PANEL_PAGE_SIZE),
-    [items, cartPage]
-  );
-
-  const confirmPagination = useMemo(
-    () => paginateItems(items, confirmListPage, CONFIRM_MODAL_PAGE_SIZE),
-    [items, confirmListPage]
-  );
+  const cartTopPx = useCartTopOffsetPx();
 
   useEffect(() => {
     if (!confirmOpen) {
       setPaymentMethod(PAYMENT_CASH);
-      setConfirmListPage(1);
       setKhqrPayment(null);
       setOrderCode('');
     }
@@ -61,23 +95,6 @@ export function CardlistSummaryOrder({
     if (!khqrPayment || !qrHostRef.current) return;
     mountKhqrQr(qrHostRef.current, khqrPayment);
   }, [khqrPayment, confirmOpen]);
-
-  useEffect(() => {
-    setCartPage(1);
-    setConfirmListPage(1);
-  }, [items.length]);
-
-  useEffect(() => {
-    if (cartPage > cartPagination.totalPages) {
-      setCartPage(cartPagination.totalPages);
-    }
-  }, [cartPage, cartPagination.totalPages]);
-
-  useEffect(() => {
-    if (confirmListPage > confirmPagination.totalPages) {
-      setConfirmListPage(confirmPagination.totalPages);
-    }
-  }, [confirmListPage, confirmPagination.totalPages]);
 
   useEffect(() => {
     if (!cartFocused || confirmOpen) return undefined;
@@ -94,6 +111,24 @@ export function CardlistSummaryOrder({
     window.addEventListener('solara:dining-cart-blur', onBlurCart);
     return () => window.removeEventListener('solara:dining-cart-blur', onBlurCart);
   }, []);
+
+  const revealCart = useCallback(() => {
+    setCollapsed(false);
+    setCartFocused(true);
+  }, []);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(DINING_CART_OPEN_FLAG) === '1') {
+      sessionStorage.removeItem(DINING_CART_OPEN_FLAG);
+      revealCart();
+    }
+  }, [revealCart]);
+
+  useEffect(() => {
+    const onOpenCart = () => revealCart();
+    window.addEventListener(DINING_CART_OPEN_EVENT, onOpenCart);
+    return () => window.removeEventListener(DINING_CART_OPEN_EVENT, onOpenCart);
+  }, [revealCart]);
 
   if (items.length === 0 && !confirmOpen) {
     return null;
@@ -172,15 +207,19 @@ export function CardlistSummaryOrder({
   return (
     <>
       <aside
-        className={`fixed right-3 sm:right-6 w-[min(calc(100vw-1.5rem),22rem)] transition-[top,z-index] duration-200 ${
-          cartFocused && !confirmOpen ? 'z-[45] top-[7.25rem] sm:top-[7.75rem]' : 'z-[35] top-[5.75rem] sm:top-[6.25rem]'
+        className={`fixed right-3 sm:right-6 z-[40] w-[min(calc(100vw-1.5rem),22rem)] flex flex-col min-h-0 pointer-events-auto transition-[z-index] duration-200 ${
+          cartFocused && !confirmOpen ? 'z-[45]' : ''
         }`}
+        style={{
+          top: cartTopPx,
+          bottom: `max(${CART_VIEWPORT_BOTTOM_PX}px, env(safe-area-inset-bottom, 0px))`,
+        }}
         aria-label={t('dining.orderSummary', 'Order summary')}
         onPointerDown={() => setCartFocused(true)}
         data-dining-order-summary
       >
-        <div className="bg-surface border border-border rounded-[var(--radius-card)] shadow-2xl overflow-hidden flex flex-col max-h-[min(70vh,32rem)]">
-          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-surface-elevated/80">
+        <div className="flex flex-col flex-1 min-h-0 h-full max-h-full bg-surface border border-border rounded-[var(--radius-card)] shadow-2xl overflow-hidden">
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-surface-elevated/80">
             <div className="flex items-center gap-2 min-w-0">
               <ShoppingBag className="w-4 h-4 text-gold shrink-0" aria-hidden />
               <h2 className="text-sm font-serif font-bold text-text truncate">
@@ -201,14 +240,17 @@ export function CardlistSummaryOrder({
           </div>
 
           {!collapsed && (
-            <>
-              {cartPagination.total > CART_PANEL_PAGE_SIZE && (
-                <p className="px-3 pt-2 text-[10px] text-muted tabular-nums">
-                  {cartPagination.startIndex}–{cartPagination.endIndex} of {cartPagination.total}
+            <div className="flex flex-col flex-1 min-h-0">
+              {items.length > 1 && (
+                <p className="shrink-0 px-3 pt-2 text-[10px] text-muted tabular-nums">
+                  {items.length} {t('dining.cartScrollHint', 'items — scroll to see all')}
                 </p>
               )}
-              <ul className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-                {cartPagination.items.map((line) => {
+              <ul
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 space-y-3 [scrollbar-gutter:stable]"
+                aria-label={t('dining.cartItemsList', 'Cart items')}
+              >
+                {items.map((line) => {
                   const lineTotal = line.price * line.quantity;
                   return (
                     <li
@@ -255,7 +297,7 @@ export function CardlistSummaryOrder({
                             {t('common.cancel', 'Cancel')}
                           </button>
                         </div>
-                        <p className="text-xs font-semibold text-primary tabular-nums">
+                        <p className="text-xs font-semibold text-gold tabular-nums">
                           {formatCurrency(lineTotal, currency)}
                         </p>
                       </div>
@@ -264,16 +306,7 @@ export function CardlistSummaryOrder({
                 })}
               </ul>
 
-              {cartPagination.showPagination && (
-                <Pagination
-                  className="px-3 pb-2"
-                  page={cartPagination.page}
-                  totalPages={cartPagination.totalPages}
-                  onPageChange={setCartPage}
-                />
-              )}
-
-              <div className="border-t border-border p-4 space-y-3 bg-surface-elevated/40">
+              <div className="shrink-0 border-t border-border p-4 space-y-3 bg-surface-elevated/40 shadow-[0_-10px_28px_rgba(0,0,0,0.15)]">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted">{t('dining.cartTotal', 'Total')}</span>
                   <span className="font-serif font-bold text-text tabular-nums">
@@ -284,7 +317,7 @@ export function CardlistSummaryOrder({
                   {t('dining.buyNow', 'Buy Now')}
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </div>
       </aside>
@@ -320,15 +353,8 @@ export function CardlistSummaryOrder({
                       </p>
                     </div>
 
-                    {confirmPagination.total > CONFIRM_MODAL_PAGE_SIZE && (
-                      <p className="text-xs text-muted tabular-nums">
-                        Showing {confirmPagination.startIndex}–{confirmPagination.endIndex} of{' '}
-                        {confirmPagination.total} items
-                      </p>
-                    )}
-
-                    <ul className="text-xs sm:text-sm space-y-2 border border-border rounded-[var(--radius-card)] p-4 bg-bg/40">
-                      {confirmPagination.items.map((line) => (
+                    <ul className="text-xs sm:text-sm space-y-2 border border-border rounded-[var(--radius-card)] p-4 bg-bg/40 max-h-[min(55dvh,24rem)] overflow-y-auto overscroll-contain touch-pan-y [scrollbar-gutter:stable]">
+                      {items.map((line) => (
                         <li
                           key={line.id}
                           className="flex flex-row items-center justify-between gap-3 py-2 border-b border-border/60 last:border-0"
@@ -349,14 +375,6 @@ export function CardlistSummaryOrder({
                         </li>
                       ))}
                     </ul>
-
-                    {confirmPagination.showPagination && (
-                      <Pagination
-                        page={confirmPagination.page}
-                        totalPages={confirmPagination.totalPages}
-                        onPageChange={setConfirmListPage}
-                      />
-                    )}
 
                     <div className="flex flex-row items-center justify-between text-base font-semibold pt-2 border-t border-border">
                       <span>{t('dining.cartTotal', 'Total')}</span>

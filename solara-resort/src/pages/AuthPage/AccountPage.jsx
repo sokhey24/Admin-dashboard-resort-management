@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useMotionPresets } from '../../motion/useMotionPresets.js';
@@ -16,6 +16,7 @@ import {
   MapPin,
   Camera,
   Loader2,
+  ShoppingBag,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { Input } from '../../components/ui/Input.jsx';
@@ -41,6 +42,13 @@ import { deleteGuestReview } from '../../services/api/reviewsApi.js';
 import { getApiErrorMessage } from '../../services/api/errors.js';
 import GuestLiveBill from '../../components/account/GuestLiveBill.jsx';
 import { RescheduleBookingModal } from '../../components/booking/RescheduleBookingModal.jsx';
+import {
+  CardlistSummaryOrder,
+  DINING_CART_OPEN_EVENT,
+} from '../Dining/CardlistSummaryOrder.jsx';
+import { useGuestFoodOrders } from '../../hooks/useGuestFoodOrders.js';
+import { useDiningCart } from '../Dining/useDiningCart.js';
+import { useDiningCheckout } from '../../hooks/useDiningCheckout.js';
 
 const BOOKING_ROOM_IMAGE_FALLBACK = MARKETING_IMAGES.villa;
 
@@ -90,6 +98,67 @@ function bookingStatusBadgeClass(status) {
 
 function canGuestRescheduleOnline(booking) {
   return booking && ['pending', 'confirmed'].includes(booking.status);
+}
+
+function foodOrderStatusBadgeClass(status) {
+  switch (status) {
+    case 'completed':
+    case 'served':
+    case 'paid':
+      return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+    case 'preparing':
+    case 'ready':
+      return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
+    case 'cancelled':
+      return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
+    default:
+      return 'bg-surface-elevated text-muted border border-border';
+  }
+}
+
+function formatOrderDate(iso, language) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString(language === 'km' ? 'km-KH' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function DiningOrderLineRow({ line, currency, imageSrc, fallbackImage }) {
+  const unitPrice = Number(line.unitPrice ?? line.price ?? 0);
+  const quantity = Number(line.quantity) || 1;
+  const lineTotal = unitPrice * quantity;
+
+  return (
+    <li className="flex gap-3 p-2.5 rounded-lg border border-border/80 bg-bg/50">
+      <img
+        src={imageSrc || fallbackImage}
+        alt=""
+        className="w-14 h-14 rounded-md object-cover shrink-0 border border-border bg-surface"
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = fallbackImage;
+        }}
+      />
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <p className="text-xs font-serif font-bold text-text line-clamp-2 leading-snug">{line.name}</p>
+        <p className="text-[11px] text-muted tabular-nums">
+          {formatCurrency(unitPrice, currency)}
+          <span className="text-muted/80"> / {quantity > 1 ? 'ea.' : 'item'}</span>
+        </p>
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-text-secondary tabular-nums">
+            × {quantity}
+          </span>
+          <span className="font-semibold text-gold tabular-nums">{formatCurrency(lineTotal, currency)}</span>
+        </div>
+      </div>
+    </li>
+  );
 }
 
 function bookingStatusLabel(status, language) {
@@ -146,6 +215,7 @@ export const AccountPage = () => {
   else if (path.includes('/notifications')) currentTab = 'notifications';
   else if (path.includes('/settings')) currentTab = 'settings';
   else if (path.includes('/favorites')) currentTab = 'favorites';
+  else if (path.includes('/orders')) currentTab = 'orders';
 
   const favoriteResortIds = favorites?.resorts ?? [];
   const favoriteRoomIds = favorites?.rooms ?? [];
@@ -154,6 +224,62 @@ export const AccountPage = () => {
     favoriteResortIds.length + favoriteRoomIds.length + favoriteDishIds.length;
 
   const { menuItems: liveMenuItems } = useDiningMenu();
+
+  const {
+    items: diningCartItems,
+    increment: incrementDiningCart,
+    decrement: decrementDiningCart,
+    removeItem: removeDiningCartItem,
+    clearCart: clearDiningCart,
+    total: diningCartTotal,
+    totalCount: diningCartCount,
+  } = useDiningCart();
+
+  const {
+    checkoutLoading: diningCheckoutLoading,
+    handleCheckoutConfirm: handleDiningCheckoutConfirm,
+    activeBooking: diningActiveBooking,
+  } = useDiningCheckout({
+    cartItems: diningCartItems,
+    clearCart: clearDiningCart,
+    addToast,
+    t,
+    user,
+    bookings,
+  });
+
+  const {
+    orders: diningOrderHistory,
+    loading: diningOrdersLoading,
+    error: diningOrdersError,
+  } = useGuestFoodOrders(user);
+
+  const openFloatingDiningCart = () => {
+    window.dispatchEvent(new CustomEvent(DINING_CART_OPEN_EVENT));
+  };
+
+  const menuImageById = useMemo(() => {
+    const map = new Map();
+    for (const dish of liveMenuItems) {
+      if (dish?.id != null && dish.image) {
+        map.set(String(dish.id), dish.image);
+      }
+    }
+    return map;
+  }, [liveMenuItems]);
+
+  const diningLineImage = useCallback(
+    (line) => {
+      if (line?.image) return line.image;
+      const id = line?.menuItemId ?? line?.id;
+      if (id != null) {
+        return menuImageById.get(String(id)) ?? BOOKING_ROOM_IMAGE_FALLBACK;
+      }
+      return MARKETING_IMAGES.dining ?? BOOKING_ROOM_IMAGE_FALLBACK;
+    },
+    [menuImageById]
+  );
+
   const favoriteDishes = useMemo(
     () => getFavoriteDishesByIds(favoriteDishIds, liveMenuItems),
     [favoriteDishIds, liveMenuItems]
@@ -201,6 +327,7 @@ export const AccountPage = () => {
   const [bookingFilter, setBookingFilter] = useState('all');
   const [bookingsPage, setBookingsPage] = useState(1);
   const [notificationsPage, setNotificationsPage] = useState(1);
+  const [diningOrdersPage, setDiningOrdersPage] = useState(1);
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState(null);
   const [bookingForReview, setBookingForReview] = useState(null);
   const [editingReview, setEditingReview] = useState(null);
@@ -254,9 +381,23 @@ export const AccountPage = () => {
     [notifications, notificationsPage]
   );
 
+  const paginatedDiningOrders = useMemo(
+    () => paginateItems(diningOrderHistory, diningOrdersPage),
+    [diningOrderHistory, diningOrdersPage]
+  );
+
   useEffect(() => {
     setBookingsPage(1);
   }, [bookingFilter]);
+
+  useEffect(() => {
+    setDiningOrdersPage(1);
+  }, [diningOrderHistory.length]);
+
+  useEffect(() => {
+    if (currentTab === 'orders') return;
+    setDiningOrdersPage(1);
+  }, [currentTab]);
 
   useEffect(() => {
     if (bookingsPage > paginatedBookings.totalPages) {
@@ -269,6 +410,12 @@ export const AccountPage = () => {
       setNotificationsPage(paginatedNotifications.totalPages);
     }
   }, [notificationsPage, paginatedNotifications.totalPages]);
+
+  useEffect(() => {
+    if (diningOrdersPage > paginatedDiningOrders.totalPages) {
+      setDiningOrdersPage(paginatedDiningOrders.totalPages);
+    }
+  }, [diningOrdersPage, paginatedDiningOrders.totalPages]);
 
   useEffect(() => {
     setNotificationsPage(1);
@@ -427,7 +574,22 @@ export const AccountPage = () => {
   };
 
   return (
-    <div className="w-full min-h-screen pt-28 pb-24 bg-bg">
+    <div className="w-full min-h-screen pt-28 pb-24 bg-bg relative">
+      <CardlistSummaryOrder
+        items={diningCartItems}
+        currency={currency}
+        t={t}
+        onIncrement={incrementDiningCart}
+        onDecrement={decrementDiningCart}
+        onRemove={removeDiningCartItem}
+        onCheckoutConfirm={handleDiningCheckoutConfirm}
+        onCartClear={clearDiningCart}
+        checkoutLoading={diningCheckoutLoading}
+        canChargeToRoom={Boolean(diningActiveBooking)}
+        total={diningCartTotal}
+        totalCount={diningCartCount}
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* User Card */}
         <div className="bg-surface border border-border p-6 sm:p-8 rounded-[var(--radius-card)] shadow-lg mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -516,11 +678,10 @@ export const AccountPage = () => {
             <nav className="bg-surface border border-border p-2 rounded-[var(--radius-card)] space-y-1">
               <Link
                 to="/account"
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
-                  currentTab === 'dashboard'
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'dashboard'
                     ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
                     : 'text-text hover:bg-surface-hover hover:text-gold'
-                }`}
+                  }`}
               >
                 <User className="w-4 h-4 text-gold shrink-0" />
                 <span>{t('account.dashboard', 'Dashboard')}</span>
@@ -528,11 +689,10 @@ export const AccountPage = () => {
 
               <Link
                 to="/account/bookings"
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
-                  currentTab === 'bookings'
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'bookings'
                     ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
                     : 'text-text hover:bg-surface-hover hover:text-gold'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <Calendar className="w-4 h-4 text-gold shrink-0" />
@@ -545,11 +705,10 @@ export const AccountPage = () => {
 
               <Link
                 to="/account/notifications"
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
-                  currentTab === 'notifications'
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'notifications'
                     ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
                     : 'text-text hover:bg-surface-hover hover:text-gold'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <Bell className="w-4 h-4 text-gold shrink-0" />
@@ -564,11 +723,10 @@ export const AccountPage = () => {
 
               <Link
                 to="/account/favorites"
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
-                  currentTab === 'favorites'
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'favorites'
                     ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
                     : 'text-text hover:bg-surface-hover hover:text-gold'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <Heart className="w-4 h-4 text-gold shrink-0" />
@@ -580,12 +738,33 @@ export const AccountPage = () => {
               </Link>
 
               <Link
-                to="/account/settings"
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
-                  currentTab === 'settings'
+                to={ROUTES.accountOrders}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'orders'
                     ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
                     : 'text-text hover:bg-surface-hover hover:text-gold'
-                }`}
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShoppingBag className="w-4 h-4 text-gold shrink-0" />
+                  <span>{t('account.storeHistory', 'Store History')}</span>
+                </div>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded tabular-nums ${
+                    diningCartCount > 0
+                      ? 'bg-gold/20 text-gold font-semibold'
+                      : 'text-muted bg-surface-elevated'
+                  }`}
+                >
+                  {diningCartCount > 0 ? diningCartCount : diningOrderHistory.length}
+                </span>
+              </Link>
+
+              <Link
+                to="/account/settings"
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${currentTab === 'settings'
+                    ? 'bg-gold/15 text-gold border border-gold/30 font-semibold'
+                    : 'text-text hover:bg-surface-hover hover:text-gold'
+                  }`}
               >
                 <Settings className="w-4 h-4 text-gold shrink-0" />
                 <span>{t('account.settings', 'Preferences & Profile')}</span>
@@ -643,1084 +822,1245 @@ export const AccountPage = () => {
           {/* Main Tab Area */}
           <main className="lg:col-span-3 space-y-8">
             <AnimatePresence mode="wait">
-            {currentTab === 'dashboard' && (
-              <motion.div key="account-dashboard" {...tabPanelMotion} className="space-y-8">
-                {upcomingBooking && (
-                  <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-md space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-border">
-                      <span className="text-xs uppercase tracking-wider text-gold font-semibold flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{language === 'km' ? 'ការស្នាក់នៅរមណីយដ្ឋានបន្ទាប់របស់អ្នក' : 'Upcoming Sanctuary Residency'}</span>
-                      </span>
-                      <span className="text-xs font-mono font-semibold text-text">
-                        #{upcomingBooking.id}
-                      </span>
-                    </div>
+              {currentTab === 'dashboard' && (
+                <motion.div key="account-dashboard" {...tabPanelMotion} className="space-y-8">
+                  {upcomingBooking && (
+                    <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-md space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-border">
+                        <span className="text-xs uppercase tracking-wider text-gold font-semibold flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{language === 'km' ? 'ការស្នាក់នៅរមណីយដ្ឋានបន្ទាប់របស់អ្នក' : 'Upcoming Sanctuary Residency'}</span>
+                        </span>
+                        <span className="text-xs font-mono font-semibold text-text">
+                          #{upcomingBooking.id}
+                        </span>
+                      </div>
 
-                    <div className="flex flex-col md:flex-row gap-6 items-start">
-                      <img
-                        src={bookingRoomImageSrc(upcomingBooking.roomImage)}
-                        alt={upcomingBooking.roomName}
-                        className="w-full md:w-44 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = BOOKING_ROOM_IMAGE_FALLBACK;
-                        }}
-                      />
-                      <div className="space-y-2 flex-1 text-left">
-                        <h3 className="text-xl font-serif font-bold text-text">
-                          {upcomingBooking.roomName}
-                        </h3>
-                        <p className="text-xs text-gold-light">{upcomingBooking.resortName}</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted pt-1">
-                          <div>
-                            <span className="text-[10px] block uppercase">{t('search.checkIn', 'Check-In')}</span>
-                            <span className="font-medium text-text">{upcomingBooking.checkIn}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] block uppercase">{t('search.checkOut', 'Check-Out')}</span>
-                            <span className="font-medium text-text">{upcomingBooking.checkOut}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] block uppercase">{t('common.totalDue', 'Total Paid')}</span>
-                            <span className="font-medium text-gold font-serif">
-                              {formatCurrency(upcomingBooking.pricing.totalUSD, currency)}
-                            </span>
+                      <div className="flex flex-col md:flex-row gap-6 items-start">
+                        <img
+                          src={bookingRoomImageSrc(upcomingBooking.roomImage)}
+                          alt={upcomingBooking.roomName}
+                          className="w-full md:w-44 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = BOOKING_ROOM_IMAGE_FALLBACK;
+                          }}
+                        />
+                        <div className="space-y-2 flex-1 text-left">
+                          <h3 className="text-xl font-serif font-bold text-text">
+                            {upcomingBooking.roomName}
+                          </h3>
+                          <p className="text-xs text-gold-light">{upcomingBooking.resortName}</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted pt-1">
+                            <div>
+                              <span className="text-[10px] block uppercase">{t('search.checkIn', 'Check-In')}</span>
+                              <span className="font-medium text-text">{upcomingBooking.checkIn}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] block uppercase">{t('search.checkOut', 'Check-Out')}</span>
+                              <span className="font-medium text-text">{upcomingBooking.checkOut}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] block uppercase">{t('common.totalDue', 'Total Paid')}</span>
+                              <span className="font-medium text-gold font-serif">
+                                {formatCurrency(upcomingBooking.pricing.totalUSD, currency)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs">
-                      {bookingNeedsPayment(upcomingBooking) ? (
-                        <span className="text-amber-400 font-medium flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>
-                            {language === 'km' ? 'ការបង់ប្រាក់មិនទាន់បញ្ចប់' : 'Payment outstanding'}
+                      <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs">
+                        {bookingNeedsPayment(upcomingBooking) ? (
+                          <span className="text-amber-400 font-medium flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>
+                              {language === 'km' ? 'ការបង់ប្រាក់មិនទាន់បញ្ចប់' : 'Payment outstanding'}
+                            </span>
                           </span>
-                        </span>
-                      ) : (
-                        <span className="text-emerald-400 font-medium flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{t('confirm.verified', 'Confirmed & Guaranteed')}</span>
-                        </span>
-                      )}
-                      <div className="flex items-center gap-2">
-                        {bookingNeedsPayment(upcomingBooking) && (
-                          <Button
-                            variant="gold"
-                            size="sm"
-                            disabled={paymentNavigatingId === upcomingBooking.apiId}
-                            onClick={() => goToCompletePayment(upcomingBooking)}
-                          >
-                            {t('account.completePayment', 'Complete Payment')}
-                          </Button>
+                        ) : (
+                          <span className="text-emerald-400 font-medium flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{t('confirm.verified', 'Confirmed & Guaranteed')}</span>
+                          </span>
                         )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedBookingForDetail(upcomingBooking)}
-                        >
-                          {language === 'km' ? 'មើលវិញ្ញាបនបត្រកក់' : 'View Full Voucher'}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {bookingNeedsPayment(upcomingBooking) && (
+                            <Button
+                              variant="gold"
+                              size="sm"
+                              disabled={paymentNavigatingId === upcomingBooking.apiId}
+                              onClick={() => goToCompletePayment(upcomingBooking)}
+                            >
+                              {t('account.completePayment', 'Complete Payment')}
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedBookingForDetail(upcomingBooking)}
+                          >
+                            {language === 'km' ? 'មើលវិញ្ញាបនបត្រកក់' : 'View Full Voucher'}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
-                    <span className="text-[10px] uppercase text-muted tracking-wider block">
-                      {language === 'km' ? 'ការស្នាក់នៅសរុប' : 'Total Stays'}
-                    </span>
-                    <span className="text-2xl font-bold font-serif text-text mt-1 block">
-                      {bookings.length}
-                    </span>
-                    <span className="text-[11px] text-muted">
-                      {language === 'km'
-                        ? uniqueDestinations > 0
-                          ? `នៅទូទាំង ${uniqueDestinations} គោលដៅ`
-                          : 'មិនទាន់មានការស្នាក់នៅ'
-                        : uniqueDestinations > 0
-                          ? `Across ${uniqueDestinations} destination${uniqueDestinations > 1 ? 's' : ''}`
-                          : 'No destinations yet'}
-                    </span>
-                  </div>
-
-                  {typeof user.points === 'number' && (
-                    <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
-                      <span className="text-[10px] uppercase text-muted tracking-wider block">
-                        {language === 'km' ? 'ពិន្ទុភាពស្មោះត្រង់' : 'Loyalty Points'}
-                      </span>
-                      <span className="text-2xl font-bold font-serif text-gold mt-1 block">
-                        {user.points.toLocaleString()}
-                      </span>
-                      <span className="text-[11px] text-muted">
-                        {language === 'km' ? 'រួចរាល់សម្រាប់ដំឡើងបន្ទប់' : 'Ready for room upgrade'}
-                      </span>
                     </div>
                   )}
 
-                  <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
-                    <span className="text-[10px] uppercase text-muted tracking-wider block">
-                      {t('account.savedCount', 'Saved items')}
-                    </span>
-                    <span className="text-2xl font-bold font-serif text-text mt-1 block">
-                      {favoritesTotal}
-                    </span>
-                    <Link to="/account/favorites" className="text-[11px] text-gold hover:underline">
-                      {t('account.myFavorites', 'Saved Favorites')}
-                    </Link>
-                  </div>
-                </div>
-
-                {favoritesTotal > 0 && (
-                  <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-border">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-text font-serif flex items-center gap-1.5">
-                        <Heart className="w-3.5 h-3.5 text-gold" />
-                        {t('account.myFavorites', 'Saved Favorites')}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
+                      <span className="text-[10px] uppercase text-muted tracking-wider block">
+                        {language === 'km' ? 'ការស្នាក់នៅសរុប' : 'Total Stays'}
                       </span>
-                      <Link to="/account/favorites" className="text-xs text-gold hover:underline">
-                        {language === 'km' ? 'មើលទាំងអស់' : 'View All'}
+                      <span className="text-2xl font-bold font-serif text-text mt-1 block">
+                        {bookings.length}
+                      </span>
+                      <span className="text-[11px] text-muted">
+                        {language === 'km'
+                          ? uniqueDestinations > 0
+                            ? `នៅទូទាំង ${uniqueDestinations} គោលដៅ`
+                            : 'មិនទាន់មានការស្នាក់នៅ'
+                          : uniqueDestinations > 0
+                            ? `Across ${uniqueDestinations} destination${uniqueDestinations > 1 ? 's' : ''}`
+                            : 'No destinations yet'}
+                      </span>
+                    </div>
+
+                    {typeof user.points === 'number' && (
+                      <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
+                        <span className="text-[10px] uppercase text-muted tracking-wider block">
+                          {language === 'km' ? 'ពិន្ទុភាពស្មោះត្រង់' : 'Loyalty Points'}
+                        </span>
+                        <span className="text-2xl font-bold font-serif text-gold mt-1 block">
+                          {user.points.toLocaleString()}
+                        </span>
+                        <span className="text-[11px] text-muted">
+                          {language === 'km' ? 'រួចរាល់សម្រាប់ដំឡើងបន្ទប់' : 'Ready for room upgrade'}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="bg-surface border border-border p-5 rounded-[var(--radius-card)]">
+                      <span className="text-[10px] uppercase text-muted tracking-wider block">
+                        {t('account.savedCount', 'Saved items')}
+                      </span>
+                      <span className="text-2xl font-bold font-serif text-text mt-1 block">
+                        {favoritesTotal}
+                      </span>
+                      <Link to="/account/favorites" className="text-[11px] text-gold hover:underline">
+                        {t('account.myFavorites', 'Saved Favorites')}
                       </Link>
                     </div>
-                    {favoritesLoading && favoritePreviewEntries.length === 0 ? (
-                      <p className="text-xs text-muted">{language === 'km' ? 'កំពុងផ្ទុក…' : 'Loading saved items…'}</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {favoritePreviewEntries.map(({ type, item }) => {
-                          if (type === 'dish') {
+                  </div>
+
+                  {favoritesTotal > 0 && (
+                    <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-border">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-text font-serif flex items-center gap-1.5">
+                          <Heart className="w-3.5 h-3.5 text-gold" />
+                          {t('account.myFavorites', 'Saved Favorites')}
+                        </span>
+                        <Link to="/account/favorites" className="text-xs text-gold hover:underline">
+                          {language === 'km' ? 'មើលទាំងអស់' : 'View All'}
+                        </Link>
+                      </div>
+                      {favoritesLoading && favoritePreviewEntries.length === 0 ? (
+                        <p className="text-xs text-muted">{language === 'km' ? 'កំពុងផ្ទុក…' : 'Loading saved items…'}</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {favoritePreviewEntries.map(({ type, item }) => {
+                            if (type === 'dish') {
+                              return (
+                                <Link
+                                  key={`dish-${item.id}`}
+                                  to={ROUTES.menuDetail(item.id)}
+                                  className="flex gap-3 p-3 rounded-[var(--radius-button)] border border-border hover:border-gold/40 transition-colors"
+                                >
+                                  <div className="w-20 aspect-[4/3] rounded overflow-hidden bg-slate-900 shrink-0 border border-border">
+                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0 flex-1 text-left">
+                                    <p className="text-xs font-serif font-semibold text-text truncate">{item.name}</p>
+                                    <p className="text-[10px] text-muted truncate">
+                                      {formatCurrency(item.price, currency)}
+                                    </p>
+                                  </div>
+                                  <FavoriteButton kind="dish" id={item.id} size="sm" />
+                                </Link>
+                              );
+                            }
+                            const isRoom = type === 'room';
+                            const localized = localize ? localize(item) : item;
+                            const href = isRoom ? `/room/${item.id}` : `/resort/${item.id}`;
+                            const image = localized.featuredImage;
                             return (
                               <Link
-                                key={`dish-${item.id}`}
-                                to={ROUTES.menuDetail(item.id)}
+                                key={`${type}-${item.id}`}
+                                to={href}
                                 className="flex gap-3 p-3 rounded-[var(--radius-button)] border border-border hover:border-gold/40 transition-colors"
                               >
                                 <div className="w-20 aspect-[4/3] rounded overflow-hidden bg-slate-900 shrink-0 border border-border">
-                                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                  {image ? (
+                                    <img src={image} alt={localized.name} className="w-full h-full object-cover" />
+                                  ) : null}
                                 </div>
                                 <div className="min-w-0 flex-1 text-left">
-                                  <p className="text-xs font-serif font-semibold text-text truncate">{item.name}</p>
+                                  <p className="text-xs font-serif font-semibold text-text truncate">{localized.name}</p>
                                   <p className="text-[10px] text-muted truncate">
-                                    {formatCurrency(item.price, currency)}
+                                    {isRoom ? localized.resortName : localized.location}
                                   </p>
                                 </div>
-                                <FavoriteButton kind="dish" id={item.id} size="sm" />
+                                <FavoriteButton kind={isRoom ? 'room' : 'resort'} id={item.id} size="sm" />
                               </Link>
                             );
-                          }
-                          const isRoom = type === 'room';
-                          const localized = localize ? localize(item) : item;
-                          const href = isRoom ? `/room/${item.id}` : `/resort/${item.id}`;
-                          const image = localized.featuredImage;
-                          return (
-                            <Link
-                              key={`${type}-${item.id}`}
-                              to={href}
-                              className="flex gap-3 p-3 rounded-[var(--radius-button)] border border-border hover:border-gold/40 transition-colors"
-                            >
-                              <div className="w-20 aspect-[4/3] rounded overflow-hidden bg-slate-900 shrink-0 border border-border">
-                                {image ? (
-                                  <img src={image} alt={localized.name} className="w-full h-full object-cover" />
-                                ) : null}
-                              </div>
-                              <div className="min-w-0 flex-1 text-left">
-                                <p className="text-xs font-serif font-semibold text-text truncate">{localized.name}</p>
-                                <p className="text-[10px] text-muted truncate">
-                                  {isRoom ? localized.resortName : localized.location}
-                                </p>
-                              </div>
-                              <FavoriteButton kind={isRoom ? 'room' : 'resort'} id={item.id} size="sm" />
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-border">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
-                      {language === 'km' ? 'សកម្មភាព និងការជូនដំណឹងថ្មីៗ' : 'Recent Activity & Alerts'}
-                    </span>
-                    <Link to="/account/notifications" className="text-xs text-gold hover:underline">
-                      {language === 'km' ? 'មើលទាំងអស់' : 'View All'}
-                    </Link>
-                  </div>
-                  <div className="space-y-3">
-                    {notifications.length === 0 ? (
-                      <p className="text-xs text-muted py-2">
-                        {t(
-                          'account.noAlertsYet',
-                          'No alerts yet. Reservation and payment updates will appear here.'
-                        )}
-                      </p>
-                    ) : (
-                      notifications.slice(0, 3).map((n) => (
-                        <div
-                          key={n.id}
-                          role={n.bookingApiId ? 'button' : undefined}
-                          tabIndex={n.bookingApiId ? 0 : undefined}
-                          onClick={() => n.bookingApiId && navigate('/account/bookings')}
-                          onKeyDown={(e) => {
-                            if (n.bookingApiId && (e.key === 'Enter' || e.key === ' ')) {
-                              e.preventDefault();
-                              navigate('/account/bookings');
-                            }
-                          }}
-                          className={`p-3.5 rounded-[var(--radius-button)] border text-xs flex items-start justify-between gap-3 ${
-                            n.read
-                              ? 'bg-surface border-border/50 text-muted'
-                              : 'bg-surface-elevated border-gold/30 text-text'
-                          } ${n.bookingApiId ? 'cursor-pointer hover:border-gold/50' : ''}`}
-                        >
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-text">{n.title}</p>
-                            <p className="text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
-                          </div>
-                          <span className="text-[10px] text-muted shrink-0">{n.date}</span>
+                          })}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {currentTab === 'bookings' && (
-              <motion.div key="account-bookings" {...tabPanelMotion} className="space-y-6">
-                {bookingsError && (
-                  <div className="rounded-[var(--radius-card)] border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-text">
-                    <p className="font-medium text-rose-200/90">{bookingsError}</p>
-                    <button
-                      type="button"
-                      className="text-gold hover:underline mt-2 cursor-pointer"
-                      onClick={() => refreshMyBookings()}
-                    >
-                      {t('common.tryAgain', 'Try again')}
-                    </button>
-                  </div>
-                )}
-
-                {bookingsLoading && bookings.length === 0 && !bookingsError && (
-                  <p className="text-xs text-muted text-center py-8">
-                    {t('account.loadingReservations', 'Loading your reservations…')}
-                  </p>
-                )}
-
-                {unpaidBookingsCount > 0 && (
-                  <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-text">
-                    <p className="font-medium text-amber-200/90">
-                      {language === 'km'
-                        ? `ការកក់ ${unpaidBookingsCount} ដែលរង់ចាំការបង់ប្រាក់`
-                        : `${unpaidBookingsCount} reservation${unpaidBookingsCount > 1 ? 's' : ''} awaiting payment`}
-                    </p>
-                    <p className="text-muted mt-1">
-                      {t(
-                        'account.unpaidBookingsHint',
-                        'You have reservations waiting for payment. Use Complete Payment to continue with KHQR.'
                       )}
-                    </p>
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {(myReviewsLoading || myGuestReviews.length > 0) && (
-                  <div className="space-y-3 pb-6 border-b border-border">
-                    <h3 className="text-sm font-serif font-bold text-text">
-                      {t('account.myReviews', 'Your Reviews')}
-                    </h3>
-                    <p className="text-[11px] text-muted">
-                      {t(
-                        'account.reviewsHomeHint',
-                        'Published reviews appear on the Home page after staff approval.'
-                      )}
-                    </p>
-                    {myReviewsLoading && myGuestReviews.length === 0 && (
-                      <p className="text-xs text-muted">{t('account.loadingReviews', 'Loading your reviews…')}</p>
-                    )}
+                  <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-border">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-text font-serif">
+                        {language === 'km' ? 'សកម្មភាព និងការជូនដំណឹងថ្មីៗ' : 'Recent Activity & Alerts'}
+                      </span>
+                      <Link to="/account/notifications" className="text-xs text-gold hover:underline">
+                        {language === 'km' ? 'មើលទាំងអស់' : 'View All'}
+                      </Link>
+                    </div>
                     <div className="space-y-3">
-                      {myGuestReviews.map((rev) => (
-                        <div
-                          key={rev.id}
-                          className="rounded-[var(--radius-card)] border border-border bg-surface/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                        >
-                          <div className="space-y-1.5 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <StarRatingDisplay value={rev.rating} />
-                              <span className="text-[10px] uppercase font-semibold text-muted">
-                                {rev.status === 'pending'
-                                  ? t('account.reviewStatusPending', 'Awaiting approval')
-                                  : rev.status === 'approved'
-                                    ? t('account.reviewStatusApproved', 'Published')
-                                    : t('account.reviewStatusRejected', 'Not published')}
-                              </span>
-                            </div>
-                            {rev.title && (
-                              <p className="text-sm font-semibold text-text truncate">{rev.title}</p>
-                            )}
-                            <p className="text-xs text-muted line-clamp-2">{rev.comment}</p>
-                            <p className="text-[10px] text-muted">
-                              {[rev.roomLabel, rev.locationLabel].filter(Boolean).join(' · ')}
-                            </p>
-                          </div>
-                          {rev.status === 'pending' && (
-                            <div className="flex flex-wrap gap-2 shrink-0">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs"
-                                onClick={() => setEditingReview(rev)}
-                              >
-                                {t('account.editReview', 'Edit')}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs text-rose-400 border-rose-500/30"
-                                onClick={async () => {
-                                  try {
-                                    await deleteGuestReview(re.id);
-                                    addToast(t('account.reviewDeleted', 'Review removed.'), 'info');
-                                    await reloadMyGuestReviews();
-                                    await refreshMyBookings();
-                                  } catch (err) {
-                                    addToast(
-                                      getApiErrorMessage(err, t('account.reviewDeleteFailed', 'Unable to delete review.')),
-                                      'error'
-                                    );
-                                  }
-                                }}
-                              >
-                                {t('account.deleteReview', 'Delete')}
-                              </Button>
-                            </div>
+                      {notifications.length === 0 ? (
+                        <p className="text-xs text-muted py-2">
+                          {t(
+                            'account.noAlertsYet',
+                            'No alerts yet. Reservation and payment updates will appear here.'
                           )}
-                        </div>
-                      ))}
+                        </p>
+                      ) : (
+                        notifications.slice(0, 3).map((n) => (
+                          <div
+                            key={n.id}
+                            role={n.bookingApiId ? 'button' : undefined}
+                            tabIndex={n.bookingApiId ? 0 : undefined}
+                            onClick={() => n.bookingApiId && navigate('/account/bookings')}
+                            onKeyDown={(e) => {
+                              if (n.bookingApiId && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                navigate('/account/bookings');
+                              }
+                            }}
+                            className={`p-3.5 rounded-[var(--radius-button)] border text-xs flex items-start justify-between gap-3 ${n.read
+                                ? 'bg-surface border-border/50 text-muted'
+                                : 'bg-surface-elevated border-gold/30 text-text'
+                              } ${n.bookingApiId ? 'cursor-pointer hover:border-gold/50' : ''}`}
+                          >
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-text">{n.title}</p>
+                              <p className="text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
+                            </div>
+                            <span className="text-[10px] text-muted shrink-0">{n.date}</span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                )}
+                </motion.div>
+              )}
 
-                <div className="flex items-center justify-between gap-4 pb-4 border-b border-border">
-                  <div>
-                    <h2 className="text-xl font-serif font-bold text-text">
-                      {t('account.myReservations', 'Sanctuary Reservations')}
-                    </h2>
-                    <p className="text-xs text-muted">
-                      {language === 'km'
-                        ? 'គ្រប់គ្រងការស្នាក់នៅនាពេលខាងមុខ និងប្រវត្តិស្នាក់នៅរមណីយដ្ឋាន សូឡារ៉ា របស់អ្នក'
-                        : 'Manage your upcoming and past Solara residencies'}
+              {currentTab === 'bookings' && (
+                <motion.div key="account-bookings" {...tabPanelMotion} className="space-y-6">
+                  {bookingsError && (
+                    <div className="rounded-[var(--radius-card)] border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-text">
+                      <p className="font-medium text-rose-200/90">{bookingsError}</p>
+                      <button
+                        type="button"
+                        className="text-gold hover:underline mt-2 cursor-pointer"
+                        onClick={() => refreshMyBookings()}
+                      >
+                        {t('common.tryAgain', 'Try again')}
+                      </button>
+                    </div>
+                  )}
+
+                  {bookingsLoading && bookings.length === 0 && !bookingsError && (
+                    <p className="text-xs text-muted text-center py-8">
+                      {t('account.loadingReservations', 'Loading your reservations…')}
                     </p>
-                  </div>
+                  )}
 
-                  <div className="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-[var(--radius-button)]">
-                    {[
-                      { key: 'all', label: language === 'km' ? 'ទាំងអស់' : 'All' },
-                      ...(unpaidBookingsCount > 0
-                        ? [
+                  {unpaidBookingsCount > 0 && (
+                    <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-text">
+                      <p className="font-medium text-amber-200/90">
+                        {language === 'km'
+                          ? `ការកក់ ${unpaidBookingsCount} ដែលរង់ចាំការបង់ប្រាក់`
+                          : `${unpaidBookingsCount} reservation${unpaidBookingsCount > 1 ? 's' : ''} awaiting payment`}
+                      </p>
+                      <p className="text-muted mt-1">
+                        {t(
+                          'account.unpaidBookingsHint',
+                          'You have reservations waiting for payment. Use Complete Payment to continue with KHQR.'
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {(myReviewsLoading || myGuestReviews.length > 0) && (
+                    <div className="space-y-3 pb-6 border-b border-border">
+                      <h3 className="text-sm font-serif font-bold text-text">
+                        {t('account.myReviews', 'Your Reviews')}
+                      </h3>
+                      <p className="text-[11px] text-muted">
+                        {t(
+                          'account.reviewsHomeHint',
+                          'Published reviews appear on the Home page after staff approval.'
+                        )}
+                      </p>
+                      {myReviewsLoading && myGuestReviews.length === 0 && (
+                        <p className="text-xs text-muted">{t('account.loadingReviews', 'Loading your reviews…')}</p>
+                      )}
+                      <div className="space-y-3">
+                        {myGuestReviews.map((rev) => (
+                          <div
+                            key={rev.id}
+                            className="rounded-[var(--radius-card)] border border-border bg-surface/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                          >
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <StarRatingDisplay value={rev.rating} />
+                                <span className="text-[10px] uppercase font-semibold text-muted">
+                                  {rev.status === 'pending'
+                                    ? t('account.reviewStatusPending', 'Awaiting approval')
+                                    : rev.status === 'approved'
+                                      ? t('account.reviewStatusApproved', 'Published')
+                                      : t('account.reviewStatusRejected', 'Not published')}
+                                </span>
+                              </div>
+                              {rev.title && (
+                                <p className="text-sm font-semibold text-text truncate">{rev.title}</p>
+                              )}
+                              <p className="text-xs text-muted line-clamp-2">{rev.comment}</p>
+                              <p className="text-[10px] text-muted">
+                                {[rev.roomLabel, rev.locationLabel].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                            {rev.status === 'pending' && (
+                              <div className="flex flex-wrap gap-2 shrink-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => setEditingReview(rev)}
+                                >
+                                  {t('account.editReview', 'Edit')}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs text-rose-400 border-rose-500/30"
+                                  onClick={async () => {
+                                    try {
+                                      await deleteGuestReview(re.id);
+                                      addToast(t('account.reviewDeleted', 'Review removed.'), 'info');
+                                      await reloadMyGuestReviews();
+                                      await refreshMyBookings();
+                                    } catch (err) {
+                                      addToast(
+                                        getApiErrorMessage(err, t('account.reviewDeleteFailed', 'Unable to delete review.')),
+                                        'error'
+                                      );
+                                    }
+                                  }}
+                                >
+                                  {t('account.deleteReview', 'Delete')}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-4 pb-4 border-b border-border">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold text-text">
+                        {t('account.myReservations', 'Sanctuary Reservations')}
+                      </h2>
+                      <p className="text-xs text-muted">
+                        {language === 'km'
+                          ? 'គ្រប់គ្រងការស្នាក់នៅនាពេលខាងមុខ និងប្រវត្តិស្នាក់នៅរមណីយដ្ឋាន សូឡារ៉ា របស់អ្នក'
+                          : 'Manage your upcoming and past Solara residencies'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-[var(--radius-button)]">
+                      {[
+                        { key: 'all', label: language === 'km' ? 'ទាំងអស់' : 'All' },
+                        ...(unpaidBookingsCount > 0
+                          ? [
                             {
                               key: 'unpaid',
                               label: language === 'km' ? 'រង់ចាំបង់' : 'Awaiting payment',
                             },
                           ]
-                        : []),
-                      { key: 'pending', label: language === 'km' ? 'កំពុងរង់ចាំ' : 'Pending' },
-                      { key: 'confirmed', label: language === 'km' ? 'បានបញ្ជាក់' : 'Confirmed' },
-                      { key: 'completed', label: language === 'km' ? 'បានបញ្ចប់' : 'Completed' },
-                      { key: 'cancelled', label: language === 'km' ? 'បានបោះបង់' : 'Cancelled' },
-                    ].map((filter) => (
-                      <button
-                        key={filter.key}
-                        onClick={() => setBookingFilter(filter.key)}
-                        className={`px-3 py-1 text-xs font-medium rounded capitalize cursor-pointer transition-colors ${
-                          bookingFilter === filter.key
-                            ? 'bg-gold text-slate-950 font-semibold'
-                            : 'text-muted hover:text-text'
-                        }`}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
+                          : []),
+                        { key: 'pending', label: language === 'km' ? 'កំពុងរង់ចាំ' : 'Pending' },
+                        { key: 'confirmed', label: language === 'km' ? 'បានបញ្ជាក់' : 'Confirmed' },
+                        { key: 'completed', label: language === 'km' ? 'បានបញ្ចប់' : 'Completed' },
+                        { key: 'cancelled', label: language === 'km' ? 'បានបោះបង់' : 'Cancelled' },
+                      ].map((filter) => (
+                        <button
+                          key={filter.key}
+                          onClick={() => setBookingFilter(filter.key)}
+                          className={`px-3 py-1 text-xs font-medium rounded capitalize cursor-pointer transition-colors ${bookingFilter === filter.key
+                              ? 'bg-gold text-slate-950 font-semibold'
+                              : 'text-muted hover:text-text'
+                            }`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  {filteredBookings.length === 0 ? (
-                    <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)]">
+                  <div className="space-y-4">
+                    {filteredBookings.length === 0 ? (
+                      <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)]">
+                        <p className="text-xs text-muted">
+                          {language === 'km'
+                            ? 'មិនមានការកក់បន្ទប់នៅក្នុងផ្នែកនេះទេ។'
+                            : 'No reservations found in this category.'}
+                        </p>
+                      </div>
+                    ) : (
+                      paginatedBookings.items.map((b, index) => (
+                        <StaggerItem key={b.id} index={index}>
+                          <div
+                            className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-sm flex flex-col md:flex-row items-start justify-between gap-6"
+                          >
+                            <div className="flex flex-col sm:flex-row gap-5 items-start">
+                              <img
+                                src={bookingRoomImageSrc(b.roomImage)}
+                                alt={b.roomName}
+                                className="w-full sm:w-36 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = BOOKING_ROOM_IMAGE_FALLBACK;
+                                }}
+                              />
+                              <div className="space-y-1.5 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-semibold text-gold">#{b.id}</span>
+                                  <span
+                                    className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${bookingStatusBadgeClass(
+                                      b.status
+                                    )}`}
+                                  >
+                                    {bookingStatusLabel(b.status, language)}
+                                  </span>
+                                </div>
+                                <h3 className="text-lg font-serif font-bold text-text">{b.roomName}</h3>
+                                {b.rooms?.length > 1 && (
+                                  <p className="text-[11px] text-muted">
+                                    {b.rooms.map((r) => r.label).join(' · ')}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted">{b.resortName}</p>
+                                <p className="text-xs text-text-secondary pt-1">
+                                  {b.checkIn} — {b.checkOut} ({b.nights} {b.nights === 1 ? t('common.night', 'night') : t('common.nights', 'nights')})
+                                </p>
+                                <GuestLiveBill
+                                  bookingApiId={b.apiId}
+                                  bookingStatus={b.status}
+                                  currency={currency}
+                                  t={t}
+                                />
+                                {bookingNeedsPayment(b) && (
+                                  <p className="text-[10px] font-semibold uppercase text-amber-400/90 pt-0.5">
+                                    {t('account.paymentUnpaid', 'Payment required')}
+                                    {b.paymentStatus && b.paymentStatus !== 'unpaid'
+                                      ? ` · ${b.paymentStatus}`
+                                      : ''}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="w-full md:w-auto flex md:flex-col items-center md:items-end justify-between gap-3 border-t md:border-t-0 pt-4 md:pt-0 border-border">
+                              <div className="text-left md:text-right">
+                                <span className="text-[10px] uppercase text-muted block">
+                                  {bookingNeedsPayment(b)
+                                    ? t('account.balanceDue', 'Balance due')
+                                    : t('common.totalDue', 'Total Paid')}
+                                </span>
+                                <span className="text-lg font-bold font-serif text-gold">
+                                  {formatCurrency(
+                                    bookingNeedsPayment(b) ? b.balanceDue : b.pricing.totalUSD,
+                                    currency
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                {bookingNeedsPayment(b) && (
+                                  <Button
+                                    variant="gold"
+                                    size="sm"
+                                    className="text-xs"
+                                    disabled={paymentNavigatingId === b.apiId}
+                                    onClick={() => goToCompletePayment(b)}
+                                  >
+                                    {t('account.completePayment', 'Complete Payment')}
+                                  </Button>
+                                )}
+                                {canGuestRescheduleOnline(b) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => setRescheduleBooking(b)}
+                                  >
+                                    {t('reschedule.changeDates', 'Change dates')}
+                                  </Button>
+                                )}
+                                {b.status === 'confirmed' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-rose-400 border-rose-500/30 hover:bg-rose-500/10 text-xs"
+                                    onClick={() => cancelBooking(b.id)}
+                                  >
+                                    {language === 'km' ? 'បោះបង់' : 'Cancel'}
+                                  </Button>
+                                )}
+                                {b.reviewEligibility?.can_review && (
+                                  <Button
+                                    variant="gold"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => setBookingForReview(b)}
+                                  >
+                                    {t('home.writeReview', 'Write a Review')}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs"
+                                  onClick={() => setSelectedBookingForDetail(b)}
+                                >
+                                  {language === 'km' ? 'វិញ្ញាបនបត្រ' : 'Voucher'}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </StaggerItem>
+                      ))
+                    )}
+                  </div>
+
+                  {paginatedBookings.showPagination && (
+                    <ListPagination
+                      page={paginatedBookings.page}
+                      totalPages={paginatedBookings.totalPages}
+                      total={paginatedBookings.total}
+                      startIndex={paginatedBookings.startIndex}
+                      endIndex={paginatedBookings.endIndex}
+                      onPageChange={setBookingsPage}
+                      language={language}
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {currentTab === 'notifications' && (
+                <motion.div key="account-notifications" {...tabPanelMotion} className="space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-border">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold text-text">
+                        {t('account.alerts', 'Sanctuary Alerts')}
+                      </h2>
                       <p className="text-xs text-muted">
                         {language === 'km'
-                          ? 'មិនមានការកក់បន្ទប់នៅក្នុងផ្នែកនេះទេ។'
-                          : 'No reservations found in this category.'}
+                          ? 'ព័ត៌មានបច្ចុប្បន្នភាពនៃការស្នាក់នៅ ការទូទាត់ និងការអញ្ជើញពិសេសពីក្រុមការងារ'
+                          : 'Stay updates, payment confirmations, and concierge invitations'}
                       </p>
                     </div>
-                  ) : (
-                    paginatedBookings.items.map((b, index) => (
-                      <StaggerItem key={b.id} index={index}>
-                      <div
-                        className="bg-surface border border-border p-6 rounded-[var(--radius-card)] shadow-sm flex flex-col md:flex-row items-start justify-between gap-6"
-                      >
-                        <div className="flex flex-col sm:flex-row gap-5 items-start">
-                          <img
-                            src={bookingRoomImageSrc(b.roomImage)}
-                            alt={b.roomName}
-                            className="w-full sm:w-36 aspect-[16/10] rounded-[var(--radius-button)] object-cover border border-border shrink-0"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = BOOKING_ROOM_IMAGE_FALLBACK;
-                            }}
-                          />
-                          <div className="space-y-1.5 text-left">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono font-semibold text-gold">#{b.id}</span>
-                              <span
-                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${bookingStatusBadgeClass(
-                                  b.status
-                                )}`}
-                              >
-                                {bookingStatusLabel(b.status, language)}
-                              </span>
-                            </div>
-                            <h3 className="text-lg font-serif font-bold text-text">{b.roomName}</h3>
-                            {b.rooms?.length > 1 && (
-                              <p className="text-[11px] text-muted">
-                                {b.rooms.map((r) => r.label).join(' · ')}
-                              </p>
-                            )}
-                            <p className="text-xs text-muted">{b.resortName}</p>
-                            <p className="text-xs text-text-secondary pt-1">
-                              {b.checkIn} — {b.checkOut} ({b.nights} {b.nights === 1 ? t('common.night', 'night') : t('common.nights', 'nights')})
-                            </p>
-                            <GuestLiveBill
-                              bookingApiId={b.apiId}
-                              bookingStatus={b.status}
-                              currency={currency}
-                              t={t}
-                            />
-                            {bookingNeedsPayment(b) && (
-                              <p className="text-[10px] font-semibold uppercase text-amber-400/90 pt-0.5">
-                                {t('account.paymentUnpaid', 'Payment required')}
-                                {b.paymentStatus && b.paymentStatus !== 'unpaid'
-                                  ? ` · ${b.paymentStatus}`
-                                  : ''}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="w-full md:w-auto flex md:flex-col items-center md:items-end justify-between gap-3 border-t md:border-t-0 pt-4 md:pt-0 border-border">
-                          <div className="text-left md:text-right">
-                            <span className="text-[10px] uppercase text-muted block">
-                              {bookingNeedsPayment(b)
-                                ? t('account.balanceDue', 'Balance due')
-                                : t('common.totalDue', 'Total Paid')}
-                            </span>
-                            <span className="text-lg font-bold font-serif text-gold">
-                              {formatCurrency(
-                                bookingNeedsPayment(b) ? b.balanceDue : b.pricing.totalUSD,
-                                currency
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            {bookingNeedsPayment(b) && (
-                              <Button
-                                variant="gold"
-                                size="sm"
-                                className="text-xs"
-                                disabled={paymentNavigatingId === b.apiId}
-                                onClick={() => goToCompletePayment(b)}
-                              >
-                                {t('account.completePayment', 'Complete Payment')}
-                              </Button>
-                            )}
-                            {canGuestRescheduleOnline(b) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs"
-                                onClick={() => setRescheduleBooking(b)}
-                              >
-                                {t('reschedule.changeDates', 'Change dates')}
-                              </Button>
-                            )}
-                            {b.status === 'confirmed' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-rose-400 border-rose-500/30 hover:bg-rose-500/10 text-xs"
-                                onClick={() => cancelBooking(b.id)}
-                              >
-                                {language === 'km' ? 'បោះបង់' : 'Cancel'}
-                              </Button>
-                            )}
-                            {b.reviewEligibility?.can_review && (
-                              <Button
-                                variant="gold"
-                                size="sm"
-                                className="text-xs"
-                                onClick={() => setBookingForReview(b)}
-                              >
-                                {t('home.writeReview', 'Write a Review')}
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => setSelectedBookingForDetail(b)}
-                            >
-                              {language === 'km' ? 'វិញ្ញាបនបត្រ' : 'Voucher'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      </StaggerItem>
-                    ))
-                  )}
-                </div>
-
-                {paginatedBookings.showPagination && (
-                  <ListPagination
-                    page={paginatedBookings.page}
-                    totalPages={paginatedBookings.totalPages}
-                    total={paginatedBookings.total}
-                    startIndex={paginatedBookings.startIndex}
-                    endIndex={paginatedBookings.endIndex}
-                    onPageChange={setBookingsPage}
-                    language={language}
-                  />
-                )}
-              </motion.div>
-            )}
-
-            {currentTab === 'notifications' && (
-              <motion.div key="account-notifications" {...tabPanelMotion} className="space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-border">
-                  <div>
-                    <h2 className="text-xl font-serif font-bold text-text">
-                      {t('account.alerts', 'Sanctuary Alerts')}
-                    </h2>
-                    <p className="text-xs text-muted">
-                      {language === 'km'
-                        ? 'ព័ត៌មានបច្ចុប្បន្នភាពនៃការស្នាក់នៅ ការទូទាត់ និងការអញ្ជើញពិសេសពីក្រុមការងារ'
-                        : 'Stay updates, payment confirmations, and concierge invitations'}
-                    </p>
                   </div>
-                </div>
 
-                <div className="space-y-3">
-                  {notifications.length === 0 ? (
-                    <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)]">
-                      <p className="text-xs text-muted max-w-sm mx-auto">
+                  <div className="space-y-3">
+                    {notifications.length === 0 ? (
+                      <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)]">
+                        <p className="text-xs text-muted max-w-sm mx-auto">
+                          {t(
+                            'account.noAlertsYet',
+                            'No alerts yet. Reservation and payment updates will appear here.'
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      paginatedNotifications.items.map((n, index) => (
+                        <motion.div
+                          key={n.id}
+                          layout
+                          initial={{ opacity: 0, x: reduced ? 0 : 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ ...transition(duration.card), delay: reduced ? 0 : Math.min(index, 4) * 0.05 }}
+                          onClick={() => {
+                            markNotificationRead(n.id);
+                            if (n.bookingApiId) navigate('/account/bookings');
+                          }}
+                          className={`p-5 rounded-[var(--radius-card)] border transition-colors cursor-pointer flex items-start justify-between gap-4 ${n.read
+                              ? 'bg-surface border-border text-muted'
+                              : 'bg-surface-elevated border-gold/40 shadow-sm text-text'
+                            }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-text text-sm font-serif">{n.title}</p>
+                              {!n.read && (
+                                <span className="w-2 h-2 rounded-full bg-gold shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
+                          </div>
+                          <span className="text-[11px] text-muted shrink-0">{n.date}</span>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+
+                  {paginatedNotifications.showPagination && (
+                    <ListPagination
+                      page={paginatedNotifications.page}
+                      totalPages={paginatedNotifications.totalPages}
+                      total={paginatedNotifications.total}
+                      startIndex={paginatedNotifications.startIndex}
+                      endIndex={paginatedNotifications.endIndex}
+                      onPageChange={setNotificationsPage}
+                      language={language}
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {currentTab === 'orders' && (
+                <motion.div key="account-orders" {...tabPanelMotion} className="space-y-8">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-border">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold text-text">
+                        {t('account.storeHistoryTitle', 'Dining store history')}
+                      </h2>
+                      <p className="text-xs text-muted mt-1">
                         {t(
-                          'account.noAlertsYet',
-                          'No alerts yet. Reservation and payment updates will appear here.'
+                          'account.storeHistorySubtitle',
+                          'Past food orders and your current floating cart from the resort menu'
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {diningCartCount > 0 && (
+                        <Button variant="gold" size="sm" onClick={openFloatingDiningCart}>
+                          {t('account.openFloatingCart', 'Open cart')} ({diningCartCount})
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.menuList)}>
+                        {t('account.browseMenu', 'Browse menu')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {diningCartCount > 0 && (
+                    <section className="bg-surface border border-gold/30 rounded-[var(--radius-card)] shadow-md overflow-hidden">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-border bg-surface-elevated/80">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ShoppingBag className="w-4 h-4 text-gold shrink-0" aria-hidden />
+                          <h3 className="text-sm font-serif font-bold text-text">
+                            {t('account.currentCartTitle', 'Current cart')}
+                          </h3>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-gold/15 text-gold px-2 py-0.5 rounded-full tabular-nums">
+                            {diningCartCount}
+                          </span>
+                        </div>
+                        <Button variant="gold" size="sm" onClick={openFloatingDiningCart}>
+                          {t('account.checkoutCart', 'Review & checkout')}
+                        </Button>
+                      </div>
+                      <ul className="p-3 space-y-3 max-h-[min(50vh,24rem)] overflow-y-auto">
+                        {diningCartItems.map((line) => (
+                          <DiningOrderLineRow
+                            key={line.id}
+                            line={{
+                              name: line.name,
+                              quantity: line.quantity,
+                              unitPrice: line.price,
+                              price: line.price,
+                            }}
+                            currency={currency}
+                            imageSrc={diningLineImage(line)}
+                            fallbackImage={MARKETING_IMAGES.dining ?? BOOKING_ROOM_IMAGE_FALLBACK}
+                          />
+                        ))}
+                      </ul>
+                      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border bg-bg/40 text-sm">
+                        <span className="text-xs text-muted uppercase tracking-wide">
+                          {t('dining.cartTotal', 'Total')}
+                        </span>
+                        <span className="font-serif font-bold text-gold tabular-nums">
+                          {formatCurrency(diningCartTotal, currency)}
+                        </span>
+                      </div>
+                    </section>
+                  )}
+
+                  {diningOrdersLoading ? (
+                    <p className="text-xs text-muted flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-gold" aria-hidden />
+                      {t('account.loadingOrders', 'Loading order history…')}
+                    </p>
+                  ) : diningOrdersError && diningOrderHistory.length === 0 ? (
+                    <div className="text-center py-12 bg-surface/50 border border-border rounded-[var(--radius-card)] px-6">
+                      <p className="text-xs text-muted">{t('account.ordersLoadError', 'Could not load orders. Try again later.')}</p>
+                    </div>
+                  ) : diningOrderHistory.length === 0 ? (
+                    <div className="text-center py-16 bg-surface/50 border border-border rounded-[var(--radius-card)] px-6">
+                      <ShoppingBag className="w-10 h-10 text-gold/50 mx-auto mb-3" aria-hidden />
+                      <p className="text-xs text-muted max-w-md mx-auto leading-relaxed">
+                        {t(
+                          'account.storeHistoryEmpty',
+                          'No dining orders yet. Add dishes from the menu — your orders will appear here after checkout.'
                         )}
                       </p>
                     </div>
                   ) : (
-                  paginatedNotifications.items.map((n, index) => (
-                    <motion.div
-                      key={n.id}
-                      layout
-                      initial={{ opacity: 0, x: reduced ? 0 : 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ ...transition(duration.card), delay: reduced ? 0 : Math.min(index, 4) * 0.05 }}
-                      onClick={() => {
-                        markNotificationRead(n.id);
-                        if (n.bookingApiId) navigate('/account/bookings');
-                      }}
-                      className={`p-5 rounded-[var(--radius-card)] border transition-colors cursor-pointer flex items-start justify-between gap-4 ${
-                        n.read
-                          ? 'bg-surface border-border text-muted'
-                          : 'bg-surface-elevated border-gold/40 shadow-sm text-text'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-text text-sm font-serif">{n.title}</p>
-                          {!n.read && (
-                            <span className="w-2 h-2 rounded-full bg-gold shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted leading-relaxed font-light whitespace-pre-line">{n.message}</p>
-                      </div>
-                      <span className="text-[11px] text-muted shrink-0">{n.date}</span>
-                    </motion.div>
-                  ))
+                    <>
+                    <ul className="space-y-4">
+                      {paginatedDiningOrders.items.map((order) => {
+                        const itemCount = (order.items ?? []).reduce(
+                          (sum, line) => sum + (line.quantity || 0),
+                          0
+                        );
+                        return (
+                          <li
+                            key={order.orderCode}
+                            className="bg-surface border border-border rounded-[var(--radius-card)] p-5 shadow-sm space-y-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/80 pb-3">
+                              <div>
+                                <p className="text-sm font-serif font-bold text-text">
+                                  #{order.orderCode}
+                                </p>
+                                <p className="text-[11px] text-muted mt-0.5">
+                                  {formatOrderDate(order.createdAt, language)}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${foodOrderStatusBadgeClass(order.status)}`}
+                                >
+                                  {order.status}
+                                </span>
+                                <span className="text-sm font-semibold text-gold tabular-nums">
+                                  {formatCurrency(order.total, currency)}
+                                </span>
+                              </div>
+                            </div>
+                            <ul className="space-y-2">
+                              {(order.items ?? []).map((line, idx) => (
+                                <DiningOrderLineRow
+                                  key={`${order.orderCode}-${line.menuItemId ?? idx}`}
+                                  line={line}
+                                  currency={currency}
+                                  imageSrc={diningLineImage(line)}
+                                  fallbackImage={MARKETING_IMAGES.dining ?? BOOKING_ROOM_IMAGE_FALLBACK}
+                                />
+                              ))}
+                            </ul>
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/80">
+                              <p className="text-[10px] text-muted uppercase tracking-wide">
+                                {itemCount} {t('account.orderItems', 'items')} · {order.paymentMethod} ·{' '}
+                                {order.fulfillmentType}
+                              </p>
+                              <p className="text-xs text-muted">
+                                {t('dining.cartTotal', 'Total')}:{' '}
+                                <span className="font-semibold text-gold tabular-nums">
+                                  {formatCurrency(order.total, currency)}
+                                </span>
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {paginatedDiningOrders.showPagination && (
+                      <ListPagination
+                        page={paginatedDiningOrders.page}
+                        totalPages={paginatedDiningOrders.totalPages}
+                        total={paginatedDiningOrders.total}
+                        startIndex={paginatedDiningOrders.startIndex}
+                        endIndex={paginatedDiningOrders.endIndex}
+                        onPageChange={setDiningOrdersPage}
+                        language={language}
+                      />
+                    )}
+                    </>
                   )}
-                </div>
+                </motion.div>
+              )}
 
-                {paginatedNotifications.showPagination && (
-                  <ListPagination
-                    page={paginatedNotifications.page}
-                    totalPages={paginatedNotifications.totalPages}
-                    total={paginatedNotifications.total}
-                    startIndex={paginatedNotifications.startIndex}
-                    endIndex={paginatedNotifications.endIndex}
-                    onPageChange={setNotificationsPage}
-                    language={language}
-                  />
-                )}
-              </motion.div>
-            )}
+              {currentTab === 'favorites' && (
+                <motion.div key="account-favorites" {...tabPanelMotion} className="space-y-8">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-border">
+                    <div>
+                      <h2 className="text-xl font-serif font-bold text-text">
+                        {t('account.favoritesTitle', 'Saved Resorts & Rooms')}
+                      </h2>
+                      <p className="text-xs text-muted mt-1">
+                        {t(
+                          'account.favoritesSubtitle',
+                          'Sanctuaries and accommodations you have marked with the heart icon'
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/resorts')}>
+                        {t('account.browseResorts', 'Browse resorts')}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate('/rooms')}>
+                        {t('account.browseRooms', 'Browse rooms')}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.dining)}>
+                        {t('account.browseDining', 'Browse dining')}
+                      </Button>
+                    </div>
+                  </div>
 
-            {currentTab === 'favorites' && (
-              <motion.div key="account-favorites" {...tabPanelMotion} className="space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-border">
-                  <div>
-                    <h2 className="text-xl font-serif font-bold text-text">
-                      {t('account.favoritesTitle', 'Saved Resorts & Rooms')}
-                    </h2>
-                    <p className="text-xs text-muted mt-1">
-                      {t(
-                        'account.favoritesSubtitle',
-                        'Sanctuaries and accommodations you have marked with the heart icon'
+                  {favoritesTotal === 0 ? (
+                    <div className="text-center py-16 bg-surface/50 border border-border rounded-[var(--radius-card)] px-6">
+                      <Heart className="w-10 h-10 text-gold/50 mx-auto mb-3" />
+                      <p className="text-xs text-muted max-w-md mx-auto leading-relaxed">
+                        {t(
+                          'account.favoritesEmpty',
+                          'You have not saved any resorts or rooms yet. Explore the catalog and tap the heart to save them here.'
+                        )}
+                      </p>
+                    </div>
+                  ) : favoritesLoading ? (
+                    <p className="text-xs text-muted">{language === 'km' ? 'កំពុងផ្ទុក…' : 'Loading saved items…'}</p>
+                  ) : (
+                    <>
+                      {favoriteResorts.length > 0 && (
+                        <section className="space-y-4">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
+                            {t('account.favoriteResorts', 'Favorite resorts')} ({favoriteResorts.length})
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {favoriteResorts.map((resort) => {
+                              const item = localize ? localize(resort) : resort;
+                              return (
+                                <div
+                                  key={resort.id}
+                                  className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden flex flex-col sm:flex-row shadow-sm"
+                                >
+                                  <Link
+                                    to={`/resort/${resort.id}`}
+                                    className="relative sm:w-40 aspect-[16/10] sm:aspect-auto bg-slate-900 shrink-0"
+                                  >
+                                    {item.featuredImage ? (
+                                      <img
+                                        src={item.featuredImage}
+                                        alt={item.name}
+                                        className="w-full h-full object-cover min-h-[120px]"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full min-h-[120px] flex items-center justify-center text-[10px] text-muted">
+                                        {t('catalog.noImage', 'Image not provided')}
+                                      </div>
+                                    )}
+                                  </Link>
+                                  <div className="p-4 flex flex-col justify-between flex-1 gap-3">
+                                    <div>
+                                      <Link
+                                        to={`/resort/${resort.id}`}
+                                        className="text-base font-serif font-bold text-text hover:text-gold transition-colors line-clamp-1"
+                                      >
+                                        {item.name}
+                                      </Link>
+                                      {item.location && (
+                                        <p className="text-[11px] text-muted flex items-center gap-1 mt-1">
+                                          <MapPin className="w-3 h-3 text-gold shrink-0" />
+                                          <span className="truncate">{item.location}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigate(`/resort/${resort.id}`)}
+                                      >
+                                        {t('common.explore', 'Explore')}
+                                      </Button>
+                                      <FavoriteButton kind="resort" id={resort.id} size="sm" />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
                       )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => navigate('/resorts')}>
-                      {t('account.browseResorts', 'Browse resorts')}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/rooms')}>
-                      {t('account.browseRooms', 'Browse rooms')}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.dining)}>
-                      {t('account.browseDining', 'Browse dining')}
-                    </Button>
-                  </div>
-                </div>
 
-                {favoritesTotal === 0 ? (
-                  <div className="text-center py-16 bg-surface/50 border border-border rounded-[var(--radius-card)] px-6">
-                    <Heart className="w-10 h-10 text-gold/50 mx-auto mb-3" />
-                    <p className="text-xs text-muted max-w-md mx-auto leading-relaxed">
-                      {t(
-                        'account.favoritesEmpty',
-                        'You have not saved any resorts or rooms yet. Explore the catalog and tap the heart to save them here.'
+                      {favoriteRooms.length > 0 && (
+                        <section className="space-y-4">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
+                            {t('account.favoriteRooms', 'Favorite rooms')} ({favoriteRooms.length})
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {favoriteRooms.map((room) => {
+                              const item = localize ? localize(room) : room;
+                              return (
+                                <div
+                                  key={room.id}
+                                  className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden flex flex-col sm:flex-row shadow-sm"
+                                >
+                                  <Link
+                                    to={`/room/${room.id}`}
+                                    className="relative sm:w-40 aspect-[16/10] sm:aspect-auto bg-slate-900 shrink-0"
+                                  >
+                                    {item.featuredImage ? (
+                                      <img
+                                        src={item.featuredImage}
+                                        alt={item.name}
+                                        className="w-full h-full object-cover min-h-[120px]"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full min-h-[120px] flex items-center justify-center text-[10px] text-muted">
+                                        {t('catalog.noImage', 'Image not provided')}
+                                      </div>
+                                    )}
+                                  </Link>
+                                  <div className="p-4 flex flex-col justify-between flex-1 gap-3">
+                                    <div>
+                                      <Link
+                                        to={`/room/${room.id}`}
+                                        className="text-base font-serif font-bold text-text hover:text-gold transition-colors line-clamp-1"
+                                      >
+                                        {item.name}
+                                      </Link>
+                                      <p className="text-[11px] text-muted mt-1 truncate">{item.resortName}</p>
+                                      {item.type && (
+                                        <span className="inline-block mt-1 text-[10px] uppercase tracking-wider text-gold border border-gold/30 px-2 py-0.5 rounded">
+                                          {item.type}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <Button
+                                        variant="gold"
+                                        size="sm"
+                                        onClick={() => navigate(`/room/${room.id}`)}
+                                      >
+                                        {t('common.details', 'Details')}
+                                      </Button>
+                                      <FavoriteButton kind="room" id={room.id} size="sm" />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
                       )}
-                    </p>
-                  </div>
-                ) : favoritesLoading ? (
-                  <p className="text-xs text-muted">{language === 'km' ? 'កំពុងផ្ទុក…' : 'Loading saved items…'}</p>
-                ) : (
-                  <>
-                    {favoriteResorts.length > 0 && (
-                      <section className="space-y-4">
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
-                          {t('account.favoriteResorts', 'Favorite resorts')} ({favoriteResorts.length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {favoriteResorts.map((resort) => {
-                            const item = localize ? localize(resort) : resort;
-                            return (
+
+                      {favoriteDishes.length > 0 && (
+                        <section className="space-y-4">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
+                            {t('account.favoriteDishes', 'Favorite dishes')} ({favoriteDishes.length})
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {favoriteDishes.map((dish) => (
                               <div
-                                key={resort.id}
+                                key={dish.id}
                                 className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden flex flex-col sm:flex-row shadow-sm"
                               >
                                 <Link
-                                  to={`/resort/${resort.id}`}
-                                  className="relative sm:w-40 aspect-[16/10] sm:aspect-auto bg-slate-900 shrink-0"
+                                  to={ROUTES.menuDetail(dish.id)}
+                                  className="relative sm:w-40 aspect-[4/3] sm:aspect-auto bg-slate-900 shrink-0"
                                 >
-                                  {item.featuredImage ? (
-                                    <img
-                                      src={item.featuredImage}
-                                      alt={item.name}
-                                      className="w-full h-full object-cover min-h-[120px]"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full min-h-[120px] flex items-center justify-center text-[10px] text-muted">
-                                      {t('catalog.noImage', 'Image not provided')}
-                                    </div>
-                                  )}
+                                  <img
+                                    src={dish.image}
+                                    alt={dish.name}
+                                    className="w-full h-full object-cover min-h-[120px]"
+                                  />
                                 </Link>
                                 <div className="p-4 flex flex-col justify-between flex-1 gap-3">
                                   <div>
                                     <Link
-                                      to={`/resort/${resort.id}`}
+                                      to={ROUTES.menuDetail(dish.id)}
                                       className="text-base font-serif font-bold text-text hover:text-gold transition-colors line-clamp-1"
                                     >
-                                      {item.name}
+                                      {dish.name}
                                     </Link>
-                                    {item.location && (
-                                      <p className="text-[11px] text-muted flex items-center gap-1 mt-1">
-                                        <MapPin className="w-3 h-3 text-gold shrink-0" />
-                                        <span className="truncate">{item.location}</span>
-                                      </p>
-                                    )}
+                                    <p className="text-[11px] text-gold mt-1">
+                                      {formatCurrency(dish.price, currency)}
+                                    </p>
                                   </div>
                                   <div className="flex items-center justify-between gap-2">
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => navigate(`/resort/${resort.id}`)}
+                                      onClick={() => navigate(ROUTES.menuDetail(dish.id))}
                                     >
-                                      {t('common.explore', 'Explore')}
+                                      {t('dining.viewDish', 'View')}
                                     </Button>
-                                    <FavoriteButton kind="resort" id={resort.id} size="sm" />
+                                    <FavoriteButton kind="dish" id={dish.id} size="sm" />
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    )}
-
-                    {favoriteRooms.length > 0 && (
-                      <section className="space-y-4">
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
-                          {t('account.favoriteRooms', 'Favorite rooms')} ({favoriteRooms.length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {favoriteRooms.map((room) => {
-                            const item = localize ? localize(room) : room;
-                            return (
-                              <div
-                                key={room.id}
-                                className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden flex flex-col sm:flex-row shadow-sm"
-                              >
-                                <Link
-                                  to={`/room/${room.id}`}
-                                  className="relative sm:w-40 aspect-[16/10] sm:aspect-auto bg-slate-900 shrink-0"
-                                >
-                                  {item.featuredImage ? (
-                                    <img
-                                      src={item.featuredImage}
-                                      alt={item.name}
-                                      className="w-full h-full object-cover min-h-[120px]"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full min-h-[120px] flex items-center justify-center text-[10px] text-muted">
-                                      {t('catalog.noImage', 'Image not provided')}
-                                    </div>
-                                  )}
-                                </Link>
-                                <div className="p-4 flex flex-col justify-between flex-1 gap-3">
-                                  <div>
-                                    <Link
-                                      to={`/room/${room.id}`}
-                                      className="text-base font-serif font-bold text-text hover:text-gold transition-colors line-clamp-1"
-                                    >
-                                      {item.name}
-                                    </Link>
-                                    <p className="text-[11px] text-muted mt-1 truncate">{item.resortName}</p>
-                                    {item.type && (
-                                      <span className="inline-block mt-1 text-[10px] uppercase tracking-wider text-gold border border-gold/30 px-2 py-0.5 rounded">
-                                        {item.type}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <Button
-                                      variant="gold"
-                                      size="sm"
-                                      onClick={() => navigate(`/room/${room.id}`)}
-                                    >
-                                      {t('common.details', 'Details')}
-                                    </Button>
-                                    <FavoriteButton kind="room" id={room.id} size="sm" />
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    )}
-
-                    {favoriteDishes.length > 0 && (
-                      <section className="space-y-4">
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gold">
-                          {t('account.favoriteDishes', 'Favorite dishes')} ({favoriteDishes.length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {favoriteDishes.map((dish) => (
-                            <div
-                              key={dish.id}
-                              className="bg-surface border border-border rounded-[var(--radius-card)] overflow-hidden flex flex-col sm:flex-row shadow-sm"
-                            >
-                              <Link
-                                to={ROUTES.menuDetail(dish.id)}
-                                className="relative sm:w-40 aspect-[4/3] sm:aspect-auto bg-slate-900 shrink-0"
-                              >
-                                <img
-                                  src={dish.image}
-                                  alt={dish.name}
-                                  className="w-full h-full object-cover min-h-[120px]"
-                                />
-                              </Link>
-                              <div className="p-4 flex flex-col justify-between flex-1 gap-3">
-                                <div>
-                                  <Link
-                                    to={ROUTES.menuDetail(dish.id)}
-                                    className="text-base font-serif font-bold text-text hover:text-gold transition-colors line-clamp-1"
-                                  >
-                                    {dish.name}
-                                  </Link>
-                                  <p className="text-[11px] text-gold mt-1">
-                                    {formatCurrency(dish.price, currency)}
-                                  </p>
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => navigate(ROUTES.menuDetail(dish.id))}
-                                  >
-                                    {t('dining.viewDish', 'View')}
-                                  </Button>
-                                  <FavoriteButton kind="dish" id={dish.id} size="sm" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                  </>
-                )}
-              </motion.div>
-            )}
-
-            {currentTab === 'settings' && (
-              <motion.div key="account-settings" {...tabPanelMotion} className="space-y-8">
-                <div>
-                  <h2 className="text-xl font-serif font-bold text-text">
-                    {t('account.settings', 'Preferences & Profile')}
-                  </h2>
-                  <p className="text-xs text-muted">
-                    {language === 'km'
-                      ? 'គ្រប់គ្រងព័ត៌មានផ្ទាល់ខ្លួន និងការកំណត់ការបង្ហាញកម្មវិធី'
-                      : 'Manage your personal information and application preferences'}
-                  </p>
-                </div>
-
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept={AVATAR_ACCEPT}
-                  className="hidden"
-                  onChange={handleAvatarFileChange}
-                  aria-hidden
-                  tabIndex={-1}
-                />
-
-                <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
-                    {t('account.profilePhoto', 'Profile photo')}
-                  </h3>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-                    <div className="relative shrink-0 mx-auto sm:mx-0">
-                      <img
-                        src={displayAvatarUrl}
-                        alt={user.name}
-                        className="w-24 h-24 rounded-full object-cover border-2 border-gold/60 shadow-md"
-                        onError={handleAvatarImgError}
-                      />
-                      {avatarUploading && (
-                        <span className="absolute inset-0 rounded-full bg-slate-950/55 flex items-center justify-center">
-                          <Loader2 className="w-6 h-6 text-gold animate-spin" aria-hidden />
-                        </span>
+                            ))}
+                          </div>
+                        </section>
                       )}
-                    </div>
-                    <div className="flex-1 space-y-3 text-center sm:text-left">
-                      <p className="text-xs text-muted leading-relaxed">
-                        {t(
-                          'account.profilePhotoHint',
-                          'JPG or PNG, up to 2 MB. Minimum 100×100 pixels.'
+                    </>
+                  )}
+                </motion.div>
+              )}
+
+              {currentTab === 'settings' && (
+                <motion.div key="account-settings" {...tabPanelMotion} className="space-y-8">
+                  <div>
+                    <h2 className="text-xl font-serif font-bold text-text">
+                      {t('account.settings', 'Preferences & Profile')}
+                    </h2>
+                    <p className="text-xs text-muted">
+                      {language === 'km'
+                        ? 'គ្រប់គ្រងព័ត៌មានផ្ទាល់ខ្លួន និងការកំណត់ការបង្ហាញកម្មវិធី'
+                        : 'Manage your personal information and application preferences'}
+                    </p>
+                  </div>
+
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept={AVATAR_ACCEPT}
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
+                    aria-hidden
+                    tabIndex={-1}
+                  />
+
+                  <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
+                      {t('account.profilePhoto', 'Profile photo')}
+                    </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                      <div className="relative shrink-0 mx-auto sm:mx-0">
+                        <img
+                          src={displayAvatarUrl}
+                          alt={user.name}
+                          className="w-24 h-24 rounded-full object-cover border-2 border-gold/60 shadow-md"
+                          onError={handleAvatarImgError}
+                        />
+                        {avatarUploading && (
+                          <span className="absolute inset-0 rounded-full bg-slate-950/55 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-gold animate-spin" aria-hidden />
+                          </span>
                         )}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <Button
-                          type="button"
-                          variant="gold"
-                          size="sm"
-                          disabled={avatarUploading}
-                          onClick={openAvatarPicker}
-                          leftIcon={<Camera className="w-4 h-4" />}
-                        >
-                          {avatarUploading
-                            ? t('account.profilePhotoUploading', 'Uploading photo…')
-                            : hasStoredProfilePhoto
-                              ? t('account.changePhoto', 'Change photo')
-                              : t('account.uploadPhoto', 'Upload photo')}
-                        </Button>
-                        {hasStoredProfilePhoto && (
+                      </div>
+                      <div className="flex-1 space-y-3 text-center sm:text-left">
+                        <p className="text-xs text-muted leading-relaxed">
+                          {t(
+                            'account.profilePhotoHint',
+                            'JPG or PNG, up to 2 MB. Minimum 100×100 pixels.'
+                          )}
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="gold"
                             size="sm"
                             disabled={avatarUploading}
-                            onClick={handleRemoveProfilePhoto}
+                            onClick={openAvatarPicker}
+                            leftIcon={<Camera className="w-4 h-4" />}
                           >
-                            {t('account.removePhoto', 'Remove photo')}
+                            {avatarUploading
+                              ? t('account.profilePhotoUploading', 'Uploading photo…')
+                              : hasStoredProfilePhoto
+                                ? t('account.changePhoto', 'Change photo')
+                                : t('account.uploadPhoto', 'Upload photo')}
                           </Button>
-                        )}
+                          {hasStoredProfilePhoto && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={avatarUploading}
+                              onClick={handleRemoveProfilePhoto}
+                            >
+                              {t('account.removePhoto', 'Remove photo')}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <form onSubmit={handleSaveSettings} className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
-                    {language === 'km' ? 'ព័ត៌មានភ្ញៀវស្នាក់នៅ' : 'Resident Information'}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input
-                      label={language === 'km' ? 'ឈ្មោះពេញស្របច្បាប់' : 'Full Legal Name'}
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      error={profileFieldErrors.name}
-                    />
-                    <Input
-                      label={t('contact.phone', 'Contact Telephone')}
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      error={profileFieldErrors.phone}
-                    />
-                  </div>
-                  <Input
-                    label={t('contact.email', 'Email Address')}
-                    value={user.email}
-                    disabled
-                    helperText={
-                      language === 'km'
-                        ? `អ៊ីមែលនេះភ្ជាប់ជាមួយគណនី${user?.memberTier ? ' ' + user.memberTier : ''} របស់អ្នក។`
-                        : `Email is bound to your ${user?.memberTier || 'resident'} account.`
-                    }
-                  />
-                  <div className="pt-2">
-                    <Button type="submit" variant="gold" size="sm" disabled={profileSaving}>
-                      {profileSaving
-                        ? language === 'km'
-                          ? 'កំពុងរក្សាទុក…'
-                          : 'Saving…'
-                        : language === 'km'
-                          ? 'រក្សាទុកការផ្លាស់ប្តូរ'
-                          : 'Save Profile Changes'}
-                    </Button>
-                  </div>
-                </form>
-
-                <form
-                  onSubmit={handleChangePassword}
-                  className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4"
-                >
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
-                    {language === 'km' ? 'សុវត្ថិភាពគណនី' : 'Account Security'}
-                  </h3>
-                  <p className="text-[11px] text-muted">
-                    <Link
-                      to="/forgot-password?next=/account/settings"
-                      className="text-gold font-medium hover:underline"
-                    >
-                      {t('auth.forgotPassword', 'Forgot password?')}
-                    </Link>
-                    {' · '}
-                    {language === 'km'
-                      ? 'ផ្ញើលេខកូដ OTP តាមអ៊ីមែលដើម្បីកំណត់ពាក្យសម្ងាត់ឡើងវិញ'
-                      : 'Send a verification code to your email to reset your password'}
-                  </p>
-                  {passwordError && (
-                    <div className="p-3 rounded-[var(--radius-button)] bg-error/10 border border-error/30 text-xs text-error">
-                      {passwordError}
+                  <form onSubmit={handleSaveSettings} className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
+                      {language === 'km' ? 'ព័ត៌មានភ្ញៀវស្នាក់នៅ' : 'Resident Information'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label={language === 'km' ? 'ឈ្មោះពេញស្របច្បាប់' : 'Full Legal Name'}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        error={profileFieldErrors.name}
+                      />
+                      <Input
+                        label={t('contact.phone', 'Contact Telephone')}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        error={profileFieldErrors.phone}
+                      />
                     </div>
-                  )}
-                  <Input
-                    label={language === 'km' ? 'ពាក្យសម្ងាត់បច្ចុប្បន្ន' : 'Current password'}
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    error={passwordFieldErrors.current_password}
-                    autoComplete="current-password"
-                    required
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input
-                      label={language === 'km' ? 'ពាក្យសម្ងាត់ថ្មី' : 'New password'}
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      error={passwordFieldErrors.password}
-                      autoComplete="new-password"
-                      required
+                      label={t('contact.email', 'Email Address')}
+                      value={user.email}
+                      disabled
+                      helperText={
+                        language === 'km'
+                          ? `អ៊ីមែលនេះភ្ជាប់ជាមួយគណនី${user?.memberTier ? ' ' + user.memberTier : ''} របស់អ្នក។`
+                          : `Email is bound to your ${user?.memberTier || 'resident'} account.`
+                      }
                     />
-                    <Input
-                      label={t('auth.confirmPassword', 'Confirm password')}
-                      type="password"
-                      value={newPasswordConfirm}
-                      onChange={(e) => setNewPasswordConfirm(e.target.value)}
-                      error={passwordFieldErrors.password_confirmation}
-                      autoComplete="new-password"
-                      required
-                    />
-                  </div>
-                  <Button type="submit" variant="outline" size="sm" disabled={passwordSaving}>
-                    {passwordSaving
-                      ? language === 'km'
-                        ? 'កំពុងធ្វើបច្ចុប្បន្នភាព…'
-                        : 'Updating…'
-                      : language === 'km'
-                        ? 'ផ្លាស់ប្តូរពាក្យសម្ងាត់'
-                        : 'Change Password'}
-                  </Button>
-                </form>
-
-                <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
-                    {language === 'km' ? 'ការកំណត់ការបង្ហាញកម្មវិធី' : 'Application Display Settings'}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-semibold text-text block">
-                          {language === 'km' ? 'ផ្ទៃពណ៌កម្មវិធី' : 'Display Theme'}
-                        </span>
-                        <span className="text-[11px] text-muted capitalize">{theme} Mode</span>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={toggleTheme}>
-                        {language === 'km' ? 'ប្តូរ' : 'Toggle'}
+                    <div className="pt-2">
+                      <Button type="submit" variant="gold" size="sm" disabled={profileSaving}>
+                        {profileSaving
+                          ? language === 'km'
+                            ? 'កំពុងរក្សាទុក…'
+                            : 'Saving…'
+                          : language === 'km'
+                            ? 'រក្សាទុកការផ្លាស់ប្តូរ'
+                            : 'Save Profile Changes'}
                       </Button>
                     </div>
+                  </form>
 
-                    <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-semibold text-text block">
-                          {language === 'km' ? 'រូបិយប័ណ្ណ' : 'Currency'}
-                        </span>
-                        <span className="text-[11px] text-muted">{currency}</span>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={toggleCurrency}>
-                        {language === 'km' ? 'ប្តូរ' : 'Switch'}
-                      </Button>
-                    </div>
-
-                    <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-semibold text-text block">
-                          {language === 'km' ? 'ភាសា' : 'Language'}
-                        </span>
-                        <span className="text-[11px] text-muted uppercase">
-                          {language === 'km' ? 'ភាសាខ្មែរ (KM)' : 'English (EN)'}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setLanguage(language === 'en' ? 'km' : 'en')}
+                  <form
+                    onSubmit={handleChangePassword}
+                    className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4"
+                  >
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
+                      {language === 'km' ? 'សុវត្ថិភាពគណនី' : 'Account Security'}
+                    </h3>
+                    <p className="text-[11px] text-muted">
+                      <Link
+                        to="/forgot-password?next=/account/settings"
+                        className="text-gold font-medium hover:underline"
                       >
-                        {language === 'km' ? 'English' : 'ភាសាខ្មែរ'}
-                      </Button>
+                        {t('auth.forgotPassword', 'Forgot password?')}
+                      </Link>
+                      {' · '}
+                      {language === 'km'
+                        ? 'ផ្ញើលេខកូដ OTP តាមអ៊ីមែលដើម្បីកំណត់ពាក្យសម្ងាត់ឡើងវិញ'
+                        : 'Send a verification code to your email to reset your password'}
+                    </p>
+                    {passwordError && (
+                      <div className="p-3 rounded-[var(--radius-button)] bg-error/10 border border-error/30 text-xs text-error">
+                        {passwordError}
+                      </div>
+                    )}
+                    <Input
+                      label={language === 'km' ? 'ពាក្យសម្ងាត់បច្ចុប្បន្ន' : 'Current password'}
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      error={passwordFieldErrors.current_password}
+                      autoComplete="current-password"
+                      required
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label={language === 'km' ? 'ពាក្យសម្ងាត់ថ្មី' : 'New password'}
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        error={passwordFieldErrors.password}
+                        autoComplete="new-password"
+                        required
+                      />
+                      <Input
+                        label={t('auth.confirmPassword', 'Confirm password')}
+                        type="password"
+                        value={newPasswordConfirm}
+                        onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                        error={passwordFieldErrors.password_confirmation}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </div>
+                    <Button type="submit" variant="outline" size="sm" disabled={passwordSaving}>
+                      {passwordSaving
+                        ? language === 'km'
+                          ? 'កំពុងធ្វើបច្ចុប្បន្នភាព…'
+                          : 'Updating…'
+                        : language === 'km'
+                          ? 'ផ្លាស់ប្តូរពាក្យសម្ងាត់'
+                          : 'Change Password'}
+                    </Button>
+                  </form>
+
+                  <div className="bg-surface border border-border p-6 rounded-[var(--radius-card)] space-y-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-text font-serif pb-2 border-b border-border">
+                      {language === 'km' ? 'ការកំណត់ការបង្ហាញកម្មវិធី' : 'Application Display Settings'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-semibold text-text block">
+                            {language === 'km' ? 'ផ្ទៃពណ៌កម្មវិធី' : 'Display Theme'}
+                          </span>
+                          <span className="text-[11px] text-muted capitalize">{theme} Mode</span>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={toggleTheme}>
+                          {language === 'km' ? 'ប្តូរ' : 'Toggle'}
+                        </Button>
+                      </div>
+
+                      <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-semibold text-text block">
+                            {language === 'km' ? 'រូបិយប័ណ្ណ' : 'Currency'}
+                          </span>
+                          <span className="text-[11px] text-muted">{currency}</span>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={toggleCurrency}>
+                          {language === 'km' ? 'ប្តូរ' : 'Switch'}
+                        </Button>
+                      </div>
+
+                      <div className="p-4 rounded-[var(--radius-button)] bg-bg border border-border flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-semibold text-text block">
+                            {language === 'km' ? 'ភាសា' : 'Language'}
+                          </span>
+                          <span className="text-[11px] text-muted uppercase">
+                            {language === 'km' ? 'ភាសាខ្មែរ (KM)' : 'English (EN)'}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setLanguage(language === 'en' ? 'km' : 'en')}
+                        >
+                          {language === 'km' ? 'English' : 'ភាសាខ្មែរ'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            )}
+                </motion.div>
+              )}
             </AnimatePresence>
           </main>
         </div>

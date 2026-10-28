@@ -10,9 +10,17 @@ import { useResorts } from '../../hooks/useCatalog.js';
 import { Spinner } from '../../components/common/Spinner.jsx';
 import { submitContactInquiry } from '../../services/api/contactApi.js';
 import { getApiErrorMessage, getValidationFieldErrors } from '../../services/api/errors.js';
+import { useWebsiteContent } from '../../hooks/useWebsiteContent.js';
+import { resolveContactDetails } from '../../util/marketingContent.js';
+import { SITE_CONTACT } from '../../constants/siteContact.js';
 
 export const ContactPage = () => {
   const { addToast, t, localize, language } = useApp();
+  const { grouped } = useWebsiteContent();
+  const contact = React.useMemo(
+    () => resolveContactDetails(grouped, { t, language, siteContact: SITE_CONTACT }),
+    [grouped, t, language]
+  );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -117,28 +125,61 @@ export const ContactPage = () => {
               <div className="p-4 rounded-[var(--radius-card)] bg-surface border border-border flex items-start gap-3.5">
                 <Phone className="w-4 h-4 text-gold shrink-0 mt-1" />
                 <div className="space-y-0.5 text-xs">
-                  <span className="font-semibold text-text block">{t('contact.tollFree', 'Worldwide Toll-Free')}</span>
-                  <span className="text-muted">+855 (0) 23 999 123</span>
-                  <span className="text-muted block">+1 (800) 840-SOLARA</span>
+                  <span className="font-semibold text-text block">{contact.phoneLabel}</span>
+                  <a href={contact.phoneHref} className="text-muted hover:text-gold block">
+                    {contact.phonePrimary}
+                  </a>
+                  {contact.phoneSecondary && (
+                    <span className="text-muted block">{contact.phoneSecondary}</span>
+                  )}
                 </div>
               </div>
 
               <div className="p-4 rounded-[var(--radius-card)] bg-surface border border-border flex items-start gap-3.5">
                 <Mail className="w-4 h-4 text-gold shrink-0 mt-1" />
                 <div className="space-y-0.5 text-xs">
-                  <span className="font-semibold text-text block">{t('contact.conciergeEmail', 'Concierge & Bookings')}</span>
-                  <span className="text-muted">concierge@solararesorts.com</span>
-                  <span className="text-muted block">reservations@solararesorts.com</span>
+                  <span className="font-semibold text-text block">{contact.emailLabel}</span>
+                  <a href={contact.emailHref} className="text-muted hover:text-gold block">
+                    {contact.emailPrimary}
+                  </a>
+                  {contact.emailSecondary && (
+                    <span className="text-muted block">{contact.emailSecondary}</span>
+                  )}
                 </div>
               </div>
 
               <div className="p-4 rounded-[var(--radius-card)] bg-surface border border-border flex items-start gap-3.5">
                 <Clock className="w-4 h-4 text-gold shrink-0 mt-1" />
                 <div className="space-y-0.5 text-xs">
-                  <span className="font-semibold text-text block">{t('contact.butlerHours', 'Butler Service Hours')}</span>
-                  <span className="text-muted">{language === 'km' ? '២៤ ម៉ោង / ៧ ថ្ងៃក្នុងមួយសប្តាហ៍' : '24 Hours / 7 Days a Week'}</span>
+                  <span className="font-semibold text-text block">{contact.hoursLabel}</span>
+                  <span className="text-muted">{contact.hoursValue}</span>
                 </div>
               </div>
+
+              {(contact.facebookUrl || contact.telegramUrl || contact.instagramUrl) && (
+                <div className="p-4 rounded-[var(--radius-card)] bg-surface border border-border text-xs space-y-2">
+                  <span className="font-semibold text-text block">
+                    {t('contact.social', 'Social & messaging')}
+                  </span>
+                  <div className="flex flex-wrap gap-3">
+                    {contact.facebookUrl && (
+                      <a href={contact.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">
+                        Facebook
+                      </a>
+                    )}
+                    {contact.telegramUrl && (
+                      <a href={contact.telegramUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">
+                        Telegram
+                      </a>
+                    )}
+                    {contact.instagramUrl && (
+                      <a href={contact.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-gold hover:underline">
+                        Instagram
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-6 border-t border-border space-y-3">

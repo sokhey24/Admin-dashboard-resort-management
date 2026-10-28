@@ -58,6 +58,11 @@ return [
         'currency' => strtoupper((string) env('STRIPE_CURRENCY', 'USD')),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
     'bakong' => [
         'token' => env('BAKONG_TOKEN'),
         'account_id' => env('BAKONG_ACCOUNT_ID', 'sokhey_van@bkrt'),

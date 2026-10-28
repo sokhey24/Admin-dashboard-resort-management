@@ -42,7 +42,7 @@ export const en = {
     restaurantDashboard: "Restaurant Dashboard",
     restaurantStaff: "Restaurant Staff",
     menu: "Menu",
-    foodCategory: "Food Category",
+    foodCategory: "Categories Menu",
     tableReservation: "Table Reservation",
     foodOrder: "Food Order",
     billing: "Billing",
